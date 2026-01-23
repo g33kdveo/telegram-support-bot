@@ -84,17 +84,23 @@ def generate_ticket_id():
     random_chars = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
     return f"{random_chars}-{suffix}"
 
-async def send_to_support_group(bot, text, **kwargs):
+async def send_to_support_group(bot, text, photo=None, **kwargs):
     global SUPPORT_GROUP_ID
     if not SUPPORT_GROUP_ID:
         print(f"⚠️ Cannot send message to support group: ID is 0. Message: {text}")
         return
     try:
-        await bot.send_message(chat_id=SUPPORT_GROUP_ID, text=text, **kwargs)
+        if photo:
+            await bot.send_photo(chat_id=SUPPORT_GROUP_ID, photo=photo, caption=text, **kwargs)
+        else:
+            await bot.send_message(chat_id=SUPPORT_GROUP_ID, text=text, **kwargs)
     except ChatMigrated as e:
         print(f"⚠️ Group upgraded to Supergroup. Updating SUPPORT_GROUP_ID to {e.new_chat_id}")
         SUPPORT_GROUP_ID = e.new_chat_id
-        await bot.send_message(chat_id=SUPPORT_GROUP_ID, text=text, **kwargs)
+        if photo:
+            await bot.send_photo(chat_id=SUPPORT_GROUP_ID, photo=photo, caption=text, **kwargs)
+        else:
+            await bot.send_message(chat_id=SUPPORT_GROUP_ID, text=text, **kwargs)
 
 async def handle_chat_migration(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global SUPPORT_GROUP_ID
@@ -187,7 +193,8 @@ async def create_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 # ===== DM HANDLER =====
 async def handle_dm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    text = update.message.text
+    text = update.message.text or update.message.caption
+    photo = update.message.photo[-1].file_id if update.message.photo else None
 
     # Ignore messages in the support group to prevent spam
     if update.effective_chat.id == SUPPORT_GROUP_ID:
@@ -207,10 +214,16 @@ async def handle_dm(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ticket["last_activity"] = time.time()
         save_data()
 
+        # Prepare content
+        msg_content = f"📨 Message from ({user.id}) Ticket {ticket['id']}"
+        if text:
+            msg_content += f":\n{text}"
+
         # Forward message to admin group
         await send_to_support_group(
             context.bot,
-            text=f"📨 Message from ({user.id}) Ticket {ticket['id']}:\n{text}"
+            text=msg_content,
+            photo=photo
         )
     else:
         # User hasn't selected anything yet
@@ -369,14 +382,20 @@ async def handle_admin_dm(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_dm(update, context)
         return
 
-    text = update.message.text
+    text = update.message.text or update.message.caption
+    photo = update.message.photo[-1].file_id if update.message.photo else None
     
     # Update ticket activity
     if str(target_id) in bot_data["tickets"]:
         bot_data["tickets"][str(target_id)]["last_activity"] = time.time()
         save_data()
 
-    await context.bot.send_message(chat_id=target_id, text=f"💬 Staff: {text}")
+    if photo:
+        caption = f"💬 Staff: {text}" if text else "💬 Staff"
+        await context.bot.send_photo(chat_id=target_id, photo=photo, caption=caption)
+    else:
+        await context.bot.send_message(chat_id=target_id, text=f"💬 Staff: {text}")
+        
     await update.message.reply_text("✅ Message sent to user!")
 
 # ===== BACKGROUND JOBS =====
@@ -459,8 +478,8 @@ def main():
     
     app.add_handler(MessageHandler(filters.StatusUpdate.MIGRATE, handle_chat_migration))
     # Admin handler must be registered BEFORE the general user handler
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.User(ADMIN_IDS), handle_admin_dm))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_dm))
+    app.add_handler(MessageHandler((filters.TEXT | filters.PHOTO) & ~filters.COMMAND & filters.User(ADMIN_IDS), handle_admin_dm))
+    app.add_handler(MessageHandler((filters.TEXT | filters.PHOTO) & ~filters.COMMAND, handle_dm))
 
     # Job Queue for Timeouts (runs every 60 seconds)
     app.job_queue.run_repeating(check_timeouts, interval=60, first=10)
