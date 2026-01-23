@@ -13,8 +13,8 @@ from telegram.ext import (
 
 # ===== CONFIG =====
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",")]
-SUPPORT_GROUP_ID = int(os.getenv("SUPPORT_GROUP_ID"))
+ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()]
+SUPPORT_GROUP_ID = int(os.getenv("SUPPORT_GROUP_ID", "0"))
 DATA_FILE = "bot_data.json"
 TICKET_TIMEOUT = 4 * 60 * 60  # 4 hours in seconds
 
@@ -78,6 +78,21 @@ def generate_ticket_id():
     # 6 random chars
     random_chars = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
     return f"{random_chars}-{suffix}"
+
+async def send_to_support_group(bot, text, **kwargs):
+    global SUPPORT_GROUP_ID
+    try:
+        await bot.send_message(chat_id=SUPPORT_GROUP_ID, text=text, **kwargs)
+    except ChatMigrated as e:
+        print(f"⚠️ Group upgraded to Supergroup. Updating SUPPORT_GROUP_ID to {e.new_chat_id}")
+        SUPPORT_GROUP_ID = e.new_chat_id
+        await bot.send_message(chat_id=SUPPORT_GROUP_ID, text=text, **kwargs)
+
+async def handle_chat_migration(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global SUPPORT_GROUP_ID
+    new_id = update.message.migrate_to_chat_id
+    print(f"⚠️ Group upgraded to Supergroup (Event). Updating SUPPORT_GROUP_ID to {new_id}")
+    SUPPORT_GROUP_ID = new_id
 
 # ===== COMMANDS =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -151,8 +166,8 @@ async def create_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     keyboard = [[InlineKeyboardButton("Reply to Ticket ✍️", callback_data=f"reply_{user.id}")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await context.bot.send_message(
-        chat_id=SUPPORT_GROUP_ID,
+    await send_to_support_group(
+        context.bot,
         text=f"🆕 <b>New Ticket Created!</b>\n"
              f"👤 User: {user.first_name} ({user.id})\n"
              f"🎫 Ticket ID: {ticket_id}\n"
@@ -185,8 +200,8 @@ async def handle_dm(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_data()
 
         # Forward message to admin group
-        await context.bot.send_message(
-            chat_id=SUPPORT_GROUP_ID,
+        await send_to_support_group(
+            context.bot,
             text=f"📨 Message from ({user.id}) Ticket {ticket['id']}:\n{text}"
         )
     else:
@@ -278,8 +293,8 @@ async def stop_reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     if context.user_data.pop('reply_to', None):
         # Notify group only
-        await context.bot.send_message(
-            chat_id=SUPPORT_GROUP_ID,
+        await send_to_support_group(
+            context.bot,
             text=f"ℹ️ Admin {user.first_name} disconnected from the ticket."
         )
         # No message to user
@@ -309,7 +324,7 @@ async def close_ticket_command(update: Update, context: ContextTypes.DEFAULT_TYP
                 pass
             
             # Notify Admin/Group
-            await context.bot.send_message(chat_id=SUPPORT_GROUP_ID, text=f"🔒 Ticket {ticket_id} closed by admin.")
+            await send_to_support_group(context.bot, text=f"🔒 Ticket {ticket_id} closed by admin.")
             context.user_data.pop('reply_to', None)
         else:
             await update.message.reply_text("❗ Ticket already closed or not found.")
@@ -322,8 +337,8 @@ async def close_ticket_command(update: Update, context: ContextTypes.DEFAULT_TYP
             save_data()
             
             await update.message.reply_text(f"🔒 Ticket {ticket_id} has been closed.")
-            await context.bot.send_message(
-                chat_id=SUPPORT_GROUP_ID, 
+            await send_to_support_group(
+                context.bot,
                 text=f"🔒 Ticket {ticket_id} closed by user {user.first_name}."
             )
         else:
@@ -372,7 +387,7 @@ async def check_timeouts(context: ContextTypes.DEFAULT_TYPE):
         save_data()
         
         # Notify
-        await context.bot.send_message(chat_id=SUPPORT_GROUP_ID, text=f"⏳ Ticket {ticket_id} closed due to inactivity.")
+        await send_to_support_group(context.bot, text=f"⏳ Ticket {ticket_id} closed due to inactivity.")
         try:
             await context.bot.send_message(chat_id=int(uid), text=f"⏳ Ticket {ticket_id} has been closed due to inactivity.")
         except:
@@ -420,9 +435,10 @@ def main():
     app.add_handler(CommandHandler("done", stop_reply_command))
     app.add_handler(CommandHandler("close", close_ticket_command))
     app.add_handler(CallbackQueryHandler(handle_callback, pattern="^(create_order|support|order_singles|order_bulk)$"))
-    app.add_handler(CallbackQueryHandler(handle_reply_selection, pattern="^reply_\d+$"))
-    app.add_handler(CallbackQueryHandler(handle_ping_selection, pattern="^ping_\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_reply_selection, pattern=r"^reply_\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_ping_selection, pattern=r"^ping_\d+$"))
     
+    app.add_handler(MessageHandler(filters.StatusUpdate.MIGRATE, handle_chat_migration))
     # Admin handler must be registered BEFORE the general user handler
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.User(ADMIN_IDS), handle_admin_dm))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_dm))
