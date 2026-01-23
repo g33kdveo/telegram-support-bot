@@ -4,16 +4,17 @@ import random
 import string
 import time
 import asyncio
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv not installed, skipping .env load
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, BotCommandScopeAllPrivateChats, BotCommandScopeChat, BotCommandScopeChatAdministrators
 from telegram.error import ChatMigrated
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, filters,
     CallbackQueryHandler, ContextTypes
 )
-
-# Load environment variables from .env file
-load_dotenv()
 
 # ===== CONFIG =====
 TOKEN = os.getenv("BOT_TOKEN")
@@ -85,6 +86,9 @@ def generate_ticket_id():
 
 async def send_to_support_group(bot, text, **kwargs):
     global SUPPORT_GROUP_ID
+    if not SUPPORT_GROUP_ID:
+        print(f"⚠️ Cannot send message to support group: ID is 0. Message: {text}")
+        return
     try:
         await bot.send_message(chat_id=SUPPORT_GROUP_ID, text=text, **kwargs)
     except ChatMigrated as e:
@@ -430,6 +434,7 @@ async def set_commands(app):
         ], scope=BotCommandScopeChatAdministrators(chat_id=SUPPORT_GROUP_ID))
 
 def main():
+    print("🚀 Bot is starting...")
     # Validation
     if not TOKEN:
         print("❌ Error: BOT_TOKEN is missing! Set it in your environment variables.")
