@@ -9,7 +9,7 @@ try:
     load_dotenv()
 except ImportError:
     pass  # python-dotenv not installed, skipping .env load
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, BotCommandScopeAllPrivateChats, BotCommandScopeChat, BotCommandScopeChatAdministrators
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, BotCommandScopeAllPrivateChats, BotCommandScopeChat, BotCommandScopeChatAdministrators, __version__ as ptb_version
 from telegram.error import ChatMigrated
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, filters,
@@ -434,7 +434,7 @@ async def set_commands(app):
         ], scope=BotCommandScopeChatAdministrators(chat_id=SUPPORT_GROUP_ID))
 
 def main():
-    print("🚀 Bot is starting...")
+    print(f"🚀 Bot is starting... (PTB Version: {ptb_version})")
     # Validation
     if not TOKEN:
         print("❌ Error: BOT_TOKEN is missing! Set it in your environment variables.")
