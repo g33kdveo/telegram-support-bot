@@ -14,7 +14,7 @@ from telegram.ext import (
 # ===== CONFIG =====
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()]
-SUPPORT_GROUP_ID = int(os.getenv("SUPPORT_GROUP_ID", "0"))
+SUPPORT_GROUP_ID = int(os.getenv("SUPPORT_GROUP_ID") or 0)
 DATA_FILE = "bot_data.json"
 TICKET_TIMEOUT = 4 * 60 * 60  # 4 hours in seconds
 
@@ -426,6 +426,15 @@ async def set_commands(app):
         ], scope=BotCommandScopeChatAdministrators(chat_id=SUPPORT_GROUP_ID))
 
 def main():
+    # Validation
+    if not TOKEN:
+        print("❌ Error: BOT_TOKEN is missing! Set it in your environment variables.")
+        return
+    if not SUPPORT_GROUP_ID:
+        print("⚠️ Warning: SUPPORT_GROUP_ID is missing or 0. Messages to the admin group will fail.")
+    if not ADMIN_IDS:
+        print("⚠️ Warning: ADMIN_IDS is empty. No admins will be able to reply.")
+
     load_data()
     app = ApplicationBuilder().token(TOKEN).post_init(set_commands).build()
 
