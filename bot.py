@@ -475,6 +475,8 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_callback, pattern="^(create_order|support|order_singles|order_bulk)$"))
     app.add_handler(CallbackQueryHandler(handle_reply_selection, pattern=r"^reply_\d+$"))
     app.add_handler(CallbackQueryHandler(handle_ping_selection, pattern=r"^ping_\d+$"))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_dm))
+
     
     app.add_handler(MessageHandler(filters.StatusUpdate.MIGRATE, handle_chat_migration))
     # Admin handler must be registered BEFORE the general user handler
