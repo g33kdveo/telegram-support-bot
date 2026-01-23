@@ -4,12 +4,16 @@ import random
 import string
 import time
 import asyncio
+from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, BotCommandScopeAllPrivateChats, BotCommandScopeChat, BotCommandScopeChatAdministrators
 from telegram.error import ChatMigrated
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, filters,
     CallbackQueryHandler, ContextTypes
 )
+
+# Load environment variables from .env file
+load_dotenv()
 
 # ===== CONFIG =====
 TOKEN = os.getenv("BOT_TOKEN")
@@ -432,6 +436,7 @@ def main():
         return
     if not SUPPORT_GROUP_ID:
         print("⚠️ Warning: SUPPORT_GROUP_ID is missing or 0. Messages to the admin group will fail.")
+    print(f"ℹ️ Current Support Group ID: {SUPPORT_GROUP_ID}")
     if not ADMIN_IDS:
         print("⚠️ Warning: ADMIN_IDS is empty. No admins will be able to reply.")
 
