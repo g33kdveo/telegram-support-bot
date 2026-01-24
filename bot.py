@@ -183,7 +183,7 @@ async def create_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     await send_to_support_group(
         context.bot,
         text=f"🆕 <b>New Ticket Created!</b>\n"
-             f"👤 User: {user.first_name} ({user.id})\n"
+             f"👤 User: {user.first_name} (@{user.username}) ({user.id})\n"
              f"🎫 Ticket ID: {ticket_id}\n"
              f"📂 Category: {section_name}",
         parse_mode='HTML',
