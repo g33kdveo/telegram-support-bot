@@ -196,8 +196,8 @@ async def handle_dm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text or update.message.caption
     photo = update.message.photo[-1].file_id if update.message.photo else None
 
-    # Ignore messages in the support group to prevent spam
-    if update.effective_chat.id == SUPPORT_GROUP_ID:
+    # Ignore messages in the support group or any public group to prevent spam
+    if update.effective_chat.id == SUPPORT_GROUP_ID or update.effective_chat.type != 'private':
         return
 
     # Auto-start menu for first-time users
@@ -475,13 +475,12 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_callback, pattern="^(create_order|support|order_singles|order_bulk)$"))
     app.add_handler(CallbackQueryHandler(handle_reply_selection, pattern=r"^reply_\d+$"))
     app.add_handler(CallbackQueryHandler(handle_ping_selection, pattern=r"^ping_\d+$"))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_dm))
 
     
     app.add_handler(MessageHandler(filters.StatusUpdate.MIGRATE, handle_chat_migration))
     # Admin handler must be registered BEFORE the general user handler
     app.add_handler(MessageHandler((filters.TEXT | filters.PHOTO) & ~filters.COMMAND & filters.User(ADMIN_IDS), handle_admin_dm))
-    app.add_handler(MessageHandler((filters.TEXT | filters.PHOTO) & ~filters.COMMAND, handle_dm))
+    app.add_handler(MessageHandler((filters.TEXT | filters.PHOTO) & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_dm))
 
     # Job Queue for Timeouts (runs every 60 seconds)
     app.job_queue.run_repeating(check_timeouts, interval=60, first=10)
