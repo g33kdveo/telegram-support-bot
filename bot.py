@@ -83,6 +83,17 @@ def load_data():
             with open(DATA_FILE, 'r') as f:
                 loaded_data = json.load(f)
                 bot_data.update(loaded_data)
+            
+            # MIGRATION: Convert user_id keys to ticket_id keys for multi-ticket support
+            migrated_tickets = {}
+            for k, v in bot_data.get("tickets", {}).items():
+                if k.isdigit(): # Old format (User ID key)
+                    v['user_id'] = int(k)
+                    migrated_tickets[v['id']] = v
+                else:
+                    migrated_tickets[k] = v
+            bot_data["tickets"] = migrated_tickets
+
             # Convert user_started to set for faster lookup, but keep as list in json
             bot_data["user_started"] = list(set(bot_data.get("user_started", [])))
             
@@ -230,8 +241,9 @@ async def create_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     user = update.effective_user
     ticket_id = generate_ticket_id()
     
-    bot_data["tickets"][str(user.id)] = {
+    bot_data["tickets"][ticket_id] = {
         "id": ticket_id,
+        "user_id": user.id,
         "section": section_name,
         "created_at": time.time(),
         "last_activity": time.time()
@@ -248,7 +260,7 @@ async def create_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     await update.callback_query.message.edit_text(msg_text)
 
     # Message to Admin Group
-    keyboard = [[InlineKeyboardButton("Reply to Ticket ✍️", callback_data=f"reply_{user.id}")]]
+    keyboard = [[InlineKeyboardButton("Reply to Ticket ✍️", callback_data=f"reply_{ticket_id}")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await send_to_support_group(
@@ -279,8 +291,14 @@ async def handle_dm(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Only handle message if user is in a session
-    ticket = bot_data["tickets"].get(str(user.id))
-    if ticket:
+    # Find active ticket(s) for user
+    user_tickets = [t for t in bot_data["tickets"].values() if t.get('user_id') == user.id]
+    
+    if user_tickets:
+        # Sort by created_at desc to get latest
+        user_tickets.sort(key=lambda x: x['created_at'], reverse=True)
+        ticket = user_tickets[0]
+        
         # Update activity
         ticket["last_activity"] = time.time()
         save_data()
@@ -328,12 +346,12 @@ async def handle_reply_command(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # Build inline keyboard of open tickets
     keyboard = []
-    for uid, ticket_info in bot_data["tickets"].items():
+    for tid, ticket_info in bot_data["tickets"].items():
         tid = ticket_info['id']
         section = ticket_info['section']
         keyboard.append([
-            InlineKeyboardButton(f"Ticket {tid} ({section})", callback_data=f"reply_{uid}"),
-            InlineKeyboardButton("Ping 🔔", callback_data=f"ping_{uid}")
+            InlineKeyboardButton(f"Ticket {tid} ({section})", callback_data=f"reply_{tid}"),
+            InlineKeyboardButton("Ping 🔔", callback_data=f"ping_{tid}")
         ])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -347,16 +365,17 @@ async def handle_reply_selection(update: Update, context: ContextTypes.DEFAULT_T
     if admin_user.id not in ADMIN_IDS:
         return
 
-    # Extract user_id from callback_data
-    target_id = int(query.data.split("_")[1])
-    context.user_data['reply_to'] = target_id
+    # Extract ticket_id from callback_data
+    ticket_id = query.data.split("_")[1]
+    context.user_data['reply_ticket_id'] = ticket_id
     
     # Get ticket info for display
-    ticket = bot_data["tickets"].get(str(target_id))
-    ticket_display = ticket['id'] if ticket else "Unknown"
+    ticket = bot_data["tickets"].get(ticket_id)
+    ticket_display = ticket['id'] if ticket else ticket_id
+    target_user_id = ticket['user_id'] if ticket else "Unknown"
     
     if update.effective_chat.type == 'private':
-        await query.message.edit_text(f"✏️ Now reply to Ticket {ticket_display} (User {target_id}).\nType your message here:\n(Type /done to finish, /close to close ticket)")
+        await query.message.edit_text(f"✏️ Now reply to Ticket {ticket_display} (User {target_user_id}).\nType your message here:\n(Type /done to finish, /close to close ticket)")
     else:
         # In group chat, just notify via alert and don't edit the ticket message
         await query.answer(f"✏️ You are now replying to Ticket {ticket_display}", show_alert=True)
@@ -369,21 +388,26 @@ async def handle_ping_selection(update: Update, context: ContextTypes.DEFAULT_TY
     if update.effective_user.id not in ADMIN_IDS:
         return
 
-    # Extract user_id from callback_data
-    target_id = int(query.data.split("_")[1])
+    # Extract ticket_id from callback_data
+    ticket_id = query.data.split("_")[1]
+    ticket = bot_data["tickets"].get(ticket_id)
     
-    try:
-        await context.bot.send_message(chat_id=target_id, text="❗ You are currently being pinged by the staff!")
-        await query.message.reply_text(f"✅ Ping sent to {target_id}!")
-    except Exception as e:
-        await query.message.reply_text(f"❌ Failed to ping {target_id}: {e}")
+    if ticket:
+        target_id = ticket['user_id']
+        try:
+            await context.bot.send_message(chat_id=target_id, text="❗ You are currently being pinged by the staff!")
+            await query.message.reply_text(f"✅ Ping sent to User {target_id} (Ticket {ticket_id})!")
+        except Exception as e:
+            await query.message.reply_text(f"❌ Failed to ping {target_id}: {e}")
+    else:
+        await query.message.reply_text("❌ Ticket not found.")
 
 async def stop_reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
         return
     
-    if context.user_data.pop('reply_to', None):
+    if context.user_data.pop('reply_ticket_id', None):
         # Notify group only
         await send_to_support_group(
             context.bot,
@@ -398,36 +422,44 @@ async def close_ticket_command(update: Update, context: ContextTypes.DEFAULT_TYP
     
     # Check if Admin
     if user.id in ADMIN_IDS:
-        target_id = context.user_data.get('reply_to')
-        if not target_id:
+        ticket_id = context.user_data.get('reply_ticket_id')
+        if not ticket_id:
             await update.message.reply_text("❗ You must be replying to a ticket to close it. Use /reply first.")
             return
         
         # Close the ticket
-        if str(target_id) in bot_data["tickets"]:
-            ticket_id = bot_data["tickets"][str(target_id)]['id']
-            del bot_data["tickets"][str(target_id)]
+        if ticket_id in bot_data["tickets"]:
+            ticket = bot_data["tickets"][ticket_id]
+            target_user_id = ticket['user_id']
+            del bot_data["tickets"][ticket_id]
             save_data()
             
             # Notify User
             try:
-                await context.bot.send_message(chat_id=target_id, text=f"🔒 Ticket {ticket_id} has been closed.")
+                await context.bot.send_message(chat_id=target_user_id, text=f"🔒 Ticket {ticket_id} has been closed.")
             except:
                 pass
             
             # Notify Admin/Group
             await send_to_support_group(context.bot, text=f"🔒 Ticket {ticket_id} closed by admin.")
-            context.user_data.pop('reply_to', None)
+            context.user_data.pop('reply_ticket_id', None)
         else:
             await update.message.reply_text("❗ Ticket already closed or not found.")
             
     else:
         # User closing their own ticket
-        if str(user.id) in bot_data["tickets"]:
-            ticket_id = bot_data["tickets"][str(user.id)]['id']
-            del bot_data["tickets"][str(user.id)]
-            save_data()
+        # Find active ticket(s) for user
+        user_tickets = [t for t in bot_data["tickets"].values() if t.get('user_id') == user.id]
+        if user_tickets:
+            # Close all or just latest? Usually users want to close "the" session.
+            # Let's close the latest one.
+            user_tickets.sort(key=lambda x: x['created_at'], reverse=True)
+            ticket = user_tickets[0]
+            ticket_id = ticket['id']
             
+            del bot_data["tickets"][ticket_id]
+            save_data()
+
             await update.message.reply_text(f"🔒 Ticket {ticket_id} has been closed.")
             await send_to_support_group(
                 context.bot,
@@ -504,13 +536,13 @@ async def handle_admin_dm(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         # Other states...
 
-    target_id = context.user_data.get('reply_to')
+    ticket_id = context.user_data.get('reply_ticket_id')
     
     # If in the support group, ignore messages unless replying to a ticket
-    if update.effective_chat.id == SUPPORT_GROUP_ID and not target_id:
+    if update.effective_chat.id == SUPPORT_GROUP_ID and not ticket_id:
         return
 
-    if not target_id:
+    if not ticket_id:
         # If not replying to a ticket, treat admin as a normal user (e.g. testing the bot)
         await handle_dm(update, context)
         return
@@ -519,17 +551,21 @@ async def handle_admin_dm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     photo = update.message.photo[-1].file_id if update.message.photo else None
     
     # Update ticket activity
-    if str(target_id) in bot_data["tickets"]:
-        bot_data["tickets"][str(target_id)]["last_activity"] = time.time()
+    if ticket_id in bot_data["tickets"]:
+        ticket = bot_data["tickets"][ticket_id]
+        ticket["last_activity"] = time.time()
+        target_user_id = ticket['user_id']
         save_data()
 
-    if photo:
-        caption = f"💬 Staff: {text}" if text else "💬 Staff"
-        await context.bot.send_photo(chat_id=target_id, photo=photo, caption=caption)
+        if photo:
+            caption = f"💬 Staff: {text}" if text else "💬 Staff"
+            await context.bot.send_photo(chat_id=target_user_id, photo=photo, caption=caption)
+        else:
+            await context.bot.send_message(chat_id=target_user_id, text=f"💬 Staff: {text}")
+            
+        await update.message.reply_text("✅ Message sent to user!")
     else:
-        await context.bot.send_message(chat_id=target_id, text=f"💬 Staff: {text}")
-        
-    await update.message.reply_text("✅ Message sent to user!")
+        await update.message.reply_text("❌ Ticket not found (might be closed).")
 
 # ===== SETTINGS / ADMIN COMMAND CENTER =====
 async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -782,19 +818,22 @@ async def check_timeouts(context: ContextTypes.DEFAULT_TYPE):
     to_remove = []
     
     # Check for expired tickets
-    for uid, ticket in bot_data["tickets"].items():
+    for tid, ticket in bot_data["tickets"].items():
         if now - ticket["last_activity"] > TICKET_TIMEOUT:
-            to_remove.append(uid)
+            to_remove.append(tid)
             
-    for uid in to_remove:
-        ticket_id = bot_data["tickets"][uid]['id']
-        del bot_data["tickets"][uid]
+    for tid in to_remove:
+        ticket = bot_data["tickets"][tid]
+        user_id = ticket.get('user_id')
+        ticket_id = ticket['id']
+        del bot_data["tickets"][tid]
         save_data()
         
         # Notify
         await send_to_support_group(context.bot, text=f"⏳ Ticket {ticket_id} closed due to inactivity.")
         try:
-            await context.bot.send_message(chat_id=int(uid), text=f"⏳ Ticket {ticket_id} has been closed due to inactivity.")
+            if user_id:
+                await context.bot.send_message(chat_id=user_id, text=f"⏳ Ticket {ticket_id} has been closed due to inactivity.")
         except:
             pass
 
@@ -853,8 +892,8 @@ def main():
     app.add_handler(CommandHandler("done", stop_reply_command))
     app.add_handler(CommandHandler("close", close_ticket_command))
     app.add_handler(CommandHandler("cancel", cancel_command))
-    app.add_handler(CallbackQueryHandler(handle_reply_selection, pattern=r"^reply_\d+$"))
-    app.add_handler(CallbackQueryHandler(handle_ping_selection, pattern=r"^ping_\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_reply_selection, pattern=r"^reply_[\w-]+$"))
+    app.add_handler(CallbackQueryHandler(handle_ping_selection, pattern=r"^ping_[\w-]+$"))
     app.add_handler(CallbackQueryHandler(handle_settings_callback, pattern=r"^(settings_|set_text_|toggle_svc_|toggle_btn_|svc_|add_type_)"))
     
     # Menu handler (catch-all for dynamic IDs)
