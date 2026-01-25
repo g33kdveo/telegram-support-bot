@@ -44,6 +44,7 @@ DEFAULT_CONFIG = {
     "texts": {
         "welcome": "👋 Hi! Thanks for reaching out to GeekdHouse Support Bot.\n\nWe want to help you as best as we can.\n\nPlease create one ticket per user at a time.\n\nChoose an option from the menu below:",
         "ticket_created": "✅ Your ticket has been created! 🎉\n\n🎫 Ticket {ticket_id} has been sent to our staff.\n⏳ They will be with you shortly! 🚀",
+        "ticket_created": "✅ You have chosen {service_name}!\nYour ticket has been created! 🎉\n\n🎫 Ticket {ticket_id} has been sent to our staff.\n⏳ They will be with you shortly! 🚀\nPlease have your order ready",
         "service_closed": "⛔ Sorry, this service is currently closed. Please choose another option."
     },
     "menu": [
@@ -241,8 +242,12 @@ async def create_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     # Message to User
     if custom_msg:
         msg_text = custom_msg.replace("{ticket_id}", ticket_id)
+        msg_text = custom_msg
     else:
         msg_text = bot_data["config"]["texts"]["ticket_created"].replace("{ticket_id}", ticket_id)
+        msg_text = bot_data["config"]["texts"]["ticket_created"]
+    
+    msg_text = msg_text.replace("{ticket_id}", ticket_id).replace("{service_name}", section_name)
     await update.callback_query.message.edit_text(msg_text)
 
     # Message to Admin Group
@@ -449,7 +454,8 @@ async def handle_admin_dm(update: Update, context: ContextTypes.DEFAULT_TYPE):
             svc_id = key.replace("svc_msg_", "")
             item, _, _ = find_menu_item(bot_data["config"]["menu"], svc_id)
             if item:
-                item["message"] = update.message.text
+                target_field = "response_message" if item["type"] == "service" else "message"
+                item[target_field] = update.message.text
                 save_data()
                 await update.message.reply_text(f"✅ Message for '{item['name']}' updated!")
             del context.user_data['editing_text']
@@ -562,10 +568,16 @@ async def handle_settings_callback(update: Update, context: ContextTypes.DEFAULT
         key = data.replace("set_text_", "")
         context.user_data['editing_text'] = key
         current_text = bot_data["config"]["texts"].get(key, "N/A")
+        
+        placeholders = ""
+        if key == "ticket_created":
+            placeholders = "\nAvailable placeholders: {ticket_id}, {service_name}"
+            
         await query.message.edit_text(
             f"📝 Editing <b>{key}</b>.\n\n"
             f"Current text:\n<pre>{current_text}</pre>\n\n"
             f"👇 Reply with the new text:",
+            f"👇 Reply with the new text:{placeholders}",
             parse_mode='HTML'
         )
         return
@@ -683,7 +695,8 @@ async def handle_settings_callback(update: Update, context: ContextTypes.DEFAULT
         svc_id = data.replace("svc_set_msg_", "")
         context.user_data['editing_text'] = f"svc_msg_{svc_id}"
         item, _, _ = find_menu_item(bot_data["config"]["menu"], svc_id)
-        current = item.get("message", "N/A")
+        target_field = "response_message" if item["type"] == "service" else "message"
+        current = item.get(target_field, "N/A")
         await query.message.edit_text(f"📝 Edit Message for <b>{item['name']}</b>\n\nCurrent:\n<pre>{current}</pre>\n\n👇 Reply with new text:", parse_mode='HTML')
         return
 
