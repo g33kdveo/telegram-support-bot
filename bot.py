@@ -43,7 +43,6 @@ TICKET_TIMEOUT = 4 * 60 * 60  # 4 hours in seconds
 DEFAULT_CONFIG = {
     "texts": {
         "welcome": "👋 Hi! Thanks for reaching out to GeekdHouse Support Bot.\n\nWe want to help you as best as we can.\n\nPlease create one ticket per user at a time.\n\nChoose an option from the menu below:",
-        "ticket_created": "✅ Your ticket has been created! 🎉\n\n🎫 Ticket {ticket_id} has been sent to our staff.\n⏳ They will be with you shortly! 🚀",
         "ticket_created": "✅ You have chosen {service_name}!\nYour ticket has been created! 🎉\n\n🎫 Ticket {ticket_id} has been sent to our staff.\n⏳ They will be with you shortly! 🚀\nPlease have your order ready",
         "service_closed": "⛔ Sorry, this service is currently closed. Please choose another option."
     },
@@ -440,6 +439,25 @@ async def close_ticket_command(update: Update, context: ContextTypes.DEFAULT_TYP
             # If user has no ticket, ignore or inform
             await update.message.reply_text("❗ You do not have an open ticket.")
 
+async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id not in ADMIN_IDS:
+        return
+
+    cancelled = False
+    if context.user_data.get('editing_text'):
+        del context.user_data['editing_text']
+        cancelled = True
+    
+    if context.user_data.get('admin_state'):
+        del context.user_data['admin_state']
+        cancelled = True
+        
+    if cancelled:
+        await update.message.reply_text("🚫 Action cancelled.")
+    else:
+        await update.message.reply_text("ℹ️ No active action to cancel.")
+
 # ===== ADMIN REPLY MESSAGES =====
 async def handle_admin_dm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -573,13 +591,13 @@ async def handle_settings_callback(update: Update, context: ContextTypes.DEFAULT
         if key == "ticket_created":
             placeholders = "\nAvailable placeholders: {ticket_id}, {service_name}"
             
-        await query.message.edit_text(
+        msg_text = (
             f"📝 Editing <b>{key}</b>.\n\n"
             f"Current text:\n<pre>{current_text}</pre>\n\n"
-            f"👇 Reply with the new text:",
-            f"👇 Reply with the new text:{placeholders}",
-            parse_mode='HTML'
+            f"👇 Reply with the new text:{placeholders}"
         )
+        
+        await query.message.edit_text(msg_text, parse_mode='HTML')
         return
 
     # ===== MANAGE SERVICES =====
@@ -836,6 +854,7 @@ def main():
     app.add_handler(CommandHandler("status", status_command))
     app.add_handler(CommandHandler("done", stop_reply_command))
     app.add_handler(CommandHandler("close", close_ticket_command))
+    app.add_handler(CommandHandler("cancel", cancel_command))
     app.add_handler(CallbackQueryHandler(handle_reply_selection, pattern=r"^reply_\d+$"))
     app.add_handler(CallbackQueryHandler(handle_ping_selection, pattern=r"^ping_\d+$"))
     app.add_handler(CallbackQueryHandler(handle_settings_callback, pattern=r"^(settings_|set_text_|toggle_svc_|toggle_btn_|svc_|add_type_)"))
