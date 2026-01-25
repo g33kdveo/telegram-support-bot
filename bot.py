@@ -322,6 +322,19 @@ def find_menu_item(menu, target_id):
                 return found, parent, idx
     return None, None, None
 
+# ===== ADMIN HELPERS =====
+def get_admin_help_text(context: ContextTypes.DEFAULT_TYPE):
+    # Check if in reply mode
+    if context.user_data.get('reply_ticket_id'):
+        cmds = ["/done", "/close", "/ticketstatus", "/ping", "/cancel", "/help"]
+        header = "📝 <b>Reply Mode Commands:</b>"
+    else:
+        cmds = ["/reply", "/settings", "/status", "/block", "/unblock", "/help"]
+        header = "🛠️ <b>Admin Commands:</b>"
+    
+    cmd_list = "\n".join(cmds)
+    return f"\n\n{header}\n{cmd_list}"
+
 # ===== COMMANDS =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     config = global_config
@@ -332,9 +345,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard.append([InlineKeyboardButton(item["name"], callback_data=item["id"])])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    msg = config["texts"]["welcome"]
+    if update.effective_user.id in ADMIN_IDS:
+        msg += get_admin_help_text(context)
+        
     await update.message.reply_text(
-        config["texts"]["welcome"], 
-        reply_markup=reply_markup
+        msg, 
+        reply_markup=reply_markup,
+        parse_mode='HTML'
     )
 
 async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -559,6 +578,12 @@ async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"❌ Failed to ping: {e}")
 
+# ===== HELP COMMAND =====
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in ADMIN_IDS: return
+    msg = get_admin_help_text(context)
+    await update.message.reply_text(msg, parse_mode='HTML')
+
 # ===== REPLY COMMAND (ADMIN ONLY) =====
 async def handle_reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -623,8 +648,10 @@ async def handle_reply_selection(update: Update, context: ContextTypes.DEFAULT_T
     ticket_display = ticket['id'] if ticket else ticket_id
     target_user_id = ticket['user_id'] if ticket else "Unknown"
     
+    help_text = get_admin_help_text(context)
+    
     if update.effective_chat.type == 'private':
-        await query.message.edit_text(f"✏️ Now reply to Ticket {ticket_display} (User {target_user_id}).\nType your message here:\n(Type /done to finish, /close to close ticket)")
+        await query.message.edit_text(f"✏️ Now reply to Ticket {ticket_display} (User {target_user_id}).\nType your message here:{help_text}", parse_mode='HTML')
     else:
         # In group chat, just notify via alert and don't edit the ticket message
         await query.answer(f"✏️ You are now replying to Ticket {ticket_display}", show_alert=True)
@@ -656,15 +683,17 @@ async def stop_reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if user.id not in ADMIN_IDS:
         return
     
+    # Clear reply state
     if context.user_data.pop('reply_ticket_id', None):
         # Notify group only
         await send_to_support_group(
             context.bot,
             text=f"ℹ️ Admin {user.first_name} disconnected from the ticket."
         )
-        # No message to user
-    else:
-        await update.message.reply_text("ℹ️ You are not in reply mode.")
+    
+    # Show general commands
+    help_text = get_admin_help_text(context)
+    await update.message.reply_text(f"✅ Disconnected from ticket.{help_text}", parse_mode='HTML')
 
 async def close_ticket_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -691,6 +720,9 @@ async def close_ticket_command(update: Update, context: ContextTypes.DEFAULT_TYP
             # Notify Admin/Group
             await send_to_support_group(context.bot, text=f"🔒 Ticket {ticket_id} closed by admin.")
             context.user_data.pop('reply_ticket_id', None)
+            
+            help_text = get_admin_help_text(context)
+            await update.message.reply_text(f"✅ Ticket closed.{help_text}", parse_mode='HTML')
         else:
             await update.message.reply_text("❗ Ticket already closed or not found.")
             
@@ -955,6 +987,11 @@ async def handle_admin_dm(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"Select type for '{name}':", reply_markup=InlineKeyboardMarkup(keyboard))
             return
         # Other states...
+
+    # Check for Review State
+    if 'review_state' in context.user_data:
+        await handle_review_step(update, context)
+        return
 
     ticket_id = context.user_data.get('reply_ticket_id')
     
@@ -1325,6 +1362,7 @@ def main():
     app.add_handler(CommandHandler("block", block_command))
     app.add_handler(CommandHandler("unblock", unblock_command))
     app.add_handler(CommandHandler("ping", ping_command))
+    app.add_handler(CommandHandler("help", help_command))
     
     app.add_handler(CallbackQueryHandler(handle_reply_selection, pattern=r"^reply_[\w-]+$"))
     app.add_handler(CallbackQueryHandler(handle_ping_selection, pattern=r"^ping_[\w-]+$"))
