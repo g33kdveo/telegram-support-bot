@@ -23,6 +23,8 @@ from telegram.ext import (
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()]
 SUPPORT_GROUP_ID = int(os.getenv("SUPPORT_GROUP_ID") or 0)
+REVIEW_CHANNEL_ID = os.getenv("REVIEW_CHANNEL_ID")
+REVIEW_TOPIC_ID = int(os.getenv("REVIEW_TOPIC_ID") or 0)
 DB_FILE = os.getenv("DB_FILE", "bot_database.db")
 TICKET_TIMEOUT = 4 * 60 * 60  # 4 hours in seconds
 
@@ -347,9 +349,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     msg = config["texts"]["welcome"]
-    if update.effective_user.id in ADMIN_IDS:
-        msg += get_admin_help_text(context)
-        
     await update.message.reply_text(
         msg, 
         reply_markup=reply_markup,
@@ -580,8 +579,16 @@ async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ===== HELP COMMAND =====
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in ADMIN_IDS: return
-    msg = get_admin_help_text(context)
+    if update.effective_user.id in ADMIN_IDS:
+        msg = get_admin_help_text(context)
+    else:
+        msg = (
+            "📚 <b>Available Commands:</b>\n\n"
+            "/start - Show the main menu\n"
+            "/mytickets - View your active tickets\n"
+            "/close - Close current ticket\n"
+            "/review - Leave a review"
+        )
     await update.message.reply_text(msg, parse_mode='HTML')
 
 # ===== REPLY COMMAND (ADMIN ONLY) =====
@@ -890,12 +897,24 @@ async def handle_review_step(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 f"💬 Review: {review_text}"
             )
             
-            await send_to_support_group(context.bot, text=admin_text, parse_mode='HTML')
+            # Determine target chat and thread
+            target_chat_id = SUPPORT_GROUP_ID
+            target_thread_id = None
+
+            if REVIEW_CHANNEL_ID:
+                target_chat_id = REVIEW_CHANNEL_ID
+            elif REVIEW_TOPIC_ID:
+                target_thread_id = REVIEW_TOPIC_ID
             
-            # Send photos separately
-            if photos:
-                for photo_id in photos:
-                    await send_to_support_group(context.bot, text="📷 Review Photo", photo=photo_id)
+            try:
+                await context.bot.send_message(chat_id=target_chat_id, message_thread_id=target_thread_id, text=admin_text, parse_mode='HTML')
+            
+                # Send photos separately
+                if photos:
+                    for photo_id in photos:
+                        await context.bot.send_photo(chat_id=target_chat_id, message_thread_id=target_thread_id, photo=photo_id, caption="📷 Review Photo")
+            except Exception as e:
+                print(f"❌ Failed to send review to {target_chat_id} (Topic {target_thread_id}): {e}")
             
             await update.message.reply_text("✅ <b>Thank you for your review!</b>", parse_mode='HTML')
             del context.user_data['review_state']
@@ -1313,7 +1332,8 @@ async def set_commands(app):
         BotCommand("start", "Show the main menu"),
         BotCommand("mytickets", "View your active tickets"),
         BotCommand("close", "Close current ticket"),
-        BotCommand("review", "Leave a review")
+        BotCommand("review", "Leave a review"),
+        BotCommand("help", "Show available commands")
     ], scope=BotCommandScopeAllPrivateChats())
 
     # Set /reply for the support group only, and ONLY for admins
