@@ -43,7 +43,7 @@ TICKET_TIMEOUT = 4 * 60 * 60  # 4 hours in seconds
 DEFAULT_CONFIG = {
     "texts": {
         "welcome": "👋 Hi! Thanks for reaching out to GeekdHouse Support Bot.\n\nWe want to help you as best as we can.\n\nPlease create one ticket per user at a time.\n\nChoose an option from the menu below:",
-        "ticket_created": "✅ You have chosen {service_name}!\nYour ticket has been created! 🎉\n\n🎫 Ticket {ticket_id} has been sent to our staff.\n⏳ They will be with you shortly! 🚀\nPlease have your order ready",
+        "ticket_created": "✅ Your ticket has been created! 🎉\n\n🎫 Ticket {ticket_id} has been sent to our staff.\n⏳ They will be with you shortly! 🚀",
         "service_closed": "⛔ Sorry, this service is currently closed. Please choose another option."
     },
     "menu": [
@@ -54,8 +54,8 @@ DEFAULT_CONFIG = {
             "visible": True,
             "message": "✅ You selected: 🛒 Create Order\n\n👇 Next, please choose from the options below:",
             "items": [
-                {"id": "order_singles", "name": "📦 Singles (1-5 pieces)", "type": "service", "status": True, "visible": True},
-                {"id": "order_bulk", "name": "🚛 Bulk (10+ pieces)", "type": "service", "status": True, "visible": True}
+                {"id": "order_singles", "name": "📦 Singles (1-5 pieces)", "type": "service", "status": True, "visible": True, "response_message": "✅ You have chosen {service_name}\nYour ticket has been created! 🎉\n\nPlease have your order ready!\n🎫 Ticket {ticket_id} has been sent to our staff.\n⏳ They will be with you shortly! 🚀"},
+                {"id": "order_bulk", "name": "🚛 Bulk (10+ pieces)", "type": "service", "status": True, "visible": True, "response_message": "✅ You have chosen {service_name}\nYour ticket has been created! 🎉\n\nPlease have your order ready!\n🎫 Ticket {ticket_id} has been sent to our staff.\n⏳ They will be with you shortly! 🚀"}
             ]
         },
         {
@@ -240,10 +240,8 @@ async def create_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
     # Message to User
     if custom_msg:
-        msg_text = custom_msg.replace("{ticket_id}", ticket_id)
         msg_text = custom_msg
     else:
-        msg_text = bot_data["config"]["texts"]["ticket_created"].replace("{ticket_id}", ticket_id)
         msg_text = bot_data["config"]["texts"]["ticket_created"]
     
     msg_text = msg_text.replace("{ticket_id}", ticket_id).replace("{service_name}", section_name)
