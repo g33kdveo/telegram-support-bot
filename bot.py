@@ -4,6 +4,8 @@ import random
 import string
 import time
 import asyncio
+import copy
+import uuid
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -37,10 +39,40 @@ TICKET_TIMEOUT = 4 * 60 * 60  # 4 hours in seconds
 #   "user_started": [list of ids],
 #   "counter": 0
 # }
+
+DEFAULT_CONFIG = {
+    "texts": {
+        "welcome": "👋 Hi! Thanks for reaching out to GeekdHouse Support Bot.\n\nWe want to help you as best as we can.\n\nPlease create one ticket per user at a time.\n\nChoose an option from the menu below:",
+        "ticket_created": "✅ Your ticket has been created! 🎉\n\n🎫 Ticket {ticket_id} has been sent to our staff.\n⏳ They will be with you shortly! 🚀",
+        "service_closed": "⛔ Sorry, this service is currently closed. Please choose another option."
+    },
+    "menu": [
+        {
+            "id": "create_order",
+            "name": "🛒 Create an Order",
+            "type": "category",
+            "visible": True,
+            "message": "✅ You selected: 🛒 Create Order\n\n👇 Next, please choose from the options below:",
+            "items": [
+                {"id": "order_singles", "name": "📦 Singles (1-5 pieces)", "type": "service", "status": True, "visible": True},
+                {"id": "order_bulk", "name": "🚛 Bulk (10+ pieces)", "type": "service", "status": True, "visible": True}
+            ]
+        },
+        {
+            "id": "support",
+            "name": "❓ Support",
+            "type": "service",
+            "status": True,
+            "visible": True
+        }
+    ]
+}
+
 bot_data = {
     "tickets": {},
     "user_started": [],
-    "counter": 0
+    "counter": 0,
+    "config": copy.deepcopy(DEFAULT_CONFIG)
 }
 
 # ===== PERSISTENCE HELPERS =====
@@ -49,9 +81,25 @@ def load_data():
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, 'r') as f:
-                bot_data = json.load(f)
+                loaded_data = json.load(f)
+                bot_data.update(loaded_data)
             # Convert user_started to set for faster lookup, but keep as list in json
             bot_data["user_started"] = list(set(bot_data.get("user_started", [])))
+            
+            # Ensure config exists and has defaults (for updates)
+            if "config" not in bot_data:
+                bot_data["config"] = copy.deepcopy(DEFAULT_CONFIG)
+            else:
+                # Ensure menu exists (migration)
+                if "menu" not in bot_data["config"]:
+                    bot_data["config"]["menu"] = copy.deepcopy(DEFAULT_CONFIG["menu"])
+                # Ensure texts exist
+                if "texts" not in bot_data["config"]:
+                    bot_data["config"]["texts"] = copy.deepcopy(DEFAULT_CONFIG["texts"])
+                else:
+                    for k, v in DEFAULT_CONFIG["texts"].items():
+                        if k not in bot_data["config"]["texts"]:
+                            bot_data["config"]["texts"][k] = v
         except Exception as e:
             print(f"Error loading data: {e}")
 
@@ -108,56 +156,77 @@ async def handle_chat_migration(update: Update, context: ContextTypes.DEFAULT_TY
     print(f"⚠️ Group upgraded to Supergroup (Event). Updating SUPPORT_GROUP_ID to {new_id}")
     SUPPORT_GROUP_ID = new_id
 
+# ===== MENU HELPERS =====
+def find_menu_item(menu, target_id):
+    for i, item in enumerate(menu):
+        if item['id'] == target_id:
+            return item, menu, i
+        if item.get('items'):
+            found, parent, idx = find_menu_item(item['items'], target_id)
+            if found:
+                return found, parent, idx
+    return None, None, None
+
 # ===== COMMANDS =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("🛒 Create an Order", callback_data='create_order')],
-        [InlineKeyboardButton("❓ Support", callback_data='support')]
-    ]
+    config = bot_data["config"]
+    keyboard = []
+    
+    for item in config.get("menu", []):
+        if item.get("visible", True):
+            keyboard.append([InlineKeyboardButton(item["name"], callback_data=item["id"])])
+
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        "👋 Hi! Thanks for reaching out to GeekdHouse Support Bot.\n\n"
-        "We want to help you as best as we can.\n\n"
-        "Please create one ticket per user at a time.\n\n"
-        "Choose an option from the menu below:", 
+        config["texts"]["welcome"], 
         reply_markup=reply_markup
     )
 
-async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    # Don't answer yet, might be handled elsewhere if we didn't filter correctly, 
+    # but here we assume it's a menu click.
     user = update.effective_user
     choice = query.data
     
+    # Try to find the item in the menu
+    item, _, _ = find_menu_item(bot_data["config"]["menu"], choice)
+    
+    if not item:
+        # Not a menu item (could be admin command handled by another handler, but if we got here, it wasn't handled)
+        # Or it's a stale button.
+        await query.answer("❌ Option not found.", show_alert=True)
+        return
+
+    await query.answer()
+
     if user.id not in bot_data["user_started"]:
         bot_data["user_started"].append(user.id)
     
-    if choice == 'create_order':
+    if item["type"] == "category":
         keyboard = [
-            [InlineKeyboardButton("📦 Singles (1-5 pieces)", callback_data='order_singles')],
-            [InlineKeyboardButton("🚛 Bulk (10+ pieces)", callback_data='order_bulk')]
         ]
+        for sub in item.get("items", []):
+            if sub.get("visible", True):
+                status_icon = ""
+                if sub["type"] == "service":
+                    status_icon = " 🟢" if sub.get("status", True) else " 🔴 (Closed)"
+                keyboard.append([InlineKeyboardButton(f"{sub['name']}{status_icon}", callback_data=sub["id"])])
+        
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.message.edit_text(
-            "✅ You selected: 🛒 Create Order\n\n"
-            "👇 Next, please choose from the options below:",
+            item.get("message", "👇 Choose an option:"),
             reply_markup=reply_markup
         )
-        return
+    elif item["type"] == "service":
+        if not item.get("status", True):
+            await query.answer(bot_data["config"]["texts"]["service_closed"], show_alert=True)
+            await query.message.reply_text(bot_data["config"]["texts"]["service_closed"])
+            return
+        
+        await create_new_ticket(update, context, item["name"], item.get("response_message"))
 
-    # Determine section name based on choice
-    section_name = ""
-    if choice == 'support':
-        section_name = "Support"
-    elif choice == 'order_singles':
-        section_name = "Create Order (Singles)"
-    elif choice == 'order_bulk':
-        section_name = "Create Order (Bulk)"
-    
-    if section_name:
-        await create_new_ticket(update, context, section_name)
-
-async def create_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE, section_name: str):
+async def create_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE, section_name: str, custom_msg=None):
     user = update.effective_user
     ticket_id = generate_ticket_id()
     
@@ -170,11 +239,11 @@ async def create_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     save_data()
 
     # Message to User
-    await update.callback_query.message.edit_text(
-        f"✅ Your ticket has been created! 🎉\n\n"
-        f"🎫 Ticket {ticket_id} has been sent to our staff.\n"
-        f"⏳ They will be with you shortly! 🚀"
-    )
+    if custom_msg:
+        msg_text = custom_msg.replace("{ticket_id}", ticket_id)
+    else:
+        msg_text = bot_data["config"]["texts"]["ticket_created"].replace("{ticket_id}", ticket_id)
+    await update.callback_query.message.edit_text(msg_text)
 
     # Message to Admin Group
     keyboard = [[InlineKeyboardButton("Reply to Ticket ✍️", callback_data=f"reply_{user.id}")]]
@@ -370,6 +439,48 @@ async def close_ticket_command(update: Update, context: ContextTypes.DEFAULT_TYP
 async def handle_admin_dm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     # Note: Filter in main() ensures this is only called for admins
+    
+    # Check for text editing mode
+    if context.user_data.get('editing_text'):
+        key = context.user_data['editing_text']
+        
+        # Handle Service/Category Message Edit
+        if key.startswith("svc_msg_"):
+            svc_id = key.replace("svc_msg_", "")
+            item, _, _ = find_menu_item(bot_data["config"]["menu"], svc_id)
+            if item:
+                item["message"] = update.message.text
+                save_data()
+                await update.message.reply_text(f"✅ Message for '{item['name']}' updated!")
+            del context.user_data['editing_text']
+            return
+
+        new_text = update.message.text
+        if new_text:
+            bot_data['config']['texts'][key] = new_text
+            save_data()
+            del context.user_data['editing_text']
+            await update.message.reply_text(f"✅ Text for '{key}' has been updated!")
+            return
+            
+    # Check for Service Adding State
+    if context.user_data.get('admin_state'):
+        state = context.user_data['admin_state']
+        if state['action'] == 'add_svc_name':
+            name = update.message.text
+            parent_id = state['parent_id']
+            # Generate ID
+            new_id = str(uuid.uuid4())[:8]
+            
+            # Ask for type
+            context.user_data['admin_state'] = {'action': 'add_svc_type', 'name': name, 'id': new_id, 'parent_id': parent_id}
+            keyboard = [
+                [InlineKeyboardButton("📂 Category (Sub-menu)", callback_data='add_type_category')],
+                [InlineKeyboardButton("🎫 Service (Ticket)", callback_data='add_type_service')]
+            ]
+            await update.message.reply_text(f"Select type for '{name}':", reply_markup=InlineKeyboardMarkup(keyboard))
+            return
+        # Other states...
 
     target_id = context.user_data.get('reply_to')
     
@@ -397,6 +508,244 @@ async def handle_admin_dm(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=target_id, text=f"💬 Staff: {text}")
         
     await update.message.reply_text("✅ Message sent to user!")
+
+# ===== SETTINGS / ADMIN COMMAND CENTER =====
+async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id not in ADMIN_IDS:
+        return
+    
+    await show_settings_menu(update, context)
+
+async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [InlineKeyboardButton("📝 Edit Texts", callback_data='settings_texts')],
+        [InlineKeyboardButton("️ Manage Services", callback_data='settings_services')],
+        [InlineKeyboardButton("❌ Close Menu", callback_data='settings_close')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    text = "⚙️ <b>Admin Command Center</b>\nSelect a category to configure:"
+    
+    if update.callback_query:
+        await update.callback_query.message.edit_text(text, reply_markup=reply_markup, parse_mode='HTML')
+    else:
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='HTML')
+
+async def handle_settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+    
+    if update.effective_user.id not in ADMIN_IDS:
+        return
+
+    if data == 'settings_close':
+        await query.message.delete()
+        return
+    
+    if data == 'settings_menu':
+        await show_settings_menu(update, context)
+        return
+
+    # Submenus
+    if data == 'settings_texts':
+        keyboard = []
+        for key in bot_data["config"]["texts"]:
+            keyboard.append([InlineKeyboardButton(f"Edit: {key}", callback_data=f"set_text_{key}")])
+        keyboard.append([InlineKeyboardButton("🔙 Back", callback_data='settings_menu')])
+        await query.message.edit_text("📝 <b>Edit Texts</b>\nSelect a text to edit:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+        return
+
+    # Actions
+    if data.startswith("set_text_"):
+        key = data.replace("set_text_", "")
+        context.user_data['editing_text'] = key
+        current_text = bot_data["config"]["texts"].get(key, "N/A")
+        await query.message.edit_text(
+            f"📝 Editing <b>{key}</b>.\n\n"
+            f"Current text:\n<pre>{current_text}</pre>\n\n"
+            f"👇 Reply with the new text:",
+            parse_mode='HTML'
+        )
+        return
+
+    # ===== MANAGE SERVICES =====
+    if data == 'settings_services':
+        await show_services_editor(update, context, bot_data["config"]["menu"], "root")
+        return
+
+    if data.startswith("svc_open_"):
+        svc_id = data.replace("svc_open_", "")
+        item, _, _ = find_menu_item(bot_data["config"]["menu"], svc_id)
+        if item and item.get("items") is not None:
+            await show_services_editor(update, context, item["items"], svc_id)
+        return
+
+    if data.startswith("svc_add_"):
+        parent_id = data.replace("svc_add_", "")
+        context.user_data['admin_state'] = {'action': 'add_svc_name', 'parent_id': parent_id}
+        await query.message.edit_text("➕ <b>Add New Service</b>\n\nPlease reply with the <b>Name</b> of the new service/category:")
+        return
+
+    if data.startswith("add_type_"):
+        # Handle type selection
+        state = context.user_data.get('admin_state')
+        if not state or 'name' not in state:
+            await query.message.edit_text("❌ Session expired.")
+            return
+        
+        new_type = data.replace("add_type_", "")
+        new_item = {
+            "id": state['id'],
+            "name": state['name'],
+            "type": new_type,
+            "visible": True
+        }
+        if new_type == "category":
+            new_item["items"] = []
+            new_item["message"] = f"👇 Options for {state['name']}:"
+        else:
+            new_item["status"] = True
+        
+        # Add to parent
+        parent_id = state['parent_id']
+        if parent_id == "root":
+            bot_data["config"]["menu"].append(new_item)
+        else:
+            parent, _, _ = find_menu_item(bot_data["config"]["menu"], parent_id)
+            if parent:
+                if "items" not in parent: parent["items"] = []
+                parent["items"].append(new_item)
+        
+        save_data()
+        del context.user_data['admin_state']
+        await query.message.edit_text(f"✅ Added '{state['name']}'!")
+        return
+
+    if data.startswith("svc_edit_"):
+        svc_id = data.replace("svc_edit_", "")
+        item, _, _ = find_menu_item(bot_data["config"]["menu"], svc_id)
+        if not item: return
+        
+        keyboard = []
+        # Toggle Visible
+        vis_icon = "👁️ Visible" if item.get("visible", True) else "🚫 Hidden"
+        keyboard.append([InlineKeyboardButton(f"Visibility: {vis_icon}", callback_data=f"svc_tog_vis_{svc_id}")])
+        
+        if item["type"] == "service":
+            # Toggle Status
+            stat_icon = "🟢 Open" if item.get("status", True) else "🔴 Closed"
+            keyboard.append([InlineKeyboardButton(f"Status: {stat_icon}", callback_data=f"svc_tog_stat_{svc_id}")])
+        
+        # Edit Message
+        msg_label = "Edit Menu Text" if item["type"] == "category" else "Edit Ticket Response"
+        keyboard.append([InlineKeyboardButton(f"📝 {msg_label}", callback_data=f"svc_set_msg_{svc_id}")])
+        
+        # Delete
+        keyboard.append([InlineKeyboardButton("🗑️ Delete", callback_data=f"svc_del_{svc_id}")])
+        keyboard.append([InlineKeyboardButton("🔙 Back", callback_data='settings_services')])
+        
+        await query.message.edit_text(f"⚙️ Editing: <b>{item['name']}</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+        return
+
+    if data.startswith("svc_tog_vis_"):
+        svc_id = data.replace("svc_tog_vis_", "")
+        item, _, _ = find_menu_item(bot_data["config"]["menu"], svc_id)
+        if item:
+            item["visible"] = not item.get("visible", True)
+            save_data()
+            # Re-render edit menu
+            update.callback_query.data = f"svc_edit_{svc_id}"
+            await handle_settings_callback(update, context)
+        return
+
+    if data.startswith("svc_tog_stat_"):
+        svc_id = data.replace("svc_tog_stat_", "")
+        item, _, _ = find_menu_item(bot_data["config"]["menu"], svc_id)
+        if item:
+            item["status"] = not item.get("status", True)
+            save_data()
+            update.callback_query.data = f"svc_edit_{svc_id}"
+            await handle_settings_callback(update, context)
+        return
+
+    if data.startswith("svc_del_"):
+        svc_id = data.replace("svc_del_", "")
+        item, parent_list, idx = find_menu_item(bot_data["config"]["menu"], svc_id)
+        if parent_list is not None:
+            del parent_list[idx]
+            save_data()
+            await query.message.edit_text("🗑️ Item deleted.")
+        return
+
+    if data.startswith("svc_set_msg_"):
+        svc_id = data.replace("svc_set_msg_", "")
+        context.user_data['editing_text'] = f"svc_msg_{svc_id}"
+        item, _, _ = find_menu_item(bot_data["config"]["menu"], svc_id)
+        current = item.get("message", "N/A")
+        await query.message.edit_text(f"📝 Edit Message for <b>{item['name']}</b>\n\nCurrent:\n<pre>{current}</pre>\n\n👇 Reply with new text:", parse_mode='HTML')
+        return
+
+async def show_services_editor(update: Update, context: ContextTypes.DEFAULT_TYPE, menu_list, parent_id):
+    keyboard = []
+    for item in menu_list:
+        icon = "📂" if item["type"] == "category" else "🎫"
+        name = item["name"]
+        if not item.get("visible", True): name += " (Hidden)"
+        
+        # Row: [Edit] [Open (if category)]
+        row = [InlineKeyboardButton(f"{icon} {name}", callback_data=f"svc_edit_{item['id']}")]
+        if item["type"] == "category":
+            row.append(InlineKeyboardButton("Open ➡️", callback_data=f"svc_open_{item['id']}"))
+        keyboard.append(row)
+    
+    keyboard.append([InlineKeyboardButton("➕ Add New", callback_data=f"svc_add_{parent_id}")])
+    
+    back_cb = 'settings_services' if parent_id != 'root' else 'settings_menu'
+    keyboard.append([InlineKeyboardButton("🔙 Back", callback_data=back_cb)])
+    
+    await update.callback_query.message.edit_text(f"🛠️ <b>Manage Services</b>\nLevel: {parent_id}", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+
+async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id not in ADMIN_IDS:
+        return
+    
+    if len(context.args) < 2:
+        await update.message.reply_text("❗ Usage: /status <service_name_or_id> <open|closed>")
+        return
+    
+    target = context.args[0].lower()
+    state = context.args[1].lower()
+    
+    if state not in ['open', 'closed']:
+        await update.message.reply_text("❗ State must be 'open' or 'closed'.")
+        return
+    
+    is_open = (state == 'open')
+    
+    # Find service
+    def find_and_update(menu, target):
+        for item in menu:
+            if target in item['id'].lower() or target in item['name'].lower():
+                if item['type'] == 'service':
+                    item['status'] = is_open
+                    return item
+            if item.get('items'):
+                found = find_and_update(item['items'], target)
+                if found: return found
+        return None
+
+    found_item = find_and_update(bot_data["config"]["menu"], target)
+    
+    if not found_item:
+        await update.message.reply_text(f"❗ Service '{target}' not found.")
+        return
+
+    save_data()
+    
+    await update.message.reply_text(f"✅ Service <b>{found_item['name']}</b> is now <b>{state.upper()}</b>.", parse_mode='HTML')
 
 # ===== BACKGROUND JOBS =====
 async def check_timeouts(context: ContextTypes.DEFAULT_TYPE):
@@ -470,11 +819,16 @@ def main():
     # Handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("reply", handle_reply_command))
+    app.add_handler(CommandHandler("settings", settings_command))
+    app.add_handler(CommandHandler("status", status_command))
     app.add_handler(CommandHandler("done", stop_reply_command))
     app.add_handler(CommandHandler("close", close_ticket_command))
-    app.add_handler(CallbackQueryHandler(handle_callback, pattern="^(create_order|support|order_singles|order_bulk)$"))
     app.add_handler(CallbackQueryHandler(handle_reply_selection, pattern=r"^reply_\d+$"))
     app.add_handler(CallbackQueryHandler(handle_ping_selection, pattern=r"^ping_\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_settings_callback, pattern=r"^(settings_|set_text_|toggle_svc_|toggle_btn_|svc_|add_type_)"))
+    
+    # Menu handler (catch-all for dynamic IDs)
+    app.add_handler(CallbackQueryHandler(handle_menu_callback))
 
     
     app.add_handler(MessageHandler(filters.StatusUpdate.MIGRATE, handle_chat_migration))
