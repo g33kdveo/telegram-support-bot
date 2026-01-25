@@ -27,6 +27,7 @@ REVIEW_CHANNEL_ID = os.getenv("REVIEW_CHANNEL_ID")
 REVIEW_TOPIC_ID = int(os.getenv("REVIEW_TOPIC_ID") or 0)
 DB_FILE = os.getenv("DB_FILE", "bot_database.db")
 TICKET_TIMEOUT = 4 * 60 * 60  # 4 hours in seconds
+RETENTION_DAYS = int(os.getenv("RETENTION_DAYS") or 15)
 
 # ===== GLOBAL STATE =====
 # Data structure:
@@ -1314,6 +1315,22 @@ async def check_timeouts(context: ContextTypes.DEFAULT_TYPE):
             except:
                 pass
 
+async def cleanup_database(context: ContextTypes.DEFAULT_TYPE):
+    """Deletes closed tickets older than RETENTION_DAYS and reclaims disk space."""
+    cutoff = time.time() - (RETENTION_DAYS * 24 * 60 * 60)
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    
+    # Delete old closed tickets
+    c.execute("DELETE FROM tickets WHERE closed = 1 AND last_activity < ?", (cutoff,))
+    deleted = c.rowcount
+    if deleted > 0:
+        # VACUUM is required to actually shrink the .db file size on disk
+        c.execute("VACUUM")
+        print(f"🧹 Database cleanup: Removed {deleted} old tickets and reclaimed space.")
+    conn.commit()
+    conn.close()
+
 # ===== SET BOT COMMANDS (ONLY VISIBLE TO ADMINS WHERE NEEDED) =====
 async def set_commands(app):
     global SUPPORT_GROUP_ID
@@ -1401,6 +1418,9 @@ def main():
 
     # Job Queue for Timeouts (runs every 60 seconds)
     app.job_queue.run_repeating(check_timeouts, interval=60, first=10)
+
+    # Job Queue for Database Cleanup (runs every 24 hours)
+    app.job_queue.run_repeating(cleanup_database, interval=86400, first=60)
 
     print("Bot is running...")
     app.run_polling()
