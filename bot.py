@@ -116,6 +116,13 @@ def init_db():
         conn.commit()
     except sqlite3.OperationalError:
         pass # Column likely exists
+    
+    # Migration for referral_code in tickets table
+    try:
+        c.execute("ALTER TABLE tickets ADD COLUMN referral_code TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass # Column likely exists
 
     return conn
 
@@ -246,11 +253,11 @@ def db_get_active_tickets(user_id):
     conn.close()
     return [dict(row) for row in rows]
 
-def db_create_ticket(ticket_id, user_id, section):
+def db_create_ticket(ticket_id, user_id, section, referral_code=None):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("INSERT INTO tickets (id, user_id, section, created_at, last_activity) VALUES (?, ?, ?, ?, ?)",
-              (ticket_id, user_id, section, time.time(), time.time()))
+    c.execute("INSERT INTO tickets (id, user_id, section, created_at, last_activity, referral_code) VALUES (?, ?, ?, ?, ?, ?)",
+              (ticket_id, user_id, section, time.time(), time.time(), referral_code))
     conn.commit()
     conn.close()
 
@@ -466,7 +473,7 @@ async def create_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         return
 
     ticket_id = generate_ticket_id()
-    db_create_ticket(ticket_id, user.id, section_name)
+    db_create_ticket(ticket_id, user.id, section_name, referral_code)
     
     # Handle Referral Logic
     referral_note = ""
@@ -615,6 +622,56 @@ async def handle_ticket_creation_step(update: Update, context: ContextTypes.DEFA
     # Proceed to create ticket
     del context.user_data['ticket_creation_state']
     await create_new_ticket(update, context, state['section_name'], state['response_message'], referral_code)
+
+# ===== MY REFERRALS COMMAND =====
+async def myreferrals_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    
+    # Admin Mode: /myreferrals <userid> addpoint/removepoint <amount>
+    if user.id in ADMIN_IDS and context.args:
+        if len(context.args) >= 3:
+            try:
+                target_id = int(context.args[0])
+                action = context.args[1].lower()
+                amount = int(context.args[2])
+                
+                if action == "addpoint":
+                    db_add_user_points(target_id, amount)
+                    await update.message.reply_text(f"✅ Added {amount} points to User {target_id}.")
+                    try:
+                        await context.bot.send_message(target_id, f"🎉 You have received {amount} referral points from an admin!")
+                    except:
+                        pass
+                elif action == "removepoint":
+                    db_add_user_points(target_id, -amount)
+                    await update.message.reply_text(f"✅ Removed {amount} points from User {target_id}.")
+                else:
+                    await update.message.reply_text("Usage: /myreferrals <userid> addpoint/removepoint <amount>")
+            except ValueError:
+                await update.message.reply_text("Invalid format. Usage: /myreferrals <userid> addpoint <amount>")
+        else:
+            await update.message.reply_text("Usage: /myreferrals <userid> addpoint <amount>")
+        return
+
+    # User Mode
+    points = db_get_user_points(user.id)
+    ref_data = None
+    # Find user's referral code
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT code FROM referrals WHERE user_id = ?", (user.id,))
+    row = c.fetchone()
+    conn.close()
+    
+    code_msg = f"Your Referral Code: <code>{row[0]}</code>" if row else "You don't have a referral code yet. Use /refer to generate one!"
+    
+    msg = (
+        f"🏆 <b>My Referrals</b>\n\n"
+        f"💰 Current Points: <b>{points}</b>\n\n"
+        f"{code_msg}\n\n"
+        f"<i>Share your code to earn more points!</i>"
+    )
+    await update.message.reply_text(msg, parse_mode='HTML')
 
 # ===== MY TICKETS COMMAND =====
 async def mytickets_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -937,6 +994,18 @@ async def ticket_status_command(update: Update, context: ContextTypes.DEFAULT_TY
         if "bulk" not in ticket['section'].lower():
             await update.message.reply_text("⚠️ Warning: This ticket does not seem to be Bulk. Proceeding anyway.")
         
+        # Award Point if Referral
+        if ticket.get('referral_code'):
+            ref_code = ticket['referral_code']
+            ref_data = db_get_referral(ref_code)
+            if ref_data:
+                referrer_id = ref_data['user_id']
+                db_add_user_points(referrer_id, 1)
+                try:
+                    await context.bot.send_message(chat_id=referrer_id, text=f"🎉 <b>Referral Bonus!</b>\n\nA user you referred has completed an order! You have received 1 referral point.\nUse /myreferrals to check your balance.", parse_mode='HTML')
+                except Exception as e:
+                    print(f"Failed to notify referrer {referrer_id}: {e}")
+
         new_status = "Order Delivered"
         db_update_ticket_status(ticket_id, new_status)
         db_close_ticket(ticket_id)
@@ -950,6 +1019,18 @@ async def ticket_status_command(update: Update, context: ContextTypes.DEFAULT_TY
         if "singles" not in ticket['section'].lower():
             await update.message.reply_text("⚠️ Warning: This ticket does not seem to be Singles. Proceeding anyway.")
             
+        # Award Point if Referral
+        if ticket.get('referral_code'):
+            ref_code = ticket['referral_code']
+            ref_data = db_get_referral(ref_code)
+            if ref_data:
+                referrer_id = ref_data['user_id']
+                db_add_user_points(referrer_id, 1)
+                try:
+                    await context.bot.send_message(chat_id=referrer_id, text=f"🎉 <b>Referral Bonus!</b>\n\nA user you referred has completed an order! You have received 1 referral point.\nUse /myreferrals to check your balance.", parse_mode='HTML')
+                except Exception as e:
+                    print(f"Failed to notify referrer {referrer_id}: {e}")
+
         new_status = "Order Complete"
         db_update_ticket_status(ticket_id, new_status)
         db_close_ticket(ticket_id)
@@ -1196,7 +1277,8 @@ async def handle_referral_callback(update: Update, context: ContextTypes.DEFAULT
             f"Thank you for using the GeekdHouse Referral Program! Here is your unique code:\n\n"
             f"<code>{code}</code>\n\n"
             f"Remember, please make sure to have your friends join the main channel! "
-            f"Points are applied once a successful order is placed using the referal code."
+            f"Points are applied once a successful order is placed using the referal code.\n\n"
+            f"Use /myreferrals to keep track of your points!"
         )
         await query.message.edit_text(response, parse_mode='HTML')
 
@@ -1288,6 +1370,11 @@ async def handle_admin_dm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Check for Shipping Details State (Admin testing as user)
     if 'ship_state' in context.user_data:
         await handle_shipping_step(update, context)
+        return
+
+    # Check for Ticket Creation (Referral) State (Admin testing as user)
+    if 'ticket_creation_state' in context.user_data:
+        await handle_ticket_creation_step(update, context)
         return
 
     ticket_id = context.user_data.get('reply_ticket_id')
@@ -1628,6 +1715,7 @@ async def set_commands(app):
         BotCommand("close", "Close current ticket"),
         BotCommand("review", "Leave a review"),
         BotCommand("refer", "Get Referral Code"),
+        BotCommand("myreferrals", "Check Referral Points"),
         BotCommand("help", "Show available commands")
     ], scope=BotCommandScopeAllPrivateChats())
 
@@ -1679,6 +1767,7 @@ def main():
     app.add_handler(CommandHandler("unblock", unblock_command))
     app.add_handler(CommandHandler("ping", ping_command))
     app.add_handler(CommandHandler("refer", refer_command))
+    app.add_handler(CommandHandler("myreferrals", myreferrals_command))
     app.add_handler(CommandHandler("help", help_command))
     
     app.add_handler(CallbackQueryHandler(handle_reply_selection, pattern=r"^reply_[\w-]+$"))
