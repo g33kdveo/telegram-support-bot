@@ -27,6 +27,8 @@ REVIEW_CHANNEL_ID = os.getenv("REVIEW_CHANNEL_ID")
 REVIEW_TOPIC_ID = int(os.getenv("REVIEW_TOPIC_ID") or 0)
 DB_FILE = os.getenv("DB_FILE", "bot_database.db")
 TICKET_TIMEOUT = 4 * 60 * 60  # 4 hours in seconds
+REFERRAL_CHAT_ID = -1003786439934
+REFERRAL_TOPIC_ID = 575
 RETENTION_DAYS = int(os.getenv("RETENTION_DAYS") or 15)
 
 # ===== GLOBAL STATE =====
@@ -95,12 +97,26 @@ def init_db():
         banned INTEGER DEFAULT 0,
         started INTEGER DEFAULT 0
     )''')
+    # Referrals Table
+    c.execute('''CREATE TABLE IF NOT EXISTS referrals (
+        code TEXT PRIMARY KEY,
+        user_id INTEGER,
+        created_at REAL
+    )''')
     # Config Table (Key-Value)
     c.execute('''CREATE TABLE IF NOT EXISTS config (
         key TEXT PRIMARY KEY,
         value TEXT
     )''')
     conn.commit()
+    
+    # Migration for points in users table
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN points INTEGER DEFAULT 0")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass # Column likely exists
+
     return conn
 
 def migrate_json_to_db(conn):
@@ -282,6 +298,39 @@ def db_register_user(user_id):
     conn.commit()
     conn.close()
 
+def db_get_referral(code):
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM referrals WHERE code = ?", (code,))
+    row = c.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def db_create_referral(code, user_id):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("INSERT INTO referrals (code, user_id, created_at) VALUES (?, ?, ?)", (code, user_id, time.time()))
+    conn.commit()
+    conn.close()
+
+def db_get_user_points(user_id):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT points FROM users WHERE user_id = ?", (user_id,))
+    row = c.fetchone()
+    conn.close()
+    return row[0] if row else 0
+
+def db_add_user_points(user_id, points):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    # Ensure user exists
+    c.execute("INSERT OR IGNORE INTO users (user_id, started) VALUES (?, 1)", (user_id,))
+    c.execute("UPDATE users SET points = points + ? WHERE user_id = ?", (points, user_id))
+    conn.commit()
+    conn.close()
+
 def db_check_user_started(user_id):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -396,19 +445,55 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             await query.message.reply_text(global_config["texts"]["service_closed"])
             return
         
-        await create_new_ticket(update, context, item["name"], item.get("response_message"))
+        # Start Referral Check Flow instead of creating ticket immediately
+        context.user_data['ticket_creation_state'] = {
+            'section_name': item["name"],
+            'response_message': item.get("response_message")
+        }
+        await query.message.edit_text("🔗 <b>Referral Code</b>\n\nDo you have a referral code from a friend?\n\nType the code below, or type <b>skip</b> to proceed.", parse_mode='HTML')
     elif item["type"] == "auto_response":
         # Automated response, no ticket
         await query.message.reply_text(item.get("response_message", "ℹ️ Info"))
 
-async def create_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE, section_name: str, custom_msg=None):
+async def create_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE, section_name: str, custom_msg=None, referral_code=None):
     user = update.effective_user
     if db_is_user_banned(user.id):
-        await update.callback_query.message.reply_text("⛔ You are blocked from creating tickets.")
+        # Handle both callback and message updates
+        if update.callback_query:
+            await update.callback_query.message.reply_text("⛔ You are blocked from creating tickets.")
+        else:
+            await update.message.reply_text("⛔ You are blocked from creating tickets.")
         return
 
     ticket_id = generate_ticket_id()
     db_create_ticket(ticket_id, user.id, section_name)
+    
+    # Handle Referral Logic
+    referral_note = ""
+    if referral_code:
+        ref_data = db_get_referral(referral_code)
+        if ref_data:
+            creator_id = ref_data['user_id']
+            # Log usage
+            try:
+                creator_info = await context.bot.get_chat(creator_id)
+                creator_name = f"{creator_info.first_name} (@{creator_info.username})"
+            except:
+                creator_name = f"ID {creator_id}"
+            
+            referral_note = f"\n🔗 <b>Referral Used:</b> {referral_code} (By {creator_name})"
+            
+            # Log to Admin Topic (Exact format requested)
+            log_msg = (
+                f"Referral code Used!\n"
+                f"Code: {referral_code}\n"
+                f"Created by: {creator_name}\n"
+                f"Used by: {user.first_name} (@{user.username})"
+            )
+            try:
+                await context.bot.send_message(chat_id=REFERRAL_CHAT_ID, message_thread_id=REFERRAL_TOPIC_ID, text=log_msg)
+            except Exception as e:
+                print(f"Failed to log referral usage: {e}")
 
     # Message to User
     if custom_msg:
@@ -417,7 +502,11 @@ async def create_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         msg_text = global_config["texts"]["ticket_created"]
     
     msg_text = msg_text.replace("{ticket_id}", ticket_id).replace("{service_name}", section_name) if msg_text else "Ticket Created."
-    await update.callback_query.message.edit_text(msg_text)
+    
+    if update.callback_query:
+        await update.callback_query.message.edit_text(msg_text)
+    else:
+        await update.message.reply_text(msg_text)
 
     # Message to Admin Group
     keyboard = [[InlineKeyboardButton("Reply to Ticket ✍️", callback_data=f"reply_{ticket_id}")]]
@@ -428,7 +517,7 @@ async def create_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         text=f"🆕 <b>New Ticket Created!</b>\n"
              f"👤 User: {user.first_name} (@{user.username}) ({user.id})\n"
              f"🎫 Ticket ID: {ticket_id}\n"
-             f"📂 Category: {section_name}",
+             f"📂 Category: {section_name}{referral_note}",
         parse_mode='HTML',
         reply_markup=reply_markup
     )
@@ -456,6 +545,16 @@ async def handle_dm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Check for Review State
     if 'review_state' in context.user_data:
         await handle_review_step(update, context)
+        return
+
+    # Check for Shipping Details State
+    if 'ship_state' in context.user_data:
+        await handle_shipping_step(update, context)
+        return
+        
+    # Check for Ticket Creation (Referral) State
+    if 'ticket_creation_state' in context.user_data:
+        await handle_ticket_creation_step(update, context)
         return
 
     # Only handle message if user is in a session
@@ -493,6 +592,29 @@ async def handle_dm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         # User hasn't selected anything yet
         await update.message.reply_text("❗ Please select an option from the menu to proceed! 📋")
+
+async def handle_ticket_creation_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    state = context.user_data.get('ticket_creation_state')
+    text = update.message.text.strip()
+    
+    referral_code = None
+    
+    if text.lower() != 'skip':
+        # Validate Code
+        ref = db_get_referral(text)
+        if ref:
+            if ref['user_id'] == update.effective_user.id:
+                await update.message.reply_text("❌ You cannot use your own referral code. Type a different code or 'skip'.")
+                return
+            referral_code = text
+            await update.message.reply_text("✅ Referral code applied!")
+        else:
+            await update.message.reply_text("❌ Invalid referral code. Please try again or type 'skip'.")
+            return
+            
+    # Proceed to create ticket
+    del context.user_data['ticket_creation_state']
+    await create_new_ticket(update, context, state['section_name'], state['response_message'], referral_code)
 
 # ===== MY TICKETS COMMAND =====
 async def mytickets_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -819,7 +941,7 @@ async def ticket_status_command(update: Update, context: ContextTypes.DEFAULT_TY
         db_update_ticket_status(ticket_id, new_status)
         db_close_ticket(ticket_id)
         
-        final_msg = "🎉 <b>Order Delivered!</b>\n\nThank you for shopping with GeekdHouse! We hope you had a great experience and we hope to see you back soon! Use /review your order and leave a review! Any feedback is appreciated!"
+        final_msg = "🎉 <b>Order Delivered!</b>\n\nThank you for shopping with GeekdHouse! We hope you had a great experience and we hope to see you back soon! Use /review your order and leave a review! Any feedback is appreciated!\n\nAdditionally, use /refer to generate a referral code that gets you future discounts on your orders!"
         await context.bot.send_message(chat_id=user_id, text=final_msg, parse_mode='HTML')
         await update.message.reply_text(f"✅ Status updated to Delivered. Ticket closed.")
         return
@@ -832,9 +954,25 @@ async def ticket_status_command(update: Update, context: ContextTypes.DEFAULT_TY
         db_update_ticket_status(ticket_id, new_status)
         db_close_ticket(ticket_id)
         
-        final_msg = "🎉 <b>Order Complete!</b>\n\nThank you for shopping with GeekdHouse! We hope you had a great experience and we hope to see you back soon! Use /review your order and leave a review! Any feedback is appreciated!"
+        final_msg = "🎉 <b>Order Complete!</b>\n\nThank you for shopping with GeekdHouse! We hope you had a great experience and we hope to see you back soon! Use /review your order and leave a review! Any feedback is appreciated!\n\nAdditionally, use /refer to generate a referral code that gets you future discounts on your orders!"
         await context.bot.send_message(chat_id=user_id, text=final_msg, parse_mode='HTML')
         await update.message.reply_text(f"✅ Status updated to Complete. Ticket closed.")
+        return
+    elif status_key == "shipdetails":
+        # Bulk Only Check
+        if "bulk" not in ticket['section'].lower():
+            await update.message.reply_text("⚠️ Warning: This ticket does not seem to be Bulk. Proceeding anyway.")
+        
+        # Send options to user
+        keyboard = [
+            [InlineKeyboardButton("📦 Ship to Me", callback_data=f"ship_opt_ship_{ticket_id}")],
+            [InlineKeyboardButton("🏃 Pick Up from Staff", callback_data=f"ship_opt_pickup_{ticket_id}")]
+        ]
+        try:
+            await context.bot.send_message(chat_id=user_id, text="🚚 <b>Shipping Options</b>\n\nHow would you like to receive your order?", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+            await update.message.reply_text(f"✅ Sent shipping options to User {user_id}.")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Failed to send to user: {e}")
         return
     else:
         await update.message.reply_text("❌ Unknown status.")
@@ -928,6 +1066,140 @@ async def handle_review_step(update: Update, context: ContextTypes.DEFAULT_TYPE)
         else:
             await update.message.reply_text("❗ Please send a photo or type 'done'/'skip'.")
 
+# ===== SHIPPING DETAILS FLOW =====
+async def handle_shipping_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+    user = update.effective_user
+    
+    # Format: ship_opt_pickup_{ticket_id} OR ship_meth_std_{ticket_id}
+    parts = data.split("_", 3)
+    action = parts[1] # opt or meth
+    sub_action = parts[2] # pickup, ship, std, prio
+    ticket_id = parts[3]
+
+    if action == "opt":
+        if sub_action == "pickup":
+            # Notify Admin
+            await send_to_support_group(
+                context.bot,
+                text=f"🏃 <b>Pickup Selected</b>\n\nUser {user.first_name} (Ticket {ticket_id}) has chosen to pick up their order from the staff.",
+                parse_mode='HTML'
+            )
+            await query.message.edit_text("✅ You have chosen to pick up your order.\nThe staff has been notified.")
+        
+        elif sub_action == "ship":
+            # Start Form
+            context.user_data['ship_state'] = {'step': 'name', 'ticket_id': ticket_id, 'data': {}}
+            await query.message.edit_text("📝 <b>Shipping Details</b>\n\nPlease enter your <b>Full Name</b>:", parse_mode='HTML')
+
+    elif action == "meth":
+        # Final Step
+        state = context.user_data.get('ship_state')
+        if not state or state['ticket_id'] != ticket_id:
+            await query.message.edit_text("❌ Session expired.")
+            return
+        
+        method_name = "Standard Shipping ($20, 3-7 days)" if sub_action == "std" else "Priority Shipping ($35, 2-4 days)"
+        state['data']['method'] = method_name
+        
+        # Compile Info
+        d = state['data']
+        summary = (
+            f"📦 <b>Shipping Details Received</b>\n"
+            f"🎫 Ticket: {ticket_id}\n"
+            f"👤 User: {user.first_name} (@{user.username})\n\n"
+            f"📛 Name: {d.get('name')}\n"
+            f"🏠 Address: {d.get('address')}\n"
+            f"🚚 Method: {method_name}"
+        )
+        
+        await send_to_support_group(context.bot, text=summary, parse_mode='HTML')
+        await query.message.edit_text("✅ <b>Thank you!</b>\n\nYour shipping details have been sent to the staff.", parse_mode='HTML')
+        
+        # Clear state
+        del context.user_data['ship_state']
+
+async def handle_shipping_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    state = context.user_data.get('ship_state')
+    step = state['step']
+    ticket_id = state['ticket_id']
+    text = update.message.text
+    
+    if step == 'name':
+        state['data']['name'] = text
+        state['step'] = 'address'
+        await update.message.reply_text("✅ Name saved.\n\n📍 Now, please enter your <b>Full Shipping Address</b>:", parse_mode='HTML')
+    
+    elif step == 'address':
+        state['data']['address'] = text
+        state['step'] = 'method'
+        
+        # Show Buttons
+        keyboard = [
+            [InlineKeyboardButton("Standard ($20, 3-7 days)", callback_data=f"ship_meth_std_{ticket_id}")],
+            [InlineKeyboardButton("Priority ($35, 2-4 days)", callback_data=f"ship_meth_prio_{ticket_id}")]
+        ]
+        await update.message.reply_text("✅ Address saved.\n\n🚚 Please choose a shipping method:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+# ===== REFERRAL SYSTEM =====
+async def refer_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = (
+        "- GEEKDHOUSE REFERRALS -\n\n"
+        "Generate a referral code unique to you that you can share with your friends.\n\n"
+        "Each time someone successfully orders using your referral code, you will gain referral points. "
+        "Each point is equivelant to $5 off your order. You are limited to using 2 points per order, "
+        "unless your order is $200+ in which case you can use 3 points. your points are stored and "
+        "remembered for as long as you are a customer with us!\n\n"
+        "Please note that anyone who is referred will also have to be a member of the main channel.\n\n"
+        "Do you agree to the terms and wish to generate a referral link?"
+    )
+    
+    keyboard = [
+        [InlineKeyboardButton("Yes", callback_data="refer_yes"), InlineKeyboardButton("No", callback_data="refer_no")]
+    ]
+    await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def handle_referral_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+    user = update.effective_user
+    
+    if data == "refer_no":
+        await query.message.edit_text("Referral cancelled, have a good day!")
+        return
+    
+    if data == "refer_yes":
+        # Generate Code
+        code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+        
+        # Ensure uniqueness
+        while db_get_referral(code):
+            code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+        
+        db_create_referral(code, user.id)
+        
+        # Log to Admin Topic (Exact format requested)
+        log_msg = (
+            f"Referral code created!\n"
+            f"Code: {code}\n"
+            f"User info: {user.first_name} (@{user.username}) ID: {user.id}"
+        )
+        try:
+            await context.bot.send_message(chat_id=REFERRAL_CHAT_ID, message_thread_id=REFERRAL_TOPIC_ID, text=log_msg)
+        except Exception as e:
+            print(f"Failed to log referral creation: {e}")
+
+        response = (
+            f"Thank you for using the GeekdHouse Referral Program! Here is your unique code:\n\n"
+            f"<code>{code}</code>\n\n"
+            f"Remember, please make sure to have your friends join the main channel! "
+            f"Points are applied once a successful order is placed using the referal code."
+        )
+        await query.message.edit_text(response, parse_mode='HTML')
+
 # ===== ADMIN REPLY MESSAGES =====
 async def handle_admin_dm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -1011,6 +1283,11 @@ async def handle_admin_dm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Check for Review State
     if 'review_state' in context.user_data:
         await handle_review_step(update, context)
+        return
+
+    # Check for Shipping Details State (Admin testing as user)
+    if 'ship_state' in context.user_data:
+        await handle_shipping_step(update, context)
         return
 
     ticket_id = context.user_data.get('reply_ticket_id')
@@ -1350,6 +1627,7 @@ async def set_commands(app):
         BotCommand("mytickets", "View your active tickets"),
         BotCommand("close", "Close current ticket"),
         BotCommand("review", "Leave a review"),
+        BotCommand("refer", "Get Referral Code"),
         BotCommand("help", "Show available commands")
     ], scope=BotCommandScopeAllPrivateChats())
 
@@ -1377,6 +1655,7 @@ def main():
     print(f"ℹ️ Current Support Group ID: {SUPPORT_GROUP_ID}")
     if not ADMIN_IDS:
         print("⚠️ Warning: ADMIN_IDS is empty. No admins will be able to reply.")
+    print(f"📂 Database File Path: {os.path.abspath(DB_FILE)}")
 
     conn = init_db()
     migrate_json_to_db(conn)
@@ -1399,6 +1678,7 @@ def main():
     app.add_handler(CommandHandler("block", block_command))
     app.add_handler(CommandHandler("unblock", unblock_command))
     app.add_handler(CommandHandler("ping", ping_command))
+    app.add_handler(CommandHandler("refer", refer_command))
     app.add_handler(CommandHandler("help", help_command))
     
     app.add_handler(CallbackQueryHandler(handle_reply_selection, pattern=r"^reply_[\w-]+$"))
@@ -1406,6 +1686,8 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_settings_callback, pattern=r"^(settings_|set_text_|toggle_svc_|toggle_btn_|svc_|add_type_)"))
     app.add_handler(CallbackQueryHandler(handle_review_callback, pattern=r"^rev_star_"))
     app.add_handler(CallbackQueryHandler(handle_myticket_selection, pattern=r"^sel_ticket_"))
+    app.add_handler(CallbackQueryHandler(handle_shipping_callback, pattern=r"^ship_"))
+    app.add_handler(CallbackQueryHandler(handle_referral_callback, pattern=r"^refer_"))
     
     # Menu handler (catch-all for dynamic IDs)
     app.add_handler(CallbackQueryHandler(handle_menu_callback))
