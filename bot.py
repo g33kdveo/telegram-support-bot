@@ -982,6 +982,52 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("ℹ️ No active action to cancel.")
 
+# ===== TICKET INFO COMMAND =====
+async def ticketinfo_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in ADMIN_IDS: return
+    
+    ticket_id = context.user_data.get('reply_ticket_id')
+    if not ticket_id:
+        await update.message.reply_text("❗ You must be replying to a ticket to view info.")
+        return
+    
+    ticket = db_get_ticket(ticket_id)
+    if not ticket:
+        await update.message.reply_text("❌ Ticket not found.")
+        return
+
+    # Format timestamps
+    created_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(ticket['created_at']))
+    last_act_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(ticket['last_activity']))
+    
+    # User details
+    user_id = ticket['user_id']
+    try:
+        chat_member = await context.bot.get_chat(user_id)
+        user_name = f"{chat_member.first_name} (@{chat_member.username})"
+    except:
+        user_name = "Unknown"
+
+    points = db_get_user_points(user_id)
+    referral = ticket.get('referral_code') or "None"
+    
+    info_text = (
+        f"📋 <b>Ticket Information</b>\n"
+        f"-----------------------------\n"
+        f"🎫 <b>Ticket ID:</b> {ticket['id']}\n"
+        f"👤 <b>User:</b> {user_name}\n"
+        f"🆔 <b>User ID:</b> {user_id}\n"
+        f"💰 <b>User Points:</b> {points}\n"
+        f"📂 <b>Section:</b> {ticket['section']}\n"
+        f"📊 <b>Status:</b> {ticket['status']}\n"
+        f"🔗 <b>Referral Code Used:</b> {referral}\n"
+        f"📅 <b>Created:</b> {created_str}\n"
+        f"⏱ <b>Last Activity:</b> {last_act_str}\n"
+        f"🔒 <b>Closed:</b> {'Yes' if ticket['closed'] else 'No'}"
+    )
+    
+    await update.message.reply_text(info_text, parse_mode='HTML')
+
 # ===== TICKET STATUS COMMAND =====
 async def ticket_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMIN_IDS: return
@@ -1854,6 +1900,7 @@ def main():
     app.add_handler(CommandHandler("settings", settings_command))
     app.add_handler(CommandHandler("status", status_command))
     app.add_handler(CommandHandler("ticketstatus", ticket_status_command))
+    app.add_handler(CommandHandler("ticketinfo", ticketinfo_command))
     app.add_handler(CommandHandler("done", stop_reply_command))
     app.add_handler(CommandHandler("close", close_ticket_command))
     app.add_handler(CommandHandler("cancel", cancel_command))
