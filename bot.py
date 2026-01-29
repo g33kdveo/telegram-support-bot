@@ -7,6 +7,7 @@ import time
 import asyncio
 import copy
 import uuid
+import re
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -62,7 +63,7 @@ DEFAULT_CONFIG = {
             "message": "✅ You selected: 🛒 Create Order\n\n👇 Next, please choose from the options below:",
             "items": [
                 {"id": "order_singles", "name": "📦 Singles (1-5 pieces)", "type": "service", "status": True, "visible": True, "response_message": "✅ You have chosen {service_name}\nYour ticket has been created! 🎉\n\nPlease have your order ready!\n🎫 Ticket {ticket_id} has been sent to our staff.\n⏳ They will be with you shortly! 🚀"},
-                {"id": "order_bulk", "name": "🚛 Bulk (10+ pieces)", "type": "service", "status": True, "visible": True, "response_message": "✅ You have chosen {service_name}\nYour ticket has been created! 🎉\n\nPlease have your order ready!\n🎫 Ticket {ticket_id} has been sent to our staff.\n⏳ They will be with you shortly! 🚀"}
+                {"id": "order_bulk", "name": "🚛 Bulk (10+ pieces SHIPPED)", "type": "service", "status": True, "visible": True, "response_message": "✅ You have chosen {service_name}\nYour ticket has been created! 🎉\n\nPlease have your order ready!\n🎫 Ticket {ticket_id} has been sent to our staff.\n⏳ They will be with you shortly! 🚀"}
             ]
         },
         {
@@ -568,7 +569,6 @@ async def create_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     await send_to_support_group(
         context.bot,
         text=f"🆕 <b>New Ticket Created!</b>\n"
-             f"👤 User: {user.first_name} (@{user.username}) ({user.id})\n"
              f"👤 User: {user_display} ({user.id})\n"
              f"🎫 Ticket ID: {ticket_id}\n"
              f"📂 Category: {section_name}{referral_note}",
@@ -1269,17 +1269,17 @@ async def handle_shipping_callback(update: Update, context: ContextTypes.DEFAULT
 
     if action == "opt":
         if sub_action == "pickup":
-            # Notify Admin
-            await send_to_support_group(
-                context.bot,
-                text=f"🏃 <b>Pickup Selected</b>\n\nUser {user.first_name} (Ticket {ticket_id}) has chosen to pick up their order from the staff.",
-                parse_mode='HTML'
-            )
-            await query.message.edit_text("✅ You have chosen to pick up your order.\nThe staff has been notified.")
+            # Start Pickup Flow (Skip name/address, go to method)
+            context.user_data['ship_state'] = {'step': 'method', 'ticket_id': ticket_id, 'data': {'type': 'pickup'}}
+            keyboard = [
+                [InlineKeyboardButton("Standard ($20, 3-7 days)", callback_data=f"ship_meth_std_{ticket_id}")],
+                [InlineKeyboardButton("Priority ($35, 2-4 days)", callback_data=f"ship_meth_prio_{ticket_id}")]
+            ]
+            await query.message.edit_text("🏃 <b>Pickup Selected</b>\n\nPlease choose a processing speed:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
         
         elif sub_action == "ship":
             # Start Form
-            context.user_data['ship_state'] = {'step': 'name', 'ticket_id': ticket_id, 'data': {}}
+            context.user_data['ship_state'] = {'step': 'name', 'ticket_id': ticket_id, 'data': {'type': 'ship'}}
             await query.message.edit_text("📝 <b>Shipping Details</b>\n\nPlease enter your <b>Full Name</b>:", parse_mode='HTML')
 
     elif action == "meth":
@@ -1294,23 +1294,35 @@ async def handle_shipping_callback(update: Update, context: ContextTypes.DEFAULT
         
         # Compile Info
         d = state['data']
+        ship_type = d.get('type', 'ship')
+        
         user_display = user.mention_html()
         if user.username:
             user_display += f" (@{user.username})"
         else:
             user_display += f' (<a href="tg://user?id={user.id}">DM Link</a>)'
-        summary = (
-            f"📦 <b>Shipping Details Received</b>\n"
-            f"🎫 Ticket: {ticket_id}\n"
-            f"👤 User: {user.first_name} (@{user.username})\n\n"
-            f"� User: {user_display}\n\n"
-            f"�📛 Name: {d.get('name')}\n"
-            f"🏠 Address: {d.get('address')}\n"
-            f"🚚 Method: {method_name}"
-        )
+        
+        if ship_type == 'pickup':
+            summary = (
+                f"🏃 <b>Pickup Request</b>\n"
+                f"🎫 Ticket: {ticket_id}\n"
+                f"👤 User: {user_display}\n\n"
+                f"⚡ Speed: {method_name}"
+            )
+            msg_user = "✅ <b>Thank you!</b>\n\nYour pickup request has been sent to the staff."
+        else:
+            summary = (
+                f"📦 <b>Shipping Details Received</b>\n"
+                f"🎫 Ticket: {ticket_id}\n"
+                f"👤 User: {user_display}\n\n"
+                f"📛 Name: {d.get('name')}\n"
+                f"🏠 Address: {d.get('address')}\n"
+                f"🚚 Method: {method_name}"
+            )
+            msg_user = "✅ <b>Thank you!</b>\n\nYour shipping details have been sent to the staff."
         
         await send_to_support_group(context.bot, text=summary, parse_mode='HTML')
-        await query.message.edit_text("✅ <b>Thank you!</b>\n\nYour shipping details have been sent to the staff.", parse_mode='HTML')
+        await query.message.edit_text(msg_user, parse_mode='HTML')
         
         # Clear state
         del context.user_data['ship_state']
@@ -1327,6 +1339,19 @@ async def handle_shipping_step(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text("✅ Name saved.\n\n📍 Now, please enter your <b>Full Shipping Address</b>:", parse_mode='HTML')
     
     elif step == 'address':
+        # Address Validation
+        # Format: Street, City, State Zip
+        if not re.search(r"\d+\s+.+,\s*.+,\s*[A-Za-z]{2}\s+\d{5}", text):
+            await update.message.reply_text(
+                "❌ <b>Invalid Address Format</b>\n\n"
+                "Please use the format:\n"
+                "<code>Street Address, City, State ZipCode</code>\n\n"
+                "Example: <i>123 Main St, New York, NY 10001</i>\n\n"
+                "Please try again:",
+                parse_mode='HTML'
+            )
+            return
+            
         state['data']['address'] = text
         state['step'] = 'method'
         
