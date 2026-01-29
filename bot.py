@@ -26,10 +26,11 @@ SUPPORT_GROUP_ID = int(os.getenv("SUPPORT_GROUP_ID") or 0)
 REVIEW_CHANNEL_ID = os.getenv("REVIEW_CHANNEL_ID")
 REVIEW_TOPIC_ID = int(os.getenv("REVIEW_TOPIC_ID") or 0)
 DB_FILE = os.getenv("DB_FILE", "bot_database.db")
-TICKET_TIMEOUT = 4 * 60 * 60  # 4 hours in seconds
+TICKET_TIMEOUT = 24 * 60 * 60  # 24 hours in seconds
 REFERRAL_CHAT_ID = -1003786439934
 REFERRAL_TOPIC_ID = 575
 RETENTION_DAYS = int(os.getenv("RETENTION_DAYS") or 15)
+DELETE_TIMEOUT = 14 * 24 * 60 * 60 # 2 weeks (Hard limit for open inactive tickets)
 
 # ===== GLOBAL STATE =====
 # Data structure:
@@ -124,6 +125,14 @@ def init_db():
     except sqlite3.OperationalError:
         pass # Column likely exists
 
+    # Migration for prompt tracking (inactivity)
+    try:
+        c.execute("ALTER TABLE tickets ADD COLUMN last_prompt_at REAL")
+        c.execute("ALTER TABLE tickets ADD COLUMN snooze_until REAL")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+
     return conn
 
 def migrate_json_to_db(conn):
@@ -140,6 +149,14 @@ def migrate_json_to_db(conn):
             c.execute("SELECT value FROM config WHERE key = 'migration_done'")
             if c.fetchone():
                 print("ℹ️ Migration already marked as done in DB. Skipping JSON import.")
+                return
+            
+            # Safety check: If tickets table is not empty, skip migration to prevent overwrite
+            c.execute("SELECT count(*) FROM tickets")
+            if c.fetchone()[0] > 0:
+                print("ℹ️ Tickets table is not empty. Skipping JSON migration to prevent overwrite.")
+                c.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", ("migration_done", "1"))
+                conn.commit()
                 return
             
             # Migrate Tickets
@@ -264,7 +281,8 @@ def db_create_ticket(ticket_id, user_id, section, referral_code=None):
 def db_update_ticket_activity(ticket_id):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("UPDATE tickets SET last_activity = ? WHERE id = ?", (time.time(), ticket_id))
+    # Update activity AND reset prompt timers so the 24h check starts over
+    c.execute("UPDATE tickets SET last_activity = ?, last_prompt_at = NULL, snooze_until = NULL WHERE id = ?", (time.time(), ticket_id))
     conn.commit()
     conn.close()
 
@@ -1677,18 +1695,82 @@ async def check_timeouts(context: ContextTypes.DEFAULT_TYPE):
     c = conn.cursor()
     c.execute("SELECT * FROM tickets WHERE closed = 0")
     tickets = c.fetchall()
-    conn.close()
     
     for t in tickets:
-        if now - t['last_activity'] > TICKET_TIMEOUT:
-            db_close_ticket(t['id'])
-            
-            # Notify
-            await send_to_support_group(context.bot, text=f"⏳ Ticket {t['id']} closed due to inactivity.")
+        ticket_id = t['id']
+        last_activity = t['last_activity']
+        last_prompt_at = t['last_prompt_at']
+        snooze_until = t['snooze_until']
+        
+        inactivity = now - last_activity
+        
+        # 1. Check for Hard Delete (2 Weeks)
+        if inactivity > DELETE_TIMEOUT:
+            db_close_ticket(ticket_id)
+            await send_to_support_group(context.bot, text=f"⏳ Ticket {ticket_id} closed automatically (2 weeks inactivity).")
             try:
-                await context.bot.send_message(chat_id=t['user_id'], text=f"⏳ Ticket {t['id']} has been closed due to inactivity.")
+                await context.bot.send_message(chat_id=t['user_id'], text=f"⏳ Ticket {ticket_id} has been closed due to extended inactivity.")
             except:
                 pass
+            continue
+
+        # 2. Check for Inactivity Prompt (24 Hours)
+        if inactivity > TICKET_TIMEOUT:
+            # Check if snoozed
+            if snooze_until and now < snooze_until:
+                continue
+            
+            should_prompt = False
+            if not last_prompt_at:
+                should_prompt = True
+            elif snooze_until and now >= snooze_until:
+                should_prompt = True
+            
+            if should_prompt:
+                # Send Prompt
+                keyboard = [
+                    [InlineKeyboardButton("Yes (Close)", callback_data=f"inact_yes_{ticket_id}")],
+                    [InlineKeyboardButton("No (Keep Open)", callback_data=f"inact_no_{ticket_id}")]
+                ]
+                await send_to_support_group(
+                    context.bot,
+                    text=f"⏳ <b>Inactivity Alert</b>\nTicket {ticket_id} has been inactive for over 24 hours.\nClose it?",
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode='HTML'
+                )
+                # Update DB: Set last_prompt_at, Clear snooze_until
+                c.execute("UPDATE tickets SET last_prompt_at = ?, snooze_until = NULL WHERE id = ?", (now, ticket_id))
+                conn.commit()
+    
+    conn.close()
+
+async def handle_inactivity_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+    
+    parts = data.split("_")
+    action = parts[1]
+    ticket_id = parts[2]
+    
+    if action == "yes":
+        db_close_ticket(ticket_id)
+        await query.message.edit_text(f"✅ Ticket {ticket_id} closed by admin.")
+        ticket = db_get_ticket(ticket_id)
+        if ticket:
+            try:
+                await context.bot.send_message(chat_id=ticket['user_id'], text=f"🔒 Ticket {ticket_id} has been closed.")
+            except:
+                pass
+    elif action == "no":
+        # Snooze for 4 hours
+        snooze_time = time.time() + (4 * 60 * 60)
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("UPDATE tickets SET snooze_until = ? WHERE id = ?", (snooze_time, ticket_id))
+        conn.commit()
+        conn.close()
+        await query.message.edit_text(f"✅ Ticket {ticket_id} kept open. Will ask again in 4 hours.")
 
 async def cleanup_database(context: ContextTypes.DEFAULT_TYPE):
     """Deletes closed tickets older than RETENTION_DAYS and reclaims disk space."""
@@ -1755,6 +1837,9 @@ def main():
     if not ADMIN_IDS:
         print("⚠️ Warning: ADMIN_IDS is empty. No admins will be able to reply.")
     print(f"📂 Database File Path: {os.path.abspath(DB_FILE)}")
+    
+    if "RAILWAY_ENVIRONMENT" in os.environ and not os.path.isabs(DB_FILE):
+        print("⚠️ WARNING: Running on Railway with a relative DB_FILE path. Ensure you have a Volume mounted and DB_FILE points to it, or data will be lost on restart!")
 
     conn = init_db()
     migrate_json_to_db(conn)
@@ -1788,6 +1873,7 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_myticket_selection, pattern=r"^sel_ticket_"))
     app.add_handler(CallbackQueryHandler(handle_shipping_callback, pattern=r"^ship_"))
     app.add_handler(CallbackQueryHandler(handle_referral_callback, pattern=r"^refer_"))
+    app.add_handler(CallbackQueryHandler(handle_inactivity_response, pattern=r"^inact_"))
     
     # Menu handler (catch-all for dynamic IDs)
     app.add_handler(CallbackQueryHandler(handle_menu_callback))
