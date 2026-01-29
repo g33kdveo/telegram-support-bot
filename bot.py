@@ -511,23 +511,35 @@ async def create_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         if ref_data:
             creator_id = ref_data['user_id']
             # Log usage
+            creator_display = f"ID {creator_id}"
             try:
                 creator_info = await context.bot.get_chat(creator_id)
-                creator_name = f"{creator_info.first_name} (@{creator_info.username})"
-            except:
-                creator_name = f"ID {creator_id}"
+                creator_link = f'<a href="tg://user?id={creator_id}">{creator_info.first_name}</a>'
+                if creator_info.username:
+                    creator_display = f"{creator_link} (@{creator_info.username})"
+                else:
+                    creator_display = f'{creator_link} (<a href="tg://user?id={creator_id}">DM Link</a>)'
+            except Exception as e:
+                print(f"Could not fetch creator info for {creator_id}: {e}")
+                creator_display = f"ID {creator_id}"
             
-            referral_note = f"\n🔗 <b>Referral Used:</b> {referral_code} (By {creator_name})"
+            referral_note = f"\n🔗 <b>Referral Used:</b> {referral_code} (By {creator_display})"
             
+            user_display = user.mention_html()
+            if user.username:
+                user_display += f" (@{user.username})"
+            else:
+                user_display += f' (<a href="tg://user?id={user.id}">DM Link</a>)'
             # Log to Admin Topic (Exact format requested)
             log_msg = (
                 f"Referral code Used!\n"
                 f"Code: {referral_code}\n"
-                f"Created by: {creator_name}\n"
-                f"Used by: {user.first_name} (@{user.username})"
+                f"Created by: {creator_display}\n"
+                f"Used by: {user_display}"
             )
             try:
                 await context.bot.send_message(chat_id=REFERRAL_CHAT_ID, message_thread_id=REFERRAL_TOPIC_ID, text=log_msg)
+                await context.bot.send_message(chat_id=REFERRAL_CHAT_ID, message_thread_id=REFERRAL_TOPIC_ID, text=log_msg, parse_mode='HTML')
             except Exception as e:
                 print(f"Failed to log referral usage: {e}")
 
@@ -548,10 +560,16 @@ async def create_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     keyboard = [[InlineKeyboardButton("Reply to Ticket ✍️", callback_data=f"reply_{ticket_id}")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
+    user_display = user.mention_html()
+    if user.username:
+        user_display += f" (@{user.username})"
+    else:
+        user_display += f' (<a href="tg://user?id={user.id}">DM Link</a>)'
     await send_to_support_group(
         context.bot,
         text=f"🆕 <b>New Ticket Created!</b>\n"
              f"👤 User: {user.first_name} (@{user.username}) ({user.id})\n"
+             f"👤 User: {user_display} ({user.id})\n"
              f"🎫 Ticket ID: {ticket_id}\n"
              f"📂 Category: {section_name}{referral_note}",
         parse_mode='HTML',
@@ -1002,11 +1020,16 @@ async def ticketinfo_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     # User details
     user_id = ticket['user_id']
+    user_name = f"Unknown (ID: {user_id})"
     try:
         chat_member = await context.bot.get_chat(user_id)
-        user_name = f"{chat_member.first_name} (@{chat_member.username})"
-    except:
-        user_name = "Unknown"
+        user_link = f'<a href="tg://user?id={user_id}">{chat_member.first_name}</a>'
+        if chat_member.username:
+            user_name = f"{user_link} (@{chat_member.username})"
+        else:
+            user_name = f'{user_link} (<a href="tg://user?id={user_id}">DM Link</a>)'
+    except Exception:
+        pass
 
     points = db_get_user_points(user_id)
     referral = ticket.get('referral_code') or "None"
@@ -1185,9 +1208,15 @@ async def handle_review_step(update: Update, context: ContextTypes.DEFAULT_TYPE)
             photos = data['photos']
             
             # Send to Admin
+            user_display = user.mention_html()
+            if user.username:
+                user_display += f" (@{user.username})"
+            else:
+                user_display += f' (<a href="tg://user?id={user.id}">DM Link</a>)'
             admin_text = (
                 f"🌟 <b>New Review!</b>\n"
                 f"👤 User: {user.first_name} (@{user.username})\n"
+                f"👤 User: {user_display}\n"
                 f"⭐ Rating: {stars}/5\n"
                 f"💬 Review: {review_text}"
             )
@@ -1262,11 +1291,17 @@ async def handle_shipping_callback(update: Update, context: ContextTypes.DEFAULT
         
         # Compile Info
         d = state['data']
+        user_display = user.mention_html()
+        if user.username:
+            user_display += f" (@{user.username})"
+        else:
+            user_display += f' (<a href="tg://user?id={user.id}">DM Link</a>)'
         summary = (
             f"📦 <b>Shipping Details Received</b>\n"
             f"🎫 Ticket: {ticket_id}\n"
             f"👤 User: {user.first_name} (@{user.username})\n\n"
-            f"📛 Name: {d.get('name')}\n"
+            f"� User: {user_display}\n\n"
+            f"�📛 Name: {d.get('name')}\n"
             f"🏠 Address: {d.get('address')}\n"
             f"🚚 Method: {method_name}"
         )
@@ -1338,13 +1373,20 @@ async def handle_referral_callback(update: Update, context: ContextTypes.DEFAULT
         db_create_referral(code, user.id)
         
         # Log to Admin Topic (Exact format requested)
+        user_display = user.mention_html()
+        if user.username:
+            user_display += f" (@{user.username})"
+        else:
+            user_display += f' (<a href="tg://user?id={user.id}">DM Link</a>)'
         log_msg = (
             f"Referral code created!\n"
             f"Code: {code}\n"
             f"User info: {user.first_name} (@{user.username}) ID: {user.id}"
+            f"User info: {user_display} ID: {user.id}"
         )
         try:
             await context.bot.send_message(chat_id=REFERRAL_CHAT_ID, message_thread_id=REFERRAL_TOPIC_ID, text=log_msg)
+            await context.bot.send_message(chat_id=REFERRAL_CHAT_ID, message_thread_id=REFERRAL_TOPIC_ID, text=log_msg, parse_mode='HTML')
         except Exception as e:
             print(f"Failed to log referral creation: {e}")
 
