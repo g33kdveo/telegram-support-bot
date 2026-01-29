@@ -1060,8 +1060,11 @@ async def ticket_status_command(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text("❗ You must be replying to a ticket to change status.")
         return
     
+    valid_options = ["accepted", "shipdetails", "paid", "package", "shipped", "delivered", "complete"]
+    
     if not context.args:
-        await update.message.reply_text("Usage: /ticketstatus <status>\nOptions: accepted, paid, package, shipped, delivered, complete")
+        options_str = ", ".join(valid_options)
+        await update.message.reply_text(f"Usage: /ticketstatus <status>\nOptions: {options_str}")
         return
     
     status_key = context.args[0].lower()
