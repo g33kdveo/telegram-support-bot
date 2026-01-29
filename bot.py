@@ -452,12 +452,23 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             await query.message.reply_text(global_config["texts"]["service_closed"])
             return
         
-        # Start Referral Check Flow instead of creating ticket immediately
-        context.user_data['ticket_creation_state'] = {
-            'section_name': item["name"],
-            'response_message': item.get("response_message")
-        }
-        await query.message.edit_text("🔗 <b>Referral Code</b>\n\nDo you have a referral code from a friend?\n\nType the code below, or type <b>skip</b> to proceed.", parse_mode='HTML')
+        # Check if this service is under "Create an Order" category (id="create_order")
+        requires_referral = False
+        create_order_cat, _, _ = find_menu_item(global_config["menu"], "create_order")
+        if create_order_cat and create_order_cat.get("items"):
+            found, _, _ = find_menu_item(create_order_cat["items"], item["id"])
+            if found:
+                requires_referral = True
+
+        if requires_referral:
+            # Start Referral Check Flow instead of creating ticket immediately
+            context.user_data['ticket_creation_state'] = {
+                'section_name': item["name"],
+                'response_message': item.get("response_message")
+            }
+            await query.message.edit_text("🔗 <b>Referral Code</b>\n\nDo you have a referral code from a friend?\n\nType the code below, or type <b>skip</b> to proceed.", parse_mode='HTML')
+        else:
+            await create_new_ticket(update, context, item["name"], item.get("response_message"))
     elif item["type"] == "auto_response":
         # Automated response, no ticket
         await query.message.reply_text(item.get("response_message", "ℹ️ Info"))
