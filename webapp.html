@@ -75,7 +75,7 @@
             cursor: pointer;
             position: relative;
             overflow: hidden;
-            padding-bottom: 10px;
+            padding: 10px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.04);
             transition: transform 0.1s ease-in-out;
         }
@@ -95,37 +95,48 @@
             );
         }
 
+        /* New Card Layout Elements */
+        .pc-brand {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--button-color);
+            margin-bottom: 4px;
+            align-self: flex-start;
+            z-index: 2;
+        }
+
+        .pc-name {
+            font-size: 13px;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 4px;
+            line-height: 1.3;
+            width: 100%;
+        }
+
+        .pc-meta {
+            font-size: 10px;
+            color: var(--hint-color);
+            align-self: flex-start;
+            margin-bottom: 8px;
+        }
+
         .product-image {
             width: 100%;
             aspect-ratio: 1;
             height: auto;
-            object-fit: cover;
-            border-radius: 0;
+            object-fit: contain;
+            border-radius: 8px;
             background-color: var(--secondary-bg);
+            margin-bottom: 8px;
         }
 
-        .product-info {
-            padding: 8px 10px 0 10px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-
-        .product-name {
+        .pc-footer {
+            font-size: 10px;
             font-weight: 600;
-            font-size: 14px;
-            margin-bottom: 5px;
-            line-height: 1.3;
-        }
-
-        .product-desc-preview {
-            font-size: 12px;
-            color: var(--hint-color);
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
+            color: var(--text-color);
+            align-self: flex-start;
+            margin-top: auto;
         }
 
         /* Modal */
@@ -470,6 +481,26 @@
         nav.innerHTML = html;
     }
 
+    // Helper to extract info from name/desc
+    function parseProductInfo(name, desc) {
+        const text = (name + " " + (desc || "")).toLowerCase();
+        
+        // Formulation Keywords
+        const forms = ["distillate", "live resin", "live rosin", "liquid diamonds", "diamonds", "sauce", "badder", "crumble", "shatter", "flower", "pre-roll", "edible", "gummy", "vape", "cartridge", "disposable"];
+        let formulation = forms.find(f => text.includes(f));
+        if (!formulation) formulation = "Product"; 
+        
+        // Volume Regex (e.g., 3.5g, 1g, 1oz)
+        const volRegex = /\b(\d+(\.\d+)?)\s*(g|gram|oz|ounce|lb|pound|ml|mg)\b/i;
+        const volMatch = text.match(volRegex);
+        let volume = volMatch ? volMatch[0] : "";
+        
+        return { 
+            formulation: formulation.charAt(0).toUpperCase() + formulation.slice(1), 
+            volume: volume 
+        };
+    }
+
     function render() {
         const container = document.getElementById('main-container');
         const filtersContainer = document.getElementById('active-filters');
@@ -501,56 +532,72 @@
                 return;
             }
 
-            // 3. Iterate variants inside the group
-            if (group.products) {
-                group.products.forEach(prod => {
-                    const isHidden = settings.h.includes(prod.id);
-                    if (isHidden && !isAdmin) return;
+            // 3. Stock & Variant Logic
+            // Filter out out-of-stock variants
+            const variants = group.products || [];
+            const inStockVariants = variants.filter(p => p.qty > 0);
+            
+            // Calculate total stock for the group
+            let totalStock = 0;
+            inStockVariants.forEach(p => totalStock += p.qty);
 
-                    // 4. Search Filter
-                    if (searchTerm && !prod.name.toLowerCase().includes(searchTerm)) {
-                        return;
-                    }
+            // Hide if out of stock (unless admin)
+            if (totalStock <= 0 && !isAdmin) return;
 
-                    // Image Logic
-                    let imgUrl = '';
-                    let rawImg = '';
-                    if (prod.images && prod.images.length > 0 && prod.images[0]) {
-                        rawImg = prod.images[0];
-                    } else if (group.imgs) {
-                        const firstKey = Object.keys(group.imgs)[0];
-                        if (firstKey) rawImg = group.imgs[firstKey];
-                    }
-                    if (rawImg) {
-                        imgUrl = BASE_IMG_URL + currentImgPrefix + rawImg.replace('x_imgvariantsize', '250');
-                    }
-
-                    visibleCount++;
-
-                    const card = document.createElement('div');
-                    card.className = `product-card ${isHidden ? 'hidden-item' : ''}`;
-                    card.onclick = (e) => {
-                        if (e.target.closest('.admin-overlay')) return;
-                        openModal(prod, group);
-                    };
-
-                    card.innerHTML = `
-                        <img src="${imgUrl}" class="product-image" onerror="this.style.display='none'" loading="lazy">
-                        <div class="product-info">
-                            <div class="product-name">${prod.name}</div>
-                            <div class="product-desc-preview">${prod.desc || ''}</div>
-                        </div>
-                        ${isAdmin ? `
-                            <div class="admin-overlay">
-                                <button class="btn-hide" onclick="toggleHide(${prod.id})">
-                                    ${isHidden ? '👁️ Unhide' : '🚫 Hide'}
-                                </button>
-                            </div>
-                        ` : ''}
-                    `;
-                    grid.appendChild(card);
-                });
+            // 4. Search Filter (Check group name or any variant name)
+            if (searchTerm) {
+                const matchGroup = group.name.toLowerCase().includes(searchTerm);
+                const matchVariant = variants.some(v => v.name.toLowerCase().includes(searchTerm));
+                if (!matchGroup && !matchVariant) return;
             }
+
+            // 5. Info Extraction
+            const info = parseProductInfo(group.name, group.desc);
+            const brandName = group.brand || "Geekd";
+            const optionsCount = inStockVariants.length;
+            
+            // Image Logic (Use first available)
+            let imgUrl = '';
+            let rawImg = '';
+            if (group.imgs) {
+                const firstKey = Object.keys(group.imgs)[0];
+                if (firstKey) rawImg = group.imgs[firstKey];
+            } else if (variants.length > 0 && variants[0].images && variants[0].images[0]) {
+                rawImg = variants[0].images[0];
+            }
+            
+            if (rawImg) {
+                imgUrl = BASE_IMG_URL + currentImgPrefix + rawImg.replace('x_imgvariantsize', '250');
+            }
+
+            visibleCount++;
+
+            const card = document.createElement('div');
+            // Use group ID for hiding logic if possible, or just first variant ID for now since we grouped them
+            const groupId = variants.length > 0 ? variants[0].id : 0; 
+            const isHidden = settings.h.includes(groupId);
+            
+            card.className = `product-card ${isHidden ? 'hidden-item' : ''}`;
+            card.onclick = (e) => {
+                if (e.target.closest('.admin-overlay') || e.target.closest('.pc-brand')) return;
+                openModal(group, inStockVariants);
+            };
+
+            card.innerHTML = `
+                <div class="pc-brand" onclick="event.stopPropagation(); selectBrand('${brandName.replace(/'/g, "\\'")}')">${brandName}</div>
+                <div class="pc-name">${group.name}</div>
+                <div class="pc-meta">${info.formulation} • ${optionsCount} options</div>
+                <img src="${imgUrl}" class="product-image" onerror="this.style.display='none'" loading="lazy">
+                <div class="pc-footer">${totalStock} left • ${info.volume}</div>
+                ${isAdmin ? `
+                    <div class="admin-overlay">
+                        <button class="btn-hide" onclick="toggleHide(${groupId})">
+                            ${isHidden ? '👁️ Unhide' : '🚫 Hide'}
+                        </button>
+                    </div>
+                ` : ''}
+            `;
+            grid.appendChild(card);
         });
 
         if (visibleCount > 0) {
@@ -563,21 +610,29 @@
     }
 
     // --- MODAL LOGIC ---
-    function openModal(prod, group) {
+    function openModal(group, variants) {
         const modal = document.getElementById('detail-modal');
         const body = document.getElementById('modal-body');
         
+        // Use the first variant as the default display
+        const defaultVariant = variants.length > 0 ? variants[0] : {};
+        const info = parseProductInfo(group.name, group.desc);
+
         let imagesHtml = '';
         let imageSources = [];
 
-        // Use all images from the variant if they exist
-        if (prod.images && prod.images.length > 0 && prod.images[0]) {
-            imageSources = prod.images;
-        } 
-        // Otherwise, use all images from the parent group
-        else if (group.imgs) {
+        // Collect images from group first, then variants
+        if (group.imgs) {
             imageSources = Object.values(group.imgs);
         }
+        // Add variant images if not already present (simple check)
+        variants.forEach(v => {
+            if (v.images && v.images.length > 0) {
+                v.images.forEach(img => {
+                    if (!imageSources.includes(img)) imageSources.push(img);
+                });
+            }
+        });
 
         if (imageSources.length > 0) {
             imageSources.forEach(img => {
@@ -586,26 +641,26 @@
             });
         }
 
-        // Brand Link
-        let brandHtml = '';
-        if (group.brand) {
-            brandHtml = `<div class="brand-link" onclick="selectBrand('${group.brand.replace(/'/g, "\\'")}')">Brand: ${group.brand}</div>`;
-        }
+        const brandName = group.brand || "Geekd";
+        let brandHtml = `<div class="brand-link" onclick="selectBrand('${brandName.replace(/'/g, "\\'")}')">Brand: ${brandName}</div>`;
 
         // Variants Dropdown
         let variantsHtml = '';
-        if (group.products && group.products.length > 1) {
+        if (variants.length > 0) {
             let options = '';
-            group.products.forEach(p => {
-                const isSelected = p.id === prod.id ? 'selected' : '';
-                // Clean name for display
-                options += `<option value="${p.id}" ${isSelected}>${p.name}</option>`;
+            variants.forEach(p => {
+                // Try to extract just the flavor name if possible, otherwise use full name
+                // Often name is "Product - Flavor". 
+                let flavorName = p.name.replace(group.name, "").replace(/^-/, "").trim();
+                if (!flavorName) flavorName = "Standard";
+                
+                options += `<option value="${p.id}">${flavorName} (${p.qty} left)</option>`;
             });
             
             variantsHtml = `
                 <div class="variant-section">
                     <div class="variant-label">Select Option:</div>
-                    <select class="variant-select" onchange="switchVariant(this.value, '${group.name.replace(/'/g, "\\'")}')">
+                    <select class="variant-select">
                         ${options}
                     </select>
                 </div>
@@ -613,26 +668,15 @@
         }
 
         body.innerHTML = `
-            <div class="modal-title">${prod.name}</div>
+            <div class="modal-title">${group.name}</div>
             ${brandHtml}
+            <div style="margin-bottom:10px; font-weight:600; color:var(--hint-color)">${info.volume}</div>
             ${imagesHtml}
-            <div class="modal-desc">${prod.desc || 'No description available.'}</div>
+            <div class="modal-desc">${group.desc || 'No description available.'}</div>
             ${variantsHtml}
         `;
         modal.style.display = 'flex';
     }
-
-    // Helper to switch modal content when dropdown changes
-    window.switchVariant = function(variantId, groupName) {
-        // Find the group
-        const group = rawData.find(g => g.name === groupName);
-        if (group) {
-            const variant = group.products.find(p => p.id == variantId);
-            if (variant) {
-                openModal(variant, group);
-            }
-        }
-    };
 
     function closeModal(e) {
         if (!e || e.target.id === 'detail-modal' || e.target.classList.contains('close-modal')) {

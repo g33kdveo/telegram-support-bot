@@ -1659,7 +1659,6 @@ async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     keyboard = [
         [InlineKeyboardButton("📝 Edit Texts", callback_data='settings_texts')],
-        [InlineKeyboardButton("🛍️ Manage Shop (Web App)", web_app=WebAppInfo(url=get_webapp_url(update.effective_user.id, admin_mode=True)))],
         shop_btn,
         [InlineKeyboardButton("️ Manage Services", callback_data='settings_services')],
         [InlineKeyboardButton("❌ Close Menu", callback_data='settings_close')]
@@ -1668,10 +1667,13 @@ async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     text = "⚙️ <b>Admin Command Center</b>\nSelect a category to configure:"
     
-    if update.callback_query:
-        await update.callback_query.message.edit_text(text, reply_markup=reply_markup, parse_mode='HTML')
-    else:
-        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='HTML')
+    try:
+        if update.callback_query:
+            await update.callback_query.message.edit_text(text, reply_markup=reply_markup, parse_mode='HTML')
+        else:
+            await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='HTML')
+    except Exception as e:
+        print(f"❌ Error showing settings menu: {e}")
 
 async def handle_settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
