@@ -240,6 +240,93 @@
         body.admin-mode .admin-bar { display: flex; }
         body.admin-mode .admin-overlay { display: flex; }
 
+        /* Category Tabs */
+        .category-nav {
+            display: flex;
+            overflow-x: auto;
+            gap: 10px;
+            padding: 0 0 15px 0;
+            margin-bottom: 5px;
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none;  /* IE 10+ */
+        }
+        .category-nav::-webkit-scrollbar { 
+            display: none;  /* Chrome/Safari */
+        }
+        
+        .category-tab {
+            padding: 8px 16px;
+            background: var(--secondary-bg);
+            border-radius: 20px;
+            white-space: nowrap;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+            border: 1px solid transparent;
+        }
+        
+        .category-tab.active {
+            background: var(--button-color);
+            color: var(--button-text-color);
+        }
+
+        /* Active Filters */
+        .active-filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .filter-tag {
+            background: var(--button-color);
+            color: var(--button-text-color);
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .filter-tag span {
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+
+        /* Modal Brand & Variants */
+        .brand-link {
+            color: var(--button-color);
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            display: inline-block;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .variant-section {
+            margin-top: 15px;
+            border-top: 1px solid var(--secondary-bg);
+            padding-top: 15px;
+        }
+        .variant-label {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--hint-color);
+        }
+        .variant-select {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid var(--secondary-bg);
+            background: var(--bg-color);
+            color: var(--text-color);
+            font-size: 16px;
+            outline: none;
+        }
+
         /* Search Bar */
         .search-wrapper {
             position: sticky;
@@ -268,8 +355,12 @@
 
 <div class="container">
     <div class="search-wrapper">
-        <input type="text" id="search-input" placeholder="🔍 Search products..." oninput="render()">
+        <input type="text" id="search-input" placeholder="🔍 Search products..." oninput="handleSearch()">
     </div>
+    
+    <div id="category-nav" class="category-nav"></div>
+    <div id="active-filters" class="active-filters"></div>
+
     <div id="main-container">
         <div style="text-align: center; padding: 40px; color: var(--hint-color);">Loading menu...</div>
     </div>
@@ -296,11 +387,15 @@
     const API_URL = "/api/products";
     const BASE_IMG_URL = "https://chadsflooring.bz";
 
+    const CATEGORIES = ["Accessories", "BYOB", "Carts", "Concentrates", "Disposables", "Edibles", "Flower", "Merch", "Munchies", "Pre-rolls", "Topical"];
+
     // STATE
     let rawData = [];
     let settings = { h: [], r: {} }; // h = hidden IDs, r = renames { "Old Name": "New Name" }
     let isAdmin = false;
     let currentImgPrefix = "";
+    let selectedCategory = "All";
+    let selectedBrand = null;
 
     document.addEventListener('DOMContentLoaded', async () => {
         // 1. Parse URL Params for Admin Status & Settings
@@ -336,6 +431,7 @@
             currentImgPrefix = json.imagePathPrefix || "/uploads/products/";
             
             rawData = json.data || [];
+            renderCategories();
             render();
         } catch (e) {
             console.error(e);
@@ -343,63 +439,103 @@
         }
     }
 
+    function handleSearch() {
+        render();
+    }
+
+    function selectCategory(cat) {
+        selectedCategory = cat;
+        renderCategories();
+        render();
+    }
+
+    function selectBrand(brand) {
+        selectedBrand = brand;
+        closeModal();
+        render();
+    }
+
+    function clearBrand() {
+        selectedBrand = null;
+        render();
+    }
+
+    function renderCategories() {
+        const nav = document.getElementById('category-nav');
+        let html = `<div class="category-tab ${selectedCategory === 'All' ? 'active' : ''}" onclick="selectCategory('All')">All</div>`;
+        
+        CATEGORIES.forEach(cat => {
+            html += `<div class="category-tab ${selectedCategory === cat ? 'active' : ''}" onclick="selectCategory('${cat}')">${cat}</div>`;
+        });
+        nav.innerHTML = html;
+    }
+
     function render() {
         const container = document.getElementById('main-container');
+        const filtersContainer = document.getElementById('active-filters');
         const searchTerm = document.getElementById('search-input').value.toLowerCase().trim();
+        
         container.innerHTML = '';
+        filtersContainer.innerHTML = '';
 
-        rawData.forEach((cat, catIdx) => {
-            // Apply Rename
-            const catName = settings.r[cat.name] || cat.name;
+        // Render Active Filters
+        if (selectedBrand) {
+            filtersContainer.innerHTML = `<div class="filter-tag">Brand: ${selectedBrand} <span onclick="clearBrand()">✕</span></div>`;
+        }
 
-            // Create Category Section
-            const section = document.createElement('div');
-            section.className = 'category-section';
+        const grid = document.createElement('div');
+        grid.className = 'products-grid';
+        let visibleCount = 0;
 
-            const header = document.createElement('div');
-            header.className = 'category-header';
-            header.innerHTML = `
-                <span class="category-title">${catName}</span>
-                ${isAdmin ? `<button class="btn-edit-cat" onclick="editCategory('${cat.name.replace(/'/g, "\\'")}')">✏️ Rename</button>` : ''}
-            `;
-            section.appendChild(header);
+        // Iterate through all product groups (rawData is an array of groups)
+        rawData.forEach(group => {
+            // 1. Filter by Category
+            // The API 'cat' field might be null or match one of our categories
+            // We check if the group.cat matches selectedCategory
+            if (selectedCategory !== 'All' && group.cat !== selectedCategory) {
+                return;
+            }
 
-            const grid = document.createElement('div');
-            grid.className = 'products-grid';
+            // 2. Filter by Brand
+            if (selectedBrand && group.brand !== selectedBrand) {
+                return;
+            }
 
-            let visibleCount = 0;
-
-            // Render Products
-            if (cat.products) {
-                cat.products.forEach(prod => {
+            // 3. Iterate variants inside the group
+            if (group.products) {
+                group.products.forEach(prod => {
                     const isHidden = settings.h.includes(prod.id);
-                    
-                    // If hidden and NOT admin, skip completely
                     if (isHidden && !isAdmin) return;
 
-                    // Search Filter
+                    // 4. Search Filter
                     if (searchTerm && !prod.name.toLowerCase().includes(searchTerm)) {
                         return;
                     }
 
-                    visibleCount++;
-
                     // Image Logic
                     let imgUrl = '';
-                    if (prod.images && prod.images.length > 0) {
-                        imgUrl = BASE_IMG_URL + currentImgPrefix + prod.images[0];
+                    let rawImg = '';
+                    if (prod.images && prod.images.length > 0 && prod.images[0]) {
+                        rawImg = prod.images[0];
+                    } else if (group.imgs) {
+                        const firstKey = Object.keys(group.imgs)[0];
+                        if (firstKey) rawImg = group.imgs[firstKey];
                     }
+                    if (rawImg) {
+                        imgUrl = BASE_IMG_URL + currentImgPrefix + rawImg.replace('x_imgvariantsize', '250');
+                    }
+
+                    visibleCount++;
 
                     const card = document.createElement('div');
                     card.className = `product-card ${isHidden ? 'hidden-item' : ''}`;
                     card.onclick = (e) => {
-                        // Don't open modal if clicking admin buttons
                         if (e.target.closest('.admin-overlay')) return;
-                        openModal(prod);
+                        openModal(prod, group);
                     };
 
                     card.innerHTML = `
-                        <img src="${imgUrl}" class="product-image" onerror="this.style.display='none'">
+                        <img src="${imgUrl}" class="product-image" onerror="this.style.display='none'" loading="lazy">
                         <div class="product-info">
                             <div class="product-name">${prod.name}</div>
                             <div class="product-desc-preview">${prod.desc || ''}</div>
@@ -415,13 +551,11 @@
                     grid.appendChild(card);
                 });
             }
-
-            // Only append category if it has visible items OR we are admin
-            if (visibleCount > 0 || (isAdmin && !searchTerm)) {
-                section.appendChild(grid);
-                container.appendChild(section);
-            }
         });
+
+        if (visibleCount > 0) {
+            container.appendChild(grid);
+        }
 
         if (container.innerHTML === '') {
              container.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--hint-color)">No products found.</div>`;
@@ -429,25 +563,76 @@
     }
 
     // --- MODAL LOGIC ---
-    function openModal(prod) {
+    function openModal(prod, group) {
         const modal = document.getElementById('detail-modal');
         const body = document.getElementById('modal-body');
         
         let imagesHtml = '';
-        if (prod.images) {
-            prod.images.forEach(img => {
-                const src = BASE_IMG_URL + currentImgPrefix + img;
-                imagesHtml += `<img src="${src}" class="modal-img">`;
+        let imageSources = [];
+
+        // Use all images from the variant if they exist
+        if (prod.images && prod.images.length > 0 && prod.images[0]) {
+            imageSources = prod.images;
+        } 
+        // Otherwise, use all images from the parent group
+        else if (group.imgs) {
+            imageSources = Object.values(group.imgs);
+        }
+
+        if (imageSources.length > 0) {
+            imageSources.forEach(img => {
+                const src = BASE_IMG_URL + currentImgPrefix + img.replace('x_imgvariantsize', '750'); // Use a larger size for the modal
+                imagesHtml += `<img src="${src}" class="modal-img" onerror="this.style.display='none'">`;
             });
+        }
+
+        // Brand Link
+        let brandHtml = '';
+        if (group.brand) {
+            brandHtml = `<div class="brand-link" onclick="selectBrand('${group.brand.replace(/'/g, "\\'")}')">Brand: ${group.brand}</div>`;
+        }
+
+        // Variants Dropdown
+        let variantsHtml = '';
+        if (group.products && group.products.length > 1) {
+            let options = '';
+            group.products.forEach(p => {
+                const isSelected = p.id === prod.id ? 'selected' : '';
+                // Clean name for display
+                options += `<option value="${p.id}" ${isSelected}>${p.name}</option>`;
+            });
+            
+            variantsHtml = `
+                <div class="variant-section">
+                    <div class="variant-label">Select Option:</div>
+                    <select class="variant-select" onchange="switchVariant(this.value, '${group.name.replace(/'/g, "\\'")}')">
+                        ${options}
+                    </select>
+                </div>
+            `;
         }
 
         body.innerHTML = `
             <div class="modal-title">${prod.name}</div>
+            ${brandHtml}
             ${imagesHtml}
             <div class="modal-desc">${prod.desc || 'No description available.'}</div>
+            ${variantsHtml}
         `;
         modal.style.display = 'flex';
     }
+
+    // Helper to switch modal content when dropdown changes
+    window.switchVariant = function(variantId, groupName) {
+        // Find the group
+        const group = rawData.find(g => g.name === groupName);
+        if (group) {
+            const variant = group.products.find(p => p.id == variantId);
+            if (variant) {
+                openModal(variant, group);
+            }
+        }
+    };
 
     function closeModal(e) {
         if (!e || e.target.id === 'detail-modal' || e.target.classList.contains('close-modal')) {

@@ -1644,13 +1644,23 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
         return
+    print(f"⚙️ Settings command triggered by {user.id} in chat {update.effective_chat.id}")
     
     await show_settings_menu(update, context)
 
 async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    url = get_webapp_url(update.effective_user.id, admin_mode=True)
+    
+    shop_btn = []
+    if url:
+        shop_btn = [InlineKeyboardButton("🛍️ Manage Shop (Web App)", web_app=WebAppInfo(url=url))]
+    else:
+        shop_btn = [InlineKeyboardButton("⚠️ Shop URL Not Set", callback_data='settings_no_url')]
+
     keyboard = [
         [InlineKeyboardButton("📝 Edit Texts", callback_data='settings_texts')],
         [InlineKeyboardButton("🛍️ Manage Shop (Web App)", web_app=WebAppInfo(url=get_webapp_url(update.effective_user.id, admin_mode=True)))],
+        shop_btn,
         [InlineKeyboardButton("️ Manage Services", callback_data='settings_services')],
         [InlineKeyboardButton("❌ Close Menu", callback_data='settings_close')]
     ]
@@ -1673,6 +1683,10 @@ async def handle_settings_callback(update: Update, context: ContextTypes.DEFAULT
 
     if data == 'settings_close':
         await query.message.delete()
+        return
+    
+    if data == 'settings_no_url':
+        await query.answer("⚠️ WEBAPP_URL is missing. Check bot logs.", show_alert=True)
         return
     
     if data == 'settings_menu':
@@ -2032,14 +2046,18 @@ async def set_commands(app):
     # Set /reply for the support group only, and ONLY for admins
     try:
         await app.bot.set_my_commands([
-            BotCommand("reply", "Reply to a ticket")
+            BotCommand("reply", "Reply to a ticket"),
+            BotCommand("settings", "Admin Settings"),
+            BotCommand("help", "Admin Help")
         ], scope=BotCommandScopeChatAdministrators(chat_id=SUPPORT_GROUP_ID))
     except ChatMigrated as e:
         print(f"⚠️ Group upgraded to Supergroup. Updating SUPPORT_GROUP_ID to {e.new_chat_id}")
         SUPPORT_GROUP_ID = e.new_chat_id
         # Retry with new ID
         await app.bot.set_my_commands([
-            BotCommand("reply", "Reply to a ticket")
+            BotCommand("reply", "Reply to a ticket"),
+            BotCommand("settings", "Admin Settings"),
+            BotCommand("help", "Admin Help")
         ], scope=BotCommandScopeChatAdministrators(chat_id=SUPPORT_GROUP_ID))
 
 class BotRequestHandler(SimpleHTTPRequestHandler):
