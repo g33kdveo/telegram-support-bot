@@ -28,6 +28,11 @@ TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()]
 SUPPORT_GROUP_ID = int(os.getenv("SUPPORT_GROUP_ID") or 0)
 WEBAPP_URL = os.getenv("WEBAPP_URL")
+
+# Auto-configure WEBAPP_URL for Railway if not set manually
+if not WEBAPP_URL and os.getenv("RAILWAY_PUBLIC_DOMAIN"):
+    WEBAPP_URL = f"https://{os.getenv('RAILWAY_PUBLIC_DOMAIN')}/webapp.html"
+
 REVIEW_CHANNEL_ID = os.getenv("REVIEW_CHANNEL_ID")
 REVIEW_TOPIC_ID = int(os.getenv("REVIEW_TOPIC_ID") or 0)
 DB_FILE = os.getenv("DB_FILE", "bot_database.db")
@@ -2052,6 +2057,12 @@ def main():
     if not SUPPORT_GROUP_ID:
         print("⚠️ Warning: SUPPORT_GROUP_ID is missing or 0. Messages to the admin group will fail.")
     print(f"ℹ️ Current Support Group ID: {SUPPORT_GROUP_ID}")
+    
+    if not WEBAPP_URL:
+        print("⚠️ Warning: WEBAPP_URL is missing. The /menu command and Shop button will not work.")
+    else:
+        print(f"ℹ️ Web App URL: {WEBAPP_URL}")
+
     if not ADMIN_IDS:
         print("⚠️ Warning: ADMIN_IDS is empty. No admins will be able to reply.")
     print(f"📂 Database File Path: {os.path.abspath(DB_FILE)}")
