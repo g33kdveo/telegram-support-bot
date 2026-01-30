@@ -268,6 +268,7 @@
             padding: 10px 0;
             scrollbar-width: none; /* Firefox */
             -ms-overflow-style: none;  /* IE 10+ */
+            -webkit-overflow-scrolling: touch; /* For momentum scrolling on iOS */
         }
         .category-nav::-webkit-scrollbar { 
             display: none;  /* Chrome/Safari */
@@ -401,14 +402,14 @@
     const API_URL = "/api/products";
     const BASE_IMG_URL = "https://chadsflooring.bz";
 
-    const CATEGORIES = ["Accessories", "In-House", "Carts", "Concentrates", "Disposables", "Edibles", "Flower", "Merch", "Munchies", "Pre-rolls", "Topical"];
+    const CATEGORIES = ["Accessories", "In-House", "Carts", "Concentrates", "Disposables", "Edibles", "Flower", "Pre-rolls"];
 
     // STATE
     let rawData = [];
     let settings = { h: [], r: {} }; // h = hidden IDs, r = renames { "Old Name": "New Name" }
     let isAdmin = false;
     let currentImgPrefix = "";
-    let selectedCategory = "All";
+    let selectedCategory = CATEGORIES[0];
     let selectedBrand = null;
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -455,6 +456,10 @@
     }
 
     function preprocessData() {
+        // Filter out unwanted categories
+        const banned = ["Merch", "Munchies", "Topical"];
+        rawData = rawData.filter(g => !banned.includes(g.cat));
+
         rawData.forEach(group => {
             // 1. Rename Category "BYOB" -> "In-House"
             if (group.cat === "BYOB") group.cat = "In-House";
@@ -494,8 +499,7 @@
 
     function renderCategories() {
         const nav = document.getElementById('category-nav');
-        let html = `<div class="category-tab ${selectedCategory === 'All' ? 'active' : ''}" onclick="selectCategory('All')">All</div>`;
-        
+        let html = '';
         CATEGORIES.forEach(cat => {
             html += `<div class="category-tab ${selectedCategory === cat ? 'active' : ''}" onclick="selectCategory('${cat}')">${cat}</div>`;
         });
@@ -520,14 +524,12 @@
              formulation = "Product";
         }
         
-        // Improved Volume Regex
-        // Matches: 3.5g, 1/8 oz, 1/4 lb, half ounce, quarter pound, 1000mg, 1 liter
-        const volRegex = /((half|quarter|full)\s+)?(\d+(\.\d+)?|\d+\/\d+)?\s*(g|gram|oz|ounce|lb|pound|ml|mg|liter|pint|kg)\b/i;
+        // Specific Breakdowns/Volumes
+        // Matches: Full Pound, Half Pound, Quarter Pound, Ounce, Half Ounce, Quarter Ounce, Eighths, Gram, 10g, 7g, 4g, 2g, 1g
+        const volRegex = /\b(full pound|half pound|quarter pound|half ounce|quarter ounce|eighths|eighth|ounce|gram|10g|7g|4g|2g|1g)\b/i;
         const volMatch = text.match(volRegex);
         let volume = volMatch ? volMatch[0] : "";
-        
-        // Clean up volume text
-        if (volume) volume = volume.replace(/\b(g)\b/i, "g").replace(/\b(oz)\b/i, "oz");
+        if (volume) volume = volume.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
         return { 
             formulation: formulation.charAt(0).toUpperCase() + formulation.slice(1), 
@@ -580,9 +582,11 @@
 
             // 4. Search Filter (Check group name or any variant name)
             if (searchTerm) {
+                const brandName = (group.brand || "").toLowerCase();
                 const matchGroup = group.name.toLowerCase().includes(searchTerm);
                 const matchVariant = variants.some(v => v.name.toLowerCase().includes(searchTerm));
-                if (!matchGroup && !matchVariant) return;
+                const matchBrand = brandName.includes(searchTerm);
+                if (!matchGroup && !matchVariant && !matchBrand) return;
             }
 
             // 5. Info Extraction
