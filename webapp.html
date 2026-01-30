@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Menu</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg-color: var(--tg-theme-bg-color, #fff);
+            --text-color: var(--tg-theme-text-color, #000);
+            --hint-color: var(--tg-theme-hint-color, #999);
+            --button-color: var(--tg-theme-button-color, #3390ec);
+            --button-text-color: var(--tg-theme-button-text-color, #fff);
+            --secondary-bg: var(--tg-theme-secondary-bg-color, #f4f4f5);
+            --destructive: #ff3b30;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding-bottom: 80px;
+        }
+
+        .container {
+            padding: 15px;
+        }
+
+        /* Categories */
+        .category-section {
+            margin-bottom: 25px;
+        }
+
+        .category-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid var(--secondary-bg);
+        }
+
+        .category-title {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        /* Products */
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        @media (min-width: 600px) {
+            .products-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        @media (min-width: 900px) {
+            .products-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        .product-card {
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-color);
+            border: 1px solid var(--secondary-bg);
+            border-radius: 12px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            padding-bottom: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            transition: transform 0.1s ease-in-out;
+        }
+
+        .product-card:active {
+            transform: scale(0.98);
+        }
+
+        .product-card.hidden-item {
+            opacity: 0.6;
+            background: repeating-linear-gradient(
+                45deg,
+                var(--bg-color),
+                var(--bg-color) 10px,
+                var(--secondary-bg) 10px,
+                var(--secondary-bg) 20px
+            );
+        }
+
+        .product-image {
+            width: 100%;
+            aspect-ratio: 1;
+            height: auto;
+            object-fit: cover;
+            border-radius: 0;
+            background-color: var(--secondary-bg);
+        }
+
+        .product-info {
+            padding: 8px 10px 0 10px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .product-name {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 5px;
+            line-height: 1.3;
+        }
+
+        .product-desc-preview {
+            font-size: 12px;
+            color: var(--hint-color);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: var(--bg-color);
+            width: 100%;
+            max-width: 500px;
+            border-radius: 12px;
+            padding: 20px;
+            max-height: 85vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 28px;
+            cursor: pointer;
+            color: var(--text-color);
+            z-index: 2;
+        }
+
+        .modal-img {
+            width: 100%;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .modal-title {
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            padding-right: 30px;
+        }
+
+        .modal-desc {
+            font-size: 15px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            color: var(--text-color);
+        }
+
+        /* Admin Controls */
+        .admin-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--secondary-bg);
+            padding: 15px;
+            border-top: 1px solid #ccc;
+            display: none; /* Hidden by default */
+            justify-content: center;
+            z-index: 900;
+        }
+
+        .admin-btn {
+            background-color: var(--button-color);
+            color: var(--button-text-color);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .admin-overlay {
+            position: absolute;
+            top: 10px;
+            right: 0;
+            display: none; /* Hidden by default */
+            gap: 5px;
+        }
+
+        .btn-hide {
+            background: var(--destructive);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .btn-edit-cat {
+            background: var(--button-color);
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        /* Admin Mode Active State */
+        body.admin-mode .admin-bar { display: flex; }
+        body.admin-mode .admin-overlay { display: flex; }
+
+        /* Search Bar */
+        .search-wrapper {
+            position: sticky;
+            top: 0;
+            background: var(--bg-color);
+            padding: 10px 0;
+            z-index: 100;
+            border-bottom: 1px solid var(--secondary-bg);
+            margin-bottom: 15px;
+        }
+        
+        #search-input {
+            width: 100%;
+            padding: 10px 15px;
+            border-radius: 10px;
+            border: 1px solid var(--secondary-bg);
+            background: var(--secondary-bg);
+            color: var(--text-color);
+            font-size: 16px;
+            outline: none;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="search-wrapper">
+        <input type="text" id="search-input" placeholder="🔍 Search products..." oninput="render()">
+    </div>
+    <div id="main-container">
+        <div style="text-align: center; padding: 40px; color: var(--hint-color);">Loading menu...</div>
+    </div>
+</div>
+
+<!-- Detail Modal -->
+<div id="detail-modal" class="modal-overlay" onclick="closeModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <span class="close-modal" onclick="closeModal()">&times;</span>
+        <div id="modal-body"></div>
+    </div>
+</div>
+
+<!-- Admin Save Bar -->
+<div class="admin-bar">
+    <button class="admin-btn" onclick="saveAdminSettings()">💾 Save Changes</button>
+</div>
+
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    // CONFIG
+    const API_URL = "https://chadsflooring.bz/api/products/scrape";
+    const BASE_IMG_URL = "https://chadsflooring.bz";
+
+    // STATE
+    let rawData = [];
+    let settings = { h: [], r: {} }; // h = hidden IDs, r = renames { "Old Name": "New Name" }
+    let isAdmin = false;
+    let currentImgPrefix = "";
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        // 1. Parse URL Params for Admin Status & Settings
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        if (urlParams.get('admin') === '1') {
+            isAdmin = true;
+            document.body.classList.add('admin-mode');
+        }
+
+        const configStr = urlParams.get('settings');
+        if (configStr) {
+            try {
+                settings = JSON.parse(decodeURIComponent(configStr));
+                if (!settings.h) settings.h = [];
+                if (!settings.r) settings.r = {};
+            } catch (e) {
+                console.error("Failed to parse settings", e);
+            }
+        }
+
+        // 2. Fetch Data
+        await fetchData();
+    });
+
+    async function fetchData() {
+        try {
+            // Add timestamp to prevent caching
+            const response = await fetch(API_URL + "?t=" + new Date().getTime());
+            const json = await response.json();
+            
+            // Get dynamic prefix from JSON, fallback if missing
+            currentImgPrefix = json.imagePathPrefix || "/uploads/products/";
+            
+            rawData = json.data || [];
+            render();
+        } catch (e) {
+            console.error(e);
+            document.getElementById('main-container').innerHTML = `<div style="text-align:center; margin-top:50px;">Failed to load menu.<br>Please try again later.</div>`;
+        }
+    }
+
+    function render() {
+        const container = document.getElementById('main-container');
+        const searchTerm = document.getElementById('search-input').value.toLowerCase().trim();
+        container.innerHTML = '';
+
+        rawData.forEach((cat, catIdx) => {
+            // Apply Rename
+            const catName = settings.r[cat.name] || cat.name;
+
+            // Create Category Section
+            const section = document.createElement('div');
+            section.className = 'category-section';
+
+            const header = document.createElement('div');
+            header.className = 'category-header';
+            header.innerHTML = `
+                <span class="category-title">${catName}</span>
+                ${isAdmin ? `<button class="btn-edit-cat" onclick="editCategory('${cat.name.replace(/'/g, "\\'")}')">✏️ Rename</button>` : ''}
+            `;
+            section.appendChild(header);
+
+            const grid = document.createElement('div');
+            grid.className = 'products-grid';
+
+            let visibleCount = 0;
+
+            // Render Products
+            if (cat.products) {
+                cat.products.forEach(prod => {
+                    const isHidden = settings.h.includes(prod.id);
+                    
+                    // If hidden and NOT admin, skip completely
+                    if (isHidden && !isAdmin) return;
+
+                    // Search Filter
+                    if (searchTerm && !prod.name.toLowerCase().includes(searchTerm)) {
+                        return;
+                    }
+
+                    visibleCount++;
+
+                    // Image Logic
+                    let imgUrl = '';
+                    if (prod.images && prod.images.length > 0) {
+                        imgUrl = BASE_IMG_URL + currentImgPrefix + prod.images[0];
+                    }
+
+                    const card = document.createElement('div');
+                    card.className = `product-card ${isHidden ? 'hidden-item' : ''}`;
+                    card.onclick = (e) => {
+                        // Don't open modal if clicking admin buttons
+                        if (e.target.closest('.admin-overlay')) return;
+                        openModal(prod);
+                    };
+
+                    card.innerHTML = `
+                        <img src="${imgUrl}" class="product-image" onerror="this.style.display='none'">
+                        <div class="product-info">
+                            <div class="product-name">${prod.name}</div>
+                            <div class="product-desc-preview">${prod.desc || ''}</div>
+                        </div>
+                        ${isAdmin ? `
+                            <div class="admin-overlay">
+                                <button class="btn-hide" onclick="toggleHide(${prod.id})">
+                                    ${isHidden ? '👁️ Unhide' : '🚫 Hide'}
+                                </button>
+                            </div>
+                        ` : ''}
+                    `;
+                    grid.appendChild(card);
+                });
+            }
+
+            // Only append category if it has visible items OR we are admin
+            if (visibleCount > 0 || (isAdmin && !searchTerm)) {
+                section.appendChild(grid);
+                container.appendChild(section);
+            }
+        });
+
+        if (container.innerHTML === '') {
+             container.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--hint-color)">No products found.</div>`;
+        }
+    }
+
+    // --- MODAL LOGIC ---
+    function openModal(prod) {
+        const modal = document.getElementById('detail-modal');
+        const body = document.getElementById('modal-body');
+        
+        let imagesHtml = '';
+        if (prod.images) {
+            prod.images.forEach(img => {
+                const src = BASE_IMG_URL + currentImgPrefix + img;
+                imagesHtml += `<img src="${src}" class="modal-img">`;
+            });
+        }
+
+        body.innerHTML = `
+            <div class="modal-title">${prod.name}</div>
+            ${imagesHtml}
+            <div class="modal-desc">${prod.desc || 'No description available.'}</div>
+        `;
+        modal.style.display = 'flex';
+    }
+
+    function closeModal(e) {
+        if (!e || e.target.id === 'detail-modal' || e.target.classList.contains('close-modal')) {
+            document.getElementById('detail-modal').style.display = 'none';
+        }
+    }
+
+    // --- ADMIN LOGIC ---
+    function toggleHide(id) {
+        const idx = settings.h.indexOf(id);
+        if (idx > -1) {
+            settings.h.splice(idx, 1); // Unhide
+        } else {
+            settings.h.push(id); // Hide
+        }
+        // Re-render to show visual change. 
+        // Note: We need to re-fetch or store rawData globally. 
+        // rawData is global, so we just call render again.
+        // We need the imgPrefix again. It's not stored globally in this snippet, let's fix that.
+        // Actually, we can just pass the prefix stored in a global var or re-fetch.
+        // Let's make imgPrefix global or pass it. 
+        // For simplicity, we will just reload the page or better, store prefix.
+        // Let's modify fetchData to store prefix globally.
+        fetchData(); 
+    }
+
+    function editCategory(originalName) {
+        const currentName = settings.r[originalName] || originalName;
+        const newName = prompt("Rename Category:", currentName);
+        
+        if (newName !== null) {
+            if (newName === originalName) {
+                delete settings.r[originalName];
+            } else {
+                settings.r[originalName] = newName;
+            }
+            fetchData(); // Re-render
+        }
+    }
+
+    function saveAdminSettings() {
+        // Send settings back to Bot
+        const data = {
+            action: "save_settings",
+            settings: settings
+        };
+        tg.sendData(JSON.stringify(data));
+        tg.close();
+    }
+</script>
+
+</body>
+</html>

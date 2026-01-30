@@ -8,12 +8,15 @@ import asyncio
 import copy
 import uuid
 import re
+import urllib.parse
+import threading
+from http.server import SimpleHTTPRequestHandler, HTTPServer
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
     pass  # python-dotenv not installed, skipping .env load
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, BotCommandScopeAllPrivateChats, BotCommandScopeChat, BotCommandScopeChatAdministrators, __version__ as ptb_version
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, BotCommandScopeAllPrivateChats, BotCommandScopeChat, BotCommandScopeChatAdministrators, WebAppInfo, __version__ as ptb_version
 from telegram.error import ChatMigrated
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, filters,
@@ -24,6 +27,7 @@ from telegram.ext import (
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()]
 SUPPORT_GROUP_ID = int(os.getenv("SUPPORT_GROUP_ID") or 0)
+WEBAPP_URL = os.getenv("WEBAPP_URL")
 REVIEW_CHANNEL_ID = os.getenv("REVIEW_CHANNEL_ID")
 REVIEW_TOPIC_ID = int(os.getenv("REVIEW_TOPIC_ID") or 0)
 DB_FILE = os.getenv("DB_FILE", "bot_database.db")
@@ -55,6 +59,12 @@ DEFAULT_CONFIG = {
         "service_closed": "⛔ Sorry, this service is currently closed. Please choose another option."
     },
     "menu": [
+        {
+            "id": "shop_webapp",
+            "name": "🛍️ Open Shop",
+            "type": "web_app",
+            "visible": True
+        },
         {
             "id": "create_order",
             "name": "🛒 Create an Order",
@@ -413,6 +423,21 @@ def get_admin_help_text(context: ContextTypes.DEFAULT_TYPE):
     cmd_list = "\n".join(cmds)
     return f"\n\n{header}\n{cmd_list}"
 
+# ===== WEBAPP HELPERS =====
+def get_webapp_url(user_id):
+    base_url = WEBAPP_URL
+    if not base_url:
+        return None
+    
+    # Get Settings
+    settings = global_config.get("webapp_settings", {})
+    settings_json = json.dumps(settings)
+    settings_encoded = urllib.parse.quote(settings_json)
+    
+    is_admin = "1" if user_id in ADMIN_IDS else "0"
+    
+    return f"{base_url}?settings={settings_encoded}&admin={is_admin}"
+
 # ===== COMMANDS =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     config = global_config
@@ -420,7 +445,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     for item in config.get("menu", []):
         if item.get("visible", True):
-            keyboard.append([InlineKeyboardButton(item["name"], callback_data=item["id"])])
+            if item.get("type") == "web_app":
+                url = get_webapp_url(update.effective_user.id)
+                if url:
+                    keyboard.append([InlineKeyboardButton(item["name"], web_app=WebAppInfo(url=url))])
+            else:
+                keyboard.append([InlineKeyboardButton(item["name"], callback_data=item["id"])])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -458,7 +488,13 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
                 status_icon = ""
                 if sub["type"] == "service":
                     status_icon = " 🟢" if sub.get("status", True) else " 🔴 (Closed)"
-                keyboard.append([InlineKeyboardButton(f"{sub['name']}{status_icon}", callback_data=sub["id"])])
+                
+                if sub.get("type") == "web_app":
+                    url = get_webapp_url(user.id)
+                    if url:
+                        keyboard.append([InlineKeyboardButton(f"{sub['name']}{status_icon}", web_app=WebAppInfo(url=url))])
+                else:
+                    keyboard.append([InlineKeyboardButton(f"{sub['name']}{status_icon}", callback_data=sub["id"])])
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.message.edit_text(
@@ -576,6 +612,51 @@ async def create_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         reply_markup=reply_markup
     )
     
+async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    try:
+        data = json.loads(update.effective_message.web_app_data.data)
+    except json.JSONDecodeError:
+        return
+
+    # Handle Admin Settings Save
+    if data.get("action") == "save_settings":
+        if user.id not in ADMIN_IDS:
+            return
+        
+        new_settings = data.get("settings", {})
+        global_config["webapp_settings"] = new_settings
+        save_config()
+        await update.message.reply_text("✅ <b>Shop Settings Saved!</b>\nChanges (hidden items, renames) are now live.", parse_mode='HTML')
+        return
+
+    if data.get("action") == "web_app_order":
+        cart = data.get("cart", {})
+        if not cart:
+            return
+
+        # Build Order Summary
+        summary = "🛒 <b>New Web App Order</b>\n\n"
+        total = 0.0
+        for item in cart.values():
+            line_total = item['price'] * item['qty']
+            total += line_total
+            summary += f"• {item['qty']}x {item['parentName']} ({item['name']}) - ${line_total:.2f}\n"
+        
+        summary += f"\n<b>Total: ${total:.2f}</b>"
+
+        # Create Ticket
+        ticket_id = generate_ticket_id()
+        db_create_ticket(ticket_id, user.id, "Web App Order")
+        
+        # Notify User
+        await update.message.reply_text(f"✅ Order received!\nTicket ID: {ticket_id}\n\n{summary}", parse_mode='HTML')
+        
+        # Notify Admin
+        user_display = f"{user.first_name} (@{user.username})" if user.username else f"{user.first_name} ({user.id})"
+        admin_msg = f"🆕 <b>Web App Order</b>\n👤 {user_display}\n🎫 Ticket: {ticket_id}\n\n{summary}"
+        await send_to_support_group(context.bot, text=admin_msg, parse_mode='HTML')
+
 # ===== DM HANDLER =====
 async def handle_dm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -1801,6 +1882,18 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(f"✅ Service <b>{found_item['name']}</b> is now <b>{state.upper()}</b>.", parse_mode='HTML')
 
+# ===== MENU COMMAND =====
+async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    url = get_webapp_url(user.id)
+    
+    if not url:
+        await update.message.reply_text("⚠️ Shop URL is not configured. Please contact admin.")
+        return
+
+    keyboard = [[InlineKeyboardButton("🛍️ Open Shop", web_app=WebAppInfo(url=url))]]
+    await update.message.reply_text("👇 <b>Tap below to open the shop:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+
 # ===== BACKGROUND JOBS =====
 async def check_timeouts(context: ContextTypes.DEFAULT_TYPE):
     now = time.time()
@@ -1920,6 +2013,7 @@ async def set_commands(app):
     # Set /start for all private chats (DMs)
     await app.bot.set_my_commands([
         BotCommand("start", "Show the main menu"),
+        BotCommand("menu", "Open the Shop"),
         BotCommand("mytickets", "View your active tickets"),
         BotCommand("close", "Close current ticket"),
         BotCommand("review", "Leave a review"),
@@ -1940,6 +2034,14 @@ async def set_commands(app):
         await app.bot.set_my_commands([
             BotCommand("reply", "Reply to a ticket")
         ], scope=BotCommandScopeChatAdministrators(chat_id=SUPPORT_GROUP_ID))
+
+def run_simple_server():
+    # Railway provides PORT, default to 8080 if not set
+    port = int(os.getenv("PORT", 8080))
+    print(f"🌍 Starting Web Server on port {port}...")
+    server_address = ('0.0.0.0', port)
+    httpd = HTTPServer(server_address, SimpleHTTPRequestHandler)
+    httpd.serve_forever()
 
 def main():
     print(f"🚀 Bot is starting... (PTB Version: {ptb_version})")
@@ -1962,10 +2064,15 @@ def main():
     conn.close()
     load_config()
     
+    # Start Web Server in background thread if PORT is set (Railway)
+    if os.getenv("PORT"):
+        threading.Thread(target=run_simple_server, daemon=True).start()
+
     app = ApplicationBuilder().token(TOKEN).post_init(set_commands).build()
 
     # Handlers
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("menu", menu_command))
     app.add_handler(CommandHandler("reply", handle_reply_command))
     app.add_handler(CommandHandler("settings", settings_command))
     app.add_handler(CommandHandler("status", status_command))
@@ -1998,6 +2105,7 @@ def main():
     
     app.add_handler(MessageHandler(filters.StatusUpdate.MIGRATE, handle_chat_migration))
     # Admin handler must be registered BEFORE the general user handler
+    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
     app.add_handler(MessageHandler((filters.TEXT | filters.PHOTO) & ~filters.COMMAND & filters.User(ADMIN_IDS), handle_admin_dm))
     app.add_handler(MessageHandler((filters.TEXT | filters.PHOTO) & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_dm))
 
