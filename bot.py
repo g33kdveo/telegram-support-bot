@@ -10,6 +10,7 @@ import uuid
 import re
 import urllib.parse
 import threading
+import urllib.request
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 try:
     from dotenv import load_dotenv
@@ -429,7 +430,7 @@ def get_admin_help_text(context: ContextTypes.DEFAULT_TYPE):
     return f"\n\n{header}\n{cmd_list}"
 
 # ===== WEBAPP HELPERS =====
-def get_webapp_url(user_id):
+def get_webapp_url(user_id, admin_mode=False):
     base_url = WEBAPP_URL
     if not base_url:
         return None
@@ -439,7 +440,7 @@ def get_webapp_url(user_id):
     settings_json = json.dumps(settings)
     settings_encoded = urllib.parse.quote(settings_json)
     
-    is_admin = "1" if user_id in ADMIN_IDS else "0"
+    is_admin = "1" if (admin_mode and user_id in ADMIN_IDS) else "0"
     
     return f"{base_url}?settings={settings_encoded}&admin={is_admin}"
 
@@ -1649,6 +1650,7 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("📝 Edit Texts", callback_data='settings_texts')],
+        [InlineKeyboardButton("🛍️ Manage Shop (Web App)", web_app=WebAppInfo(url=get_webapp_url(update.effective_user.id, admin_mode=True)))],
         [InlineKeyboardButton("️ Manage Services", callback_data='settings_services')],
         [InlineKeyboardButton("❌ Close Menu", callback_data='settings_close')]
     ]
@@ -2040,12 +2042,29 @@ async def set_commands(app):
             BotCommand("reply", "Reply to a ticket")
         ], scope=BotCommandScopeChatAdministrators(chat_id=SUPPORT_GROUP_ID))
 
+class BotRequestHandler(SimpleHTTPRequestHandler):
+    def do_GET(self):
+        if self.path.startswith('/api/products'):
+            try:
+                url = "https://chadsflooring.bz/api/products/scrape"
+                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req) as response:
+                    data = response.read()
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(data)
+            except Exception as e:
+                self.send_error(500, str(e))
+            return
+        return super().do_GET()
+
 def run_simple_server():
     # Railway provides PORT, default to 8080 if not set
     port = int(os.getenv("PORT", 8080))
     print(f"🌍 Starting Web Server on port {port}...")
     server_address = ('0.0.0.0', port)
-    httpd = HTTPServer(server_address, SimpleHTTPRequestHandler)
+    httpd = HTTPServer(server_address, BotRequestHandler)
     httpd.serve_forever()
 
 def main():
