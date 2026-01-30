@@ -1649,17 +1649,8 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_settings_menu(update, context)
 
 async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    url = get_webapp_url(update.effective_user.id, admin_mode=True)
-    
-    shop_btn = []
-    if url:
-        shop_btn = [InlineKeyboardButton("🛍️ Manage Shop (Web App)", web_app=WebAppInfo(url=url))]
-    else:
-        shop_btn = [InlineKeyboardButton("⚠️ Shop URL Not Set", callback_data='settings_no_url')]
-
     keyboard = [
         [InlineKeyboardButton("📝 Edit Texts", callback_data='settings_texts')],
-        shop_btn,
         [InlineKeyboardButton("️ Manage Services", callback_data='settings_services')],
         [InlineKeyboardButton("❌ Close Menu", callback_data='settings_close')]
     ]
@@ -1674,6 +1665,19 @@ async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='HTML')
     except Exception as e:
         print(f"❌ Error showing settings menu: {e}")
+
+async def appsettings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id not in ADMIN_IDS:
+        return
+    
+    url = get_webapp_url(user.id, admin_mode=True)
+    if not url:
+        await update.message.reply_text("⚠️ Shop URL Not Set. Check WEBAPP_URL env var.")
+        return
+
+    keyboard = [[InlineKeyboardButton("🛍️ Manage Shop Settings", web_app=WebAppInfo(url=url))]]
+    await update.message.reply_text("⚙️ <b>App Settings</b>\nClick below to manage the shop:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
 
 async def handle_settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -2050,6 +2054,7 @@ async def set_commands(app):
         await app.bot.set_my_commands([
             BotCommand("reply", "Reply to a ticket"),
             BotCommand("settings", "Admin Settings"),
+            BotCommand("appsettings", "Manage Web App"),
             BotCommand("help", "Admin Help")
         ], scope=BotCommandScopeChatAdministrators(chat_id=SUPPORT_GROUP_ID))
     except ChatMigrated as e:
@@ -2059,6 +2064,7 @@ async def set_commands(app):
         await app.bot.set_my_commands([
             BotCommand("reply", "Reply to a ticket"),
             BotCommand("settings", "Admin Settings"),
+            BotCommand("appsettings", "Manage Web App"),
             BotCommand("help", "Admin Help")
         ], scope=BotCommandScopeChatAdministrators(chat_id=SUPPORT_GROUP_ID))
 
@@ -2125,6 +2131,7 @@ def main():
     app.add_handler(CommandHandler("menu", menu_command))
     app.add_handler(CommandHandler("reply", handle_reply_command))
     app.add_handler(CommandHandler("settings", settings_command))
+    app.add_handler(CommandHandler("appsettings", appsettings_command))
     app.add_handler(CommandHandler("status", status_command))
     app.add_handler(CommandHandler("ticketstatus", ticket_status_command))
     app.add_handler(CommandHandler("ticketinfo", ticketinfo_command))

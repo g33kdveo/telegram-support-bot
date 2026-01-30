@@ -66,6 +66,15 @@
             }
         }
 
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            background: var(--bg-color);
+            z-index: 100;
+            padding-bottom: 5px;
+            border-bottom: 1px solid var(--secondary-bg);
+        }
+
         .product-card {
             display: flex;
             flex-direction: column;
@@ -108,7 +117,7 @@
         .pc-name {
             font-size: 13px;
             font-weight: 700;
-            text-align: center;
+            text-align: left;
             margin-bottom: 4px;
             line-height: 1.3;
             width: 100%;
@@ -256,8 +265,7 @@
             display: flex;
             overflow-x: auto;
             gap: 10px;
-            padding: 0 0 15px 0;
-            margin-bottom: 5px;
+            padding: 10px 0;
             scrollbar-width: none; /* Firefox */
             -ms-overflow-style: none;  /* IE 10+ */
         }
@@ -286,7 +294,7 @@
         .active-filters {
             display: flex;
             gap: 10px;
-            margin-bottom: 15px;
+            padding: 5px 0 10px 0;
             flex-wrap: wrap;
         }
         .filter-tag {
@@ -340,13 +348,7 @@
 
         /* Search Bar */
         .search-wrapper {
-            position: sticky;
-            top: 0;
-            background: var(--bg-color);
             padding: 10px 0;
-            z-index: 100;
-            border-bottom: 1px solid var(--secondary-bg);
-            margin-bottom: 15px;
         }
         
         #search-input {
@@ -365,12 +367,13 @@
 <body>
 
 <div class="container">
-    <div class="search-wrapper">
-        <input type="text" id="search-input" placeholder="🔍 Search products..." oninput="handleSearch()">
+    <div class="sticky-header">
+        <div class="search-wrapper">
+            <input type="text" id="search-input" placeholder="🔍 Search products..." oninput="handleSearch()">
+        </div>
+        <div id="category-nav" class="category-nav"></div>
+        <div id="active-filters" class="active-filters"></div>
     </div>
-    
-    <div id="category-nav" class="category-nav"></div>
-    <div id="active-filters" class="active-filters"></div>
 
     <div id="main-container">
         <div style="text-align: center; padding: 40px; color: var(--hint-color);">Loading menu...</div>
@@ -398,7 +401,7 @@
     const API_URL = "/api/products";
     const BASE_IMG_URL = "https://chadsflooring.bz";
 
-    const CATEGORIES = ["Accessories", "BYOB", "Carts", "Concentrates", "Disposables", "Edibles", "Flower", "Merch", "Munchies", "Pre-rolls", "Topical"];
+    const CATEGORIES = ["Accessories", "In-House", "Carts", "Concentrates", "Disposables", "Edibles", "Flower", "Merch", "Munchies", "Pre-rolls", "Topical"];
 
     // STATE
     let rawData = [];
@@ -442,12 +445,30 @@
             currentImgPrefix = json.imagePathPrefix || "/uploads/products/";
             
             rawData = json.data || [];
+            preprocessData();
             renderCategories();
             render();
         } catch (e) {
             console.error(e);
             document.getElementById('main-container').innerHTML = `<div style="text-align:center; margin-top:50px;">Failed to load menu.<br>Please try again later.</div>`;
         }
+    }
+
+    function preprocessData() {
+        rawData.forEach(group => {
+            // 1. Rename Category "BYOB" -> "In-House"
+            if (group.cat === "BYOB") group.cat = "In-House";
+
+            // 2. Rename Brand "In-house" -> "Value"
+            if (group.brand && group.brand.toLowerCase() === "in-house") {
+                group.brand = "Value";
+                
+                // 3. Move "Flower" under "Value" (was In-house) to "In-House" Category
+                if (group.cat === "Flower") {
+                    group.cat = "In-House";
+                }
+            }
+        });
     }
 
     function handleSearch() {
@@ -485,16 +506,29 @@
     function parseProductInfo(name, desc) {
         const text = (name + " " + (desc || "")).toLowerCase();
         
-        // Formulation Keywords
-        const forms = ["distillate", "live resin", "live rosin", "liquid diamonds", "diamonds", "sauce", "badder", "crumble", "shatter", "flower", "pre-roll", "edible", "gummy", "vape", "cartridge", "disposable"];
+        // Expanded Formulation Keywords
+        const forms = [
+            "liquid diamonds", "live resin", "live rosin", "distillate", "diamonds", 
+            "sauce", "badder", "crumble", "shatter", "sugar", "kief", "hash", "moonrock",
+            "flower", "pre-roll", "edible", "gummy", "chocolate", "vape", "cartridge", "disposable", "battery", "accessory"
+        ];
         let formulation = forms.find(f => text.includes(f));
-        if (!formulation) formulation = "Product"; 
         
-        // Volume Regex (e.g., 3.5g, 1g, 1oz)
-        const volRegex = /\b(\d+(\.\d+)?)\s*(g|gram|oz|ounce|lb|pound|ml|mg)\b/i;
+        // Fallback to category name if no formulation found
+        if (!formulation) {
+             // Try to guess from name context or just return empty string to let UI handle it
+             formulation = "Product";
+        }
+        
+        // Improved Volume Regex
+        // Matches: 3.5g, 1/8 oz, 1/4 lb, half ounce, quarter pound, 1000mg, 1 liter
+        const volRegex = /((half|quarter|full)\s+)?(\d+(\.\d+)?|\d+\/\d+)?\s*(g|gram|oz|ounce|lb|pound|ml|mg|liter|pint|kg)\b/i;
         const volMatch = text.match(volRegex);
         let volume = volMatch ? volMatch[0] : "";
         
+        // Clean up volume text
+        if (volume) volume = volume.replace(/\b(g)\b/i, "g").replace(/\b(oz)\b/i, "oz");
+
         return { 
             formulation: formulation.charAt(0).toUpperCase() + formulation.slice(1), 
             volume: volume 
