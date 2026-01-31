@@ -571,28 +571,36 @@
         }
         
         let volume = "";
+        const lowerName = name.toLowerCase();
 
-        // Value Brand Rules
-        if (group.brand === "Value") {
-             if (name.toLowerCase().includes("terpene bottle")) {
-                 volume = "";
-             } else if (name.toLowerCase().includes("white label distillate")) {
-                 volume = "1g";
-             } else if (name.toLowerCase().includes("superdope")) {
-                 volume = "Eighths";
-             } else if (group.cat === "In-House" || group.cat === "Flower") {
-                 if (name.toLowerCase().includes("bulk")) {
-                     volume = "Full Pound";
-                 } else {
-                     volume = "Ounce";
-                 }
+        // 1. Specific Overrides (High Priority)
+        if (lowerName.includes("terpene bottle")) {
+             volume = "";
+        } else if (lowerName.includes("white label distillate")) {
+             volume = "1g";
+        } else if (lowerName.includes("superdope")) {
+             volume = "Eighths";
+        } else if (group.brand === "Value" && (group.cat === "In-House" || group.cat === "Flower")) {
+             if (lowerName.includes("bulk")) {
+                 volume = "Full Pound";
+             } else {
+                 volume = "Ounce";
              }
         }
 
         if (!volume) {
-            // Specific Breakdowns/Volumes (Expanded to capture variations like 0.5g, 1.0g, etc.)
-            // Added: zip, qp, hp, unit, pack, piece, count
-            const volRegex = /\b(full pound|half pound|quarter pound|half ounce|quarter ounce|eighths?|ounce|oz|pound|lb|zip|qp|hp|unit|gram|(\d+(\.\d+)?|\d\/\d)\s*(g|gram|grams|oz|ounce|ounces|lb|pound|pounds|ml|mg|kg|l|pc|piece|pieces|pack|count))\b/i;
+            // Check if category/formulation implies gram-only measurements
+            const isGramOnly = ["cartridge", "cart", "disposable", "pod", "vape", "concentrate", "extract", "badder", "budder", "crumble", "shatter", "sugar", "wax", "resin", "rosin", "sauce", "diamonds", "syringe", "isolate"].some(t => (formulation || "").toLowerCase().includes(t)) || ["Carts", "Disposables", "Concentrates"].includes(group.cat);
+
+            let volRegex;
+            if (isGramOnly) {
+                // Restricted regex for Carts/Concentrates: Only grams/mg/ml
+                volRegex = /\b(\d+(\.\d+)?|\d\/\d)\s*(g|gram|grams|ml|mg)\b/i;
+            } else {
+                // Full regex for Flower, Edibles, etc.
+                volRegex = /\b(full pound|half pound|quarter pound|half ounce|quarter ounce|eighths?|ounce|oz|pound|lb|zip|qp|hp|unit|gram|(\d+(\.\d+)?|\d\/\d)\s*(g|gram|grams|oz|ounce|ounces|lb|pound|pounds|ml|mg|kg|l|pc|piece|pieces|pack|count))\b/i;
+            }
+            
             const volMatch = text.match(volRegex);
             volume = volMatch ? volMatch[0] : "";
         }
@@ -606,7 +614,9 @@
                 "zip": "Ounce",
                 "unit": "Pound",
                 "oz": "Ounce",
-                "lb": "Pound"
+                "lb": "Pound",
+                "eighth": "Eighths",
+                "eighths": "Eighths"
             };
             
             if (volMap[vLower]) {
