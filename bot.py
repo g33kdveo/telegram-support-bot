@@ -2072,12 +2072,16 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith('/api/products'):
             try:
-                url = "https://chadsflooring.bz/api/products/scrape"
+                # Add timestamp to bypass external caching
+                url = f"https://chadsflooring.bz/api/products/scrape?t={int(time.time())}"
                 req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
                 with urllib.request.urlopen(req) as response:
                     data = response.read()
                     self.send_response(200)
                     self.send_header('Content-type', 'application/json')
+                    self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+                    self.send_header('Pragma', 'no-cache')
+                    self.send_header('Expires', '0')
                     self.end_headers()
                     self.wfile.write(data)
             except Exception as e:
