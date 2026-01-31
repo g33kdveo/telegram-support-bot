@@ -529,29 +529,56 @@
     function parseProductInfo(group) {
         const name = group.name;
         const desc = group.desc;
-        // Check first variant name for volume info as well
-        const variantName = (group.products && group.products.length > 0) ? group.products[0].name : "";
-        const text = (name + " " + variantName + " " + (desc || "")).toLowerCase();
         
-        // Expanded Formulation Keywords
+        // Combine text from name, desc, and ALL variants to find volume info
+        const variantNames = (group.products || []).map(p => p.name).join(" ");
+        const text = (name + " " + variantNames + " " + (desc || "")).toLowerCase();
+        
+        // Expanded Formulation Keywords - Ordered by specificity (longest first)
         const forms = [
-            "liquid diamonds", "live resin", "live rosin", "distillate", "diamonds", 
-            "sauce", "badder", "crumble", "shatter", "sugar", "kief", "hash", "moonrock",
-            "flower", "pre-roll", "edible", "gummy", "chocolate", "vape", "cartridge", "disposable", "battery", "accessory"
+            "liquid diamonds", "live resin", "live rosin", "cured resin", "cured rosin", 
+            "distillate", "diamonds", "sauce", "badder", "budder", "batter", 
+            "crumble", "shatter", "sugar", "kief", "hash", "moonrock", "wax", 
+            "resin", "rosin", "isolate", "terp sauce", "thca", "delta-8", "delta-9", "hhc",
+            "flower", "pre-roll", "preroll", "infused pre-roll", "infused preroll", "blunt",
+            "edible", "gummy", "gummies", "chocolate", "brownie", "cookie", "capsule", "tincture", "syrup",
+            "vape", "cartridge", "cart", "pod", "disposable", "battery", "accessory", "syringe", "topical", "lotion", "balm"
         ];
+        
+        // Find the first matching formulation
         let formulation = forms.find(f => text.includes(f));
         
         // Fallback to category name if no formulation found
         if (!formulation) {
-             // Try to guess from name context or just return empty string to let UI handle it
-             formulation = "Product";
+             formulation = group.cat;
+        }
+        
+        // Ensure we don't return "Product" as the formulation
+        if (formulation && formulation.toLowerCase() === 'product') {
+            formulation = (group.cat && group.cat !== 'Product') ? group.cat : '';
+        }
+        
+        // Normalize Formulation Display
+        if (formulation) {
+            const formMap = {
+                "cart": "Cartridge",
+                "preroll": "Pre-roll",
+                "infused preroll": "Infused Pre-roll",
+                "thca": "THCa",
+                "hhc": "HHC"
+            };
+            if (formMap[formulation.toLowerCase()]) formulation = formMap[formulation.toLowerCase()];
         }
         
         let volume = "";
 
         // Value Brand Rules
         if (group.brand === "Value") {
-             if (name.toLowerCase().includes("superdope")) {
+             if (name.toLowerCase().includes("terpene bottle")) {
+                 volume = "";
+             } else if (name.toLowerCase().includes("white label distillate")) {
+                 volume = "1g";
+             } else if (name.toLowerCase().includes("superdope")) {
                  volume = "Eighths";
              } else if (group.cat === "In-House" || group.cat === "Flower") {
                  if (name.toLowerCase().includes("bulk")) {
@@ -564,18 +591,33 @@
 
         if (!volume) {
             // Specific Breakdowns/Volumes (Expanded to capture variations like 0.5g, 1.0g, etc.)
-            // Order matters: longest match first to avoid partial matches
-            const volRegex = /\b(full pound|half pound|quarter pound|half ounce|quarter ounce|eighths?|ounce|oz|pound|lb|gram|(\d+(\.\d+)?|\d\/\d)\s*(g|gram|grams|oz|ounce|ounces|lb|pound|pounds|ml|mg|kg|l))\b/i;
+            // Added: zip, qp, hp, unit, pack, piece, count
+            const volRegex = /\b(full pound|half pound|quarter pound|half ounce|quarter ounce|eighths?|ounce|oz|pound|lb|zip|qp|hp|unit|gram|(\d+(\.\d+)?|\d\/\d)\s*(g|gram|grams|oz|ounce|ounces|lb|pound|pounds|ml|mg|kg|l|pc|piece|pieces|pack|count))\b/i;
             const volMatch = text.match(volRegex);
             volume = volMatch ? volMatch[0] : "";
         }
 
         if (volume) {
-            volume = volume.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            // Normalize volume text
+            let vLower = volume.toLowerCase();
+            const volMap = {
+                "qp": "Quarter Pound",
+                "hp": "Half Pound",
+                "zip": "Ounce",
+                "unit": "Pound",
+                "oz": "Ounce",
+                "lb": "Pound"
+            };
+            
+            if (volMap[vLower]) {
+                volume = volMap[vLower];
+            } else {
+                volume = vLower.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            }
         }
 
         return { 
-            formulation: formulation.charAt(0).toUpperCase() + formulation.slice(1), 
+            formulation: formulation ? (formulation.charAt(0).toUpperCase() + formulation.slice(1)) : "", 
             volume: volume 
         };
     }
