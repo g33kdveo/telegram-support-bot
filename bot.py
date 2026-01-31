@@ -2074,7 +2074,7 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
             try:
                 # Add timestamp and random nonce to bypass external caching
                 nonce = f"{int(time.time())}_{random.randint(1, 999999)}"
-                url = f"https://chadsflooring.bz/api/products/scrape?v={nonce}"
+                url = f"https://chadsflooring.bz/api/products?v={nonce}"
                 
                 # Add headers to force fresh content
                 headers = {

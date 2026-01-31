@@ -472,7 +472,13 @@
             const newHash = JSON.stringify(newData);
 
             // Check for updates
-            if (newHash === lastDataHash) return;
+            if (newHash === lastDataHash) {
+                const container = document.getElementById('main-container');
+                if (container && container.lastElementChild && container.lastElementChild.innerHTML.includes('Last checked')) {
+                     container.lastElementChild.innerHTML = `Last checked: ${new Date().toLocaleTimeString()}`;
+                }
+                return;
+            }
             
             lastDataHash = newHash;
             rawData = newData;
@@ -684,7 +690,10 @@
             // 3. Stock & Variant Logic
             // Filter out out-of-stock variants
             const variants = group.products || [];
-            const inStockVariants = variants.filter(p => p.qty > 0);
+            const inStockVariants = variants.filter(p => {
+                // Check quantity and common availability flags
+                return p.qty > 0 && (p.status !== false && p.status !== 0) && (p.active !== false && p.active !== 0) && (p.visible !== false && p.visible !== 0);
+            });
             
             // Calculate total stock for the group
             let totalStock = 0;
@@ -758,15 +767,16 @@
         if (container.innerHTML === '') {
              container.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--hint-color)">No products found.</div>`;
         }
-        
-        // Add timestamp footer to verify updates
+
+        // Add timestamp footer
         const footer = document.createElement('div');
         footer.style.textAlign = 'center';
         footer.style.padding = '20px';
         footer.style.color = 'var(--hint-color)';
         footer.style.fontSize = '12px';
-        footer.innerHTML = `Last updated: ${new Date().toLocaleTimeString()}`;
+        
         container.appendChild(footer);
+        footer.innerHTML = `Last checked: ${new Date().toLocaleTimeString()}`;
     }
 
     // --- MODAL LOGIC ---
