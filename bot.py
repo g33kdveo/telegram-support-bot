@@ -2072,9 +2072,17 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith('/api/products'):
             try:
-                # Add timestamp to bypass external caching
-                url = f"https://chadsflooring.bz/api/products/scrape?t={int(time.time())}"
-                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                # Add timestamp and random nonce to bypass external caching
+                nonce = f"{int(time.time())}_{random.randint(1, 999999)}"
+                url = f"https://chadsflooring.bz/api/products/scrape?v={nonce}"
+                
+                # Add headers to force fresh content
+                headers = {
+                    'User-Agent': f'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 {nonce}',
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache'
+                }
+                req = urllib.request.Request(url, headers=headers)
                 with urllib.request.urlopen(req) as response:
                     data = response.read()
                     self.send_response(200)

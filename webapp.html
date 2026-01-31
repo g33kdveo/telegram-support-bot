@@ -758,6 +758,15 @@
         if (container.innerHTML === '') {
              container.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--hint-color)">No products found.</div>`;
         }
+        
+        // Add timestamp footer to verify updates
+        const footer = document.createElement('div');
+        footer.style.textAlign = 'center';
+        footer.style.padding = '20px';
+        footer.style.color = 'var(--hint-color)';
+        footer.style.fontSize = '12px';
+        footer.innerHTML = `Last updated: ${new Date().toLocaleTimeString()}`;
+        container.appendChild(footer);
     }
 
     // --- MODAL LOGIC ---
