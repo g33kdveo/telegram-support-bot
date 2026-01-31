@@ -458,7 +458,7 @@
     async function fetchData() {
         try {
             // Add timestamp to prevent caching
-            const response = await fetch(API_URL + "?t=" + new Date().getTime());
+            const response = await fetch(API_URL + "?t=" + new Date().getTime(), { cache: "no-store" });
             const json = await response.json();
             
             // Get dynamic prefix from JSON, fallback if missing
@@ -654,7 +654,7 @@
             // 1. Filter by Category
             // The API 'cat' field might be null or match one of our categories
             // We check if the group.cat matches selectedCategory
-            if (selectedCategory !== 'All' && group.cat !== selectedCategory) {
+            if (!searchTerm && selectedCategory !== 'All' && group.cat !== selectedCategory) {
                 return;
             }
 
