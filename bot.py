@@ -11,7 +11,7 @@ import re
 import urllib.parse
 import threading
 import urllib.request
-from http.server import SimpleHTTPRequestHandler, HTTPServer
+from http.server import SimpleHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -2090,7 +2090,7 @@ def run_simple_server():
     port = int(os.getenv("PORT", 8080))
     print(f"🌍 Starting Web Server on port {port}...")
     server_address = ('0.0.0.0', port)
-    httpd = HTTPServer(server_address, BotRequestHandler)
+    httpd = ThreadingHTTPServer(server_address, BotRequestHandler)
     httpd.serve_forever()
 
 def main():

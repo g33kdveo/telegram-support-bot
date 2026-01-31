@@ -430,6 +430,7 @@
     let currentImgPrefix = "";
     let selectedCategory = CATEGORIES[0];
     let selectedBrand = null;
+    let lastDataHash = "";
 
     document.addEventListener('DOMContentLoaded', async () => {
         // 1. Parse URL Params for Admin Status & Settings
@@ -453,9 +454,12 @@
 
         // 2. Fetch Data
         await fetchData();
+
+        // 3. Start Polling (every 10 seconds)
+        setInterval(() => fetchData(true), 10000);
     });
 
-    async function fetchData() {
+    async function fetchData(isBackground = false) {
         try {
             // Add timestamp to prevent caching
             const response = await fetch(API_URL + "?t=" + new Date().getTime(), { cache: "no-store" });
@@ -464,13 +468,27 @@
             // Get dynamic prefix from JSON, fallback if missing
             currentImgPrefix = json.imagePathPrefix || "/uploads/products/";
             
-            rawData = json.data || [];
+            const newData = json.data || [];
+            const newHash = JSON.stringify(newData);
+
+            // Check for updates
+            if (newHash === lastDataHash) return;
+            
+            lastDataHash = newHash;
+            rawData = newData;
+            
             preprocessData();
-            renderCategories();
+            if (!isBackground) renderCategories();
+            
+            // Preserve scroll position on background updates
+            const scrollY = window.scrollY;
             render();
+            if (isBackground) window.scrollTo(0, scrollY);
         } catch (e) {
             console.error(e);
-            document.getElementById('main-container').innerHTML = `<div style="text-align:center; margin-top:50px;">Failed to load menu.<br>Please try again later.</div>`;
+            if (!isBackground) {
+                document.getElementById('main-container').innerHTML = `<div style="text-align:center; margin-top:50px;">Failed to load menu.<br>Please try again later.</div>`;
+            }
         }
     }
 
