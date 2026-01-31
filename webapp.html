@@ -16,6 +16,11 @@
             --destructive: #ff3b30;
         }
 
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
         body {
             margin: 0;
             padding: 0;
@@ -26,7 +31,9 @@
         }
 
         .container {
-            padding: 15px;
+            padding: 10px;
+            max-width: 800px;
+            margin: 0 auto;
         }
 
         /* Categories */
@@ -106,7 +113,7 @@
 
         /* New Card Layout Elements */
         .pc-brand {
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 700;
             color: var(--button-color);
             margin-bottom: 4px;
@@ -115,16 +122,21 @@
         }
 
         .pc-name {
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 700;
             text-align: left;
             margin-bottom: 4px;
             line-height: 1.3;
             width: 100%;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
 
         .pc-meta {
-            font-size: 10px;
+            font-size: 11px;
             color: var(--hint-color);
             align-self: flex-start;
             margin-bottom: 8px;
@@ -141,7 +153,7 @@
         }
 
         .pc-footer {
-            font-size: 10px;
+            font-size: 11px;
             font-weight: 600;
             color: var(--text-color);
             align-self: flex-start;
@@ -266,12 +278,15 @@
             overflow-x: auto;
             gap: 10px;
             padding: 10px 0;
-            scrollbar-width: none; /* Firefox */
-            -ms-overflow-style: none;  /* IE 10+ */
             -webkit-overflow-scrolling: touch; /* For momentum scrolling on iOS */
         }
-        .category-nav::-webkit-scrollbar { 
-            display: none;  /* Chrome/Safari */
+        /* Custom Scrollbar for PC */
+        .category-nav::-webkit-scrollbar {
+            height: 6px;
+        }
+        .category-nav::-webkit-scrollbar-thumb {
+            background: var(--hint-color);
+            border-radius: 3px;
         }
         
         .category-tab {
@@ -297,6 +312,10 @@
             gap: 10px;
             padding: 5px 0 10px 0;
             flex-wrap: wrap;
+        }
+        .active-filters:empty {
+            display: none;
+            padding: 0;
         }
         .filter-tag {
             background: var(--button-color);
@@ -507,8 +526,12 @@
     }
 
     // Helper to extract info from name/desc
-    function parseProductInfo(name, desc) {
-        const text = (name + " " + (desc || "")).toLowerCase();
+    function parseProductInfo(group) {
+        const name = group.name;
+        const desc = group.desc;
+        // Check first variant name for volume info as well
+        const variantName = (group.products && group.products.length > 0) ? group.products[0].name : "";
+        const text = (name + " " + variantName + " " + (desc || "")).toLowerCase();
         
         // Expanded Formulation Keywords
         const forms = [
@@ -524,12 +547,32 @@
              formulation = "Product";
         }
         
-        // Specific Breakdowns/Volumes
-        // Matches: Full Pound, Half Pound, Quarter Pound, Ounce, Half Ounce, Quarter Ounce, Eighths, Gram, 10g, 7g, 4g, 2g, 1g
-        const volRegex = /\b(full pound|half pound|quarter pound|half ounce|quarter ounce|eighths|eighth|ounce|gram|10g|7g|4g|2g|1g)\b/i;
-        const volMatch = text.match(volRegex);
-        let volume = volMatch ? volMatch[0] : "";
-        if (volume) volume = volume.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        let volume = "";
+
+        // Value Brand Rules
+        if (group.brand === "Value") {
+             if (name.toLowerCase().includes("superdope")) {
+                 volume = "Eighths";
+             } else if (group.cat === "In-House" || group.cat === "Flower") {
+                 if (name.toLowerCase().includes("bulk")) {
+                     volume = "Full Pound";
+                 } else {
+                     volume = "Ounce";
+                 }
+             }
+        }
+
+        if (!volume) {
+            // Specific Breakdowns/Volumes (Expanded to capture variations like 0.5g, 1.0g, etc.)
+            // Order matters: longest match first to avoid partial matches
+            const volRegex = /\b(full pound|half pound|quarter pound|half ounce|quarter ounce|eighths?|ounce|oz|pound|lb|gram|(\d+(\.\d+)?|\d\/\d)\s*(g|gram|grams|oz|ounce|ounces|lb|pound|pounds|ml|mg|kg|l))\b/i;
+            const volMatch = text.match(volRegex);
+            volume = volMatch ? volMatch[0] : "";
+        }
+
+        if (volume) {
+            volume = volume.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        }
 
         return { 
             formulation: formulation.charAt(0).toUpperCase() + formulation.slice(1), 
@@ -590,7 +633,7 @@
             }
 
             // 5. Info Extraction
-            const info = parseProductInfo(group.name, group.desc);
+            const info = parseProductInfo(group);
             const brandName = group.brand || "Geekd";
             const optionsCount = inStockVariants.length;
             
@@ -626,7 +669,7 @@
                 <div class="pc-name">${group.name}</div>
                 <div class="pc-meta">${info.formulation} • ${optionsCount} options</div>
                 <img src="${imgUrl}" class="product-image" onerror="this.style.display='none'" loading="lazy">
-                <div class="pc-footer">${totalStock} left • ${info.volume}</div>
+                <div class="pc-footer">${totalStock} left${info.volume ? ' • ' + info.volume : ''}</div>
                 ${isAdmin ? `
                     <div class="admin-overlay">
                         <button class="btn-hide" onclick="toggleHide(${groupId})">
@@ -654,7 +697,7 @@
         
         // Use the first variant as the default display
         const defaultVariant = variants.length > 0 ? variants[0] : {};
-        const info = parseProductInfo(group.name, group.desc);
+        const info = parseProductInfo(group);
 
         let imagesHtml = '';
         let imageSources = [];
