@@ -2075,30 +2075,64 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
                 # Add timestamp and random value to bypass all caching layers
                 import random
                 cache_buster = f"{int(time.time())}_{random.randint(1000, 9999)}"
-                url = f"https://chadsflooring.bz/api/products/scrape?t={cache_buster}&nocache={cache_buster}"
                 
-                # Add headers to prevent caching at any level
-                headers = {
-                    'User-Agent': 'Mozilla/5.0',
-                    'Cache-Control': 'no-cache, no-store, must-revalidate',
-                    'Pragma': 'no-cache',
-                    'Expires': '0'
-                }
+                # Try multiple API endpoints
+                urls_to_try = [
+                    f"https://chadsflooring.bz/api/products/scrape?t={cache_buster}",
+                    f"https://chadsflooring.bz/api/products?t={cache_buster}",
+                    f"https://www.chadsflooring.bz/api/products/scrape?t={cache_buster}"
+                ]
                 
-                req = urllib.request.Request(url, headers=headers)
-                with urllib.request.urlopen(req) as response:
-                    data = response.read()
-                    
-                    # Send response with cache prevention headers
-                    self.send_response(200)
-                    self.send_header('Content-type', 'application/json')
-                    self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
-                    self.send_header('Pragma', 'no-cache')
-                    self.send_header('Expires', '0')
-                    self.send_header('Access-Control-Allow-Origin', '*')
-                    self.end_headers()
-                    self.wfile.write(data)
+                data = None
+                last_error = None
+                
+                for url in urls_to_try:
+                    try:
+                        # Add headers to mimic a real browser
+                        headers = {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                            'Accept': 'application/json, */*',
+                            'Accept-Language': 'en-US,en;q=0.9',
+                            'Cache-Control': 'no-cache',
+                            'Pragma': 'no-cache',
+                            'Referer': 'https://chadsflooring.bz/',
+                            'Origin': 'https://chadsflooring.bz'
+                        }
+                        
+                        req = urllib.request.Request(url, headers=headers)
+                        with urllib.request.urlopen(req, timeout=10) as response:
+                            data = response.read()
+                            print(f"✅ Successfully fetched from: {url}")
+                            break
+                    except Exception as e:
+                        last_error = e
+                        print(f"❌ Failed to fetch from {url}: {str(e)}")
+                        continue
+                
+                if data is None:
+                    # If all URLs failed, return a fallback response
+                    print(f"⚠️ All API endpoints failed. Last error: {last_error}")
+                    fallback_data = {
+                        "data": [],
+                        "imagePathPrefix": "/uploads/products/",
+                        "error": "Unable to fetch menu data from source. Please try again later."
+                    }
+                    data = json.dumps(fallback_data).encode('utf-8')
+                
+                # Send response with cache prevention headers
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+                self.send_header('Pragma', 'no-cache')
+                self.send_header('Expires', '0')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(data)
+                
             except Exception as e:
+                print(f"❌ Critical error in API proxy: {str(e)}")
+                import traceback
+                traceback.print_exc()
                 self.send_error(500, str(e))
             return
         return super().do_GET()
