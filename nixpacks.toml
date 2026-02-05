@@ -8,4 +8,4 @@ nixPkgs = ["python3", "chromium"]
 cmds = ["pip install -r requirements.txt", "playwright install chromium"]
 
 [start]
-cmd = "python bot.py"
+cmd = "PLAYWRIGHT_BROWSERS_PATH=/app/pw-browsers python bot.py"

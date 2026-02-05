@@ -1,7 +1,11 @@
+import os
+# Force Playwright to look in the persistent directory for browsers
+# This must be set before importing playwright or launching browsers
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/app/pw-browsers"
+
 from playwright.sync_api import sync_playwright
 import time
 import json
-import os
 import re
 
 try:
