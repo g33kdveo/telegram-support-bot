@@ -30,19 +30,72 @@ class ChadsFlooringScraper:
         if not self.username or not self.password:
             return False
             
+        # Potential login pages to check
+        login_pages = [
+            "/login?callbackUrl=https%3A%2F%2Fchadsflooring.bz",
+            "/login", 
+            "/signin", 
+            "/auth/login", 
+            "/user/login"
+        ]
+        login_page = ""
+        login_page_url = f"{self.base_url}/login" # Default
+        
+        print("🔐 Detecting login page...")
+        
         try:
-            # First, get the login page to get any CSRF tokens
-            login_page_url = f"{self.base_url}/login"
-            req = urllib.request.Request(
-                login_page_url,
-                headers={
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                }
-            )
-            
-            with self.opener.open(req) as response:
-                login_page = response.read().decode('utf-8')
+            # ATTEMPT 0: NextAuth.js (Common with callbackUrl)
+            # Try to fetch CSRF from API first, as this is cleaner than scraping HTML for Next.js
+            try:
+                csrf_url = f"{self.base_url}/api/auth/csrf"
+                req = urllib.request.Request(csrf_url, headers={'User-Agent': 'Mozilla/5.0'})
+                with self.opener.open(req) as response:
+                    data = json.loads(response.read().decode('utf-8'))
+                    csrf_token = data.get('csrfToken')
+                    
+                if csrf_token:
+                    print(f"✅ Found NextAuth CSRF token: {csrf_token[:10]}...")
+                    # Perform NextAuth Login
+                    login_url = f"{self.base_url}/api/auth/callback/credentials"
+                    payload = {
+                        'redirect': 'false',
+                        'csrfToken': csrf_token,
+                        'username': self.username,
+                        'password': self.password,
+                        'callbackUrl': self.base_url
+                    }
+                    data_encoded = urllib.parse.urlencode(payload).encode('utf-8')
+                    req = urllib.request.Request(
+                        login_url, 
+                        data=data_encoded,
+                        headers={
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                            'Content-Type': 'application/x-www-form-urlencoded'
+                        }
+                    )
+                    with self.opener.open(req) as response:
+                        print("✅ NextAuth Login successful")
+                        return True
+            except Exception as e:
+                print(f"⚠️ NextAuth attempt failed: {e}")
+
+            for path in login_pages:
+                try:
+                    url = f"{self.base_url}{path}"
+                    req = urllib.request.Request(
+                        url,
+                        headers={
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                        }
+                    )
+                    with self.opener.open(req) as response:
+                        login_page = response.read().decode('utf-8')
+                        login_page_url = url
+                        print(f"✅ Found login page at: {path}")
+                        break
+                except Exception:
+                    continue
             
             # Try to extract any tokens from the page
             # Look for common patterns like csrf_token, authenticity_token, etc.
@@ -67,17 +120,57 @@ class ChadsFlooringScraper:
                 'password': self.password,
             }
             
+            # If username looks like email, add email field too
+            if '@' in self.username:
+                login_data['email'] = self.username
+            
             # Add CSRF token if found
             if csrf_token:
                 login_data['csrf_token'] = csrf_token
-                # Also try common variations
                 login_data['_token'] = csrf_token
                 login_data['authenticity_token'] = csrf_token
             
-            # Try to login
-            login_url = f"{self.base_url}/api/auth/login"
-            login_data_encoded = urllib.parse.urlencode(login_data).encode('utf-8')
+            # Determine POST URL from form action or defaults
+            login_url = f"{self.base_url}/api/auth/login" # Default
             
+            if login_page:
+                action_match = re.search(r'<form[^>]+action=["\']([^"\']+)["\']', login_page, re.IGNORECASE)
+                if action_match:
+                    action = action_match.group(1)
+                    if not action.startswith('http'):
+                        if action.startswith('/'):
+                            login_url = f"{self.base_url}{action}"
+                        else:
+                            login_url = f"{self.base_url}/{action}"
+                    else:
+                        login_url = action
+                    print(f"✅ Detected login action URL: {login_url}")
+            
+            # ATTEMPT 1: JSON Login (Most likely for /api/ endpoints)
+            try:
+                json_data = json.dumps(login_data).encode('utf-8')
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json, text/plain, */*',
+                    'Origin': self.base_url,
+                    'Referer': login_page_url,
+                }
+                # Add XSRF-TOKEN from cookies if present
+                for cookie in self.cookie_jar:
+                    if cookie.name == 'XSRF-TOKEN':
+                        headers['X-XSRF-TOKEN'] = urllib.parse.unquote(cookie.value)
+                        break
+                
+                req = urllib.request.Request(login_url, data=json_data, headers=headers)
+                with self.opener.open(req) as response:
+                    print(f"✅ Login successful (JSON)")
+                    return True
+            except Exception as e:
+                print(f"⚠️ JSON Login failed: {e}, trying Form Data...")
+
+            # ATTEMPT 2: Form Data Login (Fallback)
+            login_data_encoded = urllib.parse.urlencode(login_data).encode('utf-8')
             req = urllib.request.Request(
                 login_url,
                 data=login_data_encoded,
@@ -86,13 +179,13 @@ class ChadsFlooringScraper:
                     'Content-Type': 'application/x-www-form-urlencoded',
                     'Accept': 'application/json, text/plain, */*',
                     'Origin': self.base_url,
-                    'Referer': f"{self.base_url}/login",
+                    'Referer': login_page_url,
                 }
             )
             
             with self.opener.open(req) as response:
                 result = response.read().decode('utf-8')
-                print(f"✅ Login successful")
+                print(f"✅ Login successful (Form)")
                 return True
                 
         except Exception as e:
@@ -107,7 +200,9 @@ class ChadsFlooringScraper:
                 "/api/products/scrape",
                 "/api/products",
                 "/api/inventory",
-                "/products/api/all"
+                "/products/api/all",
+                "/api/v1/products",
+                "/api/products/all"
             ]
             
             for endpoint in api_endpoints:
