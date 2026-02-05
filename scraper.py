@@ -98,10 +98,6 @@ class ChadsFlooringScraper:
                 if "Executable doesn't exist" in str(e) and "executable_path" not in launch_kwargs:
                     print("⚠️ Browser binary missing. Installing Chromium & Headless Shell...")
                     try:
-                        # Clean up potential corrupt installs to avoid ETXTBSY errors
-                        if os.path.exists("/app/pw-browsers"):
-                            shutil.rmtree("/app/pw-browsers", ignore_errors=True)
-                        
                         # Install BOTH chromium and the headless shell
                         subprocess.run(["playwright", "install", "chromium", "chromium-headless-shell"], check=True)
                         print("✅ Installation complete. Retrying launch...")
