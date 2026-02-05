@@ -56,6 +56,13 @@ class ChadsFlooringScraper:
                 "/usr/bin",
                 "/bin"
             ]
+            
+            # DEBUG: List contents of Nix bin to see what's actually there
+            nix_bin = "/nix/var/nix/profiles/default/bin"
+            if os.path.exists(nix_bin):
+                print(f"DEBUG: Contents of {nix_bin}:")
+                print(os.listdir(nix_bin))
+
             # Check where python is installed - chromium is often in the same bin dir in Nix
             if sys.executable:
                 search_paths.insert(0, os.path.dirname(sys.executable))
@@ -86,6 +93,9 @@ class ChadsFlooringScraper:
                 try:
                     subprocess.run(["playwright", "install", "chromium"], check=True)
                     print("✅ Chromium installed successfully.")
+                    # Force use of the main chromium binary, not the headless shell
+                    # because the logs show chromium-1208 is what gets downloaded
+                    launch_kwargs["channel"] = "chromium"
                 except Exception as e:
                     print(f"❌ Failed to install Chromium: {e}")
 
