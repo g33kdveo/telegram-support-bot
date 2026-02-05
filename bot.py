@@ -2072,52 +2072,21 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith('/api/products'):
             try:
-                # Add timestamp and random value to bypass all caching layers
-                import random
-                cache_buster = f"{int(time.time())}_{random.randint(1000, 9999)}"
+                # Note: The chadsflooring.bz API appears to have changed or is no longer publicly accessible
+                # The /api/products endpoint requires login, and /api/products/scrape returns errors
+                # For now, return sample data or empty menu
                 
-                # Try multiple API endpoints
-                urls_to_try = [
-                    f"https://chadsflooring.bz/api/products/scrape?t={cache_buster}",
-                    f"https://chadsflooring.bz/api/products?t={cache_buster}",
-                    f"https://www.chadsflooring.bz/api/products/scrape?t={cache_buster}"
-                ]
+                print("⚠️ External API is currently unavailable. Returning fallback menu.")
                 
-                data = None
-                last_error = None
+                # Return empty menu with informative message
+                fallback_data = {
+                    "data": [],
+                    "imagePathPrefix": "/uploads/products/",
+                    "message": "Menu temporarily unavailable. The external API (chadsflooring.bz) has changed and requires authentication.",
+                    "error": False
+                }
                 
-                for url in urls_to_try:
-                    try:
-                        # Add headers to mimic a real browser
-                        headers = {
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                            'Accept': 'application/json, */*',
-                            'Accept-Language': 'en-US,en;q=0.9',
-                            'Cache-Control': 'no-cache',
-                            'Pragma': 'no-cache',
-                            'Referer': 'https://chadsflooring.bz/',
-                            'Origin': 'https://chadsflooring.bz'
-                        }
-                        
-                        req = urllib.request.Request(url, headers=headers)
-                        with urllib.request.urlopen(req, timeout=10) as response:
-                            data = response.read()
-                            print(f"✅ Successfully fetched from: {url}")
-                            break
-                    except Exception as e:
-                        last_error = e
-                        print(f"❌ Failed to fetch from {url}: {str(e)}")
-                        continue
-                
-                if data is None:
-                    # If all URLs failed, return a fallback response
-                    print(f"⚠️ All API endpoints failed. Last error: {last_error}")
-                    fallback_data = {
-                        "data": [],
-                        "imagePathPrefix": "/uploads/products/",
-                        "error": "Unable to fetch menu data from source. Please try again later."
-                    }
-                    data = json.dumps(fallback_data).encode('utf-8')
+                data = json.dumps(fallback_data).encode('utf-8')
                 
                 # Send response with cache prevention headers
                 self.send_response(200)
