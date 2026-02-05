@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 # Force Playwright to look in the persistent directory for browsers
 # This must be set before importing playwright or launching browsers
@@ -43,22 +44,30 @@ class ChadsFlooringScraper:
     def get_products(self):
         print("🚀 Starting Playwright Browser...")
         
-        # Self-healing: Install browser if missing (Runtime Fix)
-        browser_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
-        if not os.path.exists(browser_path) or not os.listdir(browser_path):
-            print(f"⚠️ Browser directory {browser_path} missing. Installing Chromium...")
-            try:
-                subprocess.run(["playwright", "install", "chromium"], check=True)
-                print("✅ Chromium installed successfully.")
-            except Exception as e:
-                print(f"❌ Failed to install Chromium: {e}")
+        # 1. Try to find System Chromium (Best for Railway/Nixpacks)
+        system_chromium = shutil.which("chromium") or shutil.which("chromium-browser")
+        launch_kwargs = {"headless": True, "args": ['--no-sandbox']}
+        
+        if system_chromium:
+            print(f"ℹ️ Using system Chromium at: {system_chromium}")
+            launch_kwargs["executable_path"] = system_chromium
+        else:
+            # 2. Fallback: Self-healing download (Runtime Fix)
+            browser_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+            if not os.path.exists(browser_path) or not os.listdir(browser_path):
+                print(f"⚠️ System Chromium not found and local browser missing. Installing...")
+                try:
+                    subprocess.run(["playwright", "install", "chromium"], check=True)
+                    print("✅ Chromium installed successfully.")
+                except Exception as e:
+                    print(f"❌ Failed to install Chromium: {e}")
 
         products = []
         
         with sync_playwright() as p:
             # Launch Chromium
             # args=['--no-sandbox'] is often needed in container environments
-            browser = p.chromium.launch(headless=True, args=['--no-sandbox'])
+            browser = p.chromium.launch(**launch_kwargs)
             context = browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
             )
