@@ -206,6 +206,19 @@ class ChadsFlooringScraper:
                 print("⏳ Waiting 2s for shop to fully open...")
                 time.sleep(2)
 
+                # NEW: Try to grab __NEXT_DATA__ or similar JSON blobs from the page
+                # This is often more reliable than clicking links for modern sites
+                print("🔍 Checking page for JSON data blobs...")
+                scripts = page.locator("script[type='application/json'], script[id='__NEXT_DATA__']").all()
+                for script in scripts:
+                    try:
+                        content = script.inner_text()
+                        if content:
+                            json_data = json.loads(content)
+                            print("📥 Captured JSON from script tag")
+                            captured_data.append(json_data)
+                    except: pass
+
                 # 5. Find "Products API (JSON)" link at the bottom
                 if not captured_data:
                     print("⚠️ No API data captured yet. Looking for 'Products API (JSON)' link...")

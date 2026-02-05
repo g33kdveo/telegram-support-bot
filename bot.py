@@ -2077,9 +2077,11 @@ async def set_commands(app):
 # Global cache for products to prevent login spam
 PRODUCT_CACHE = {
     "data": None,
-    "timestamp": 0
+    "timestamp": 0,
+    "last_attempt": 0
 }
-CACHE_DURATION = 60  # 1 minute
+CACHE_DURATION = 300  # 5 minutes
+FAILURE_COOLDOWN = 30 # 30 seconds cooldown on failure
 SCRAPE_LOCK = threading.Lock()
 
 class BotRequestHandler(SimpleHTTPRequestHandler):
@@ -2094,19 +2096,30 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
         if self.path.startswith('/api/products'):
             try:
                 # If cache is fresh and not a forced refresh, serve it immediately.
-                is_forced_refresh = "nocache" in self.path
-                if not is_forced_refresh and PRODUCT_CACHE["data"] and (time.time() - PRODUCT_CACHE["timestamp"] < CACHE_DURATION):
+                # We ignore client-side 'nocache' params to prevent login loops
+                if PRODUCT_CACHE["data"] and (time.time() - PRODUCT_CACHE["timestamp"] < CACHE_DURATION):
                     print("✅ Serving products from cache")
                     self.send_json(PRODUCT_CACHE["data"])
                     return
 
                 # Acquire lock to prevent multiple browsers from launching at once
                 with SCRAPE_LOCK:
+                    now = time.time()
+                    
                     # Double-check cache inside lock (another thread might have just finished)
-                    if PRODUCT_CACHE["data"] and (time.time() - PRODUCT_CACHE["timestamp"] < CACHE_DURATION) and "nocache" not in self.path:
+                    if PRODUCT_CACHE["data"] and (now - PRODUCT_CACHE["timestamp"] < CACHE_DURATION):
                         print("✅ Serving products from cache (after lock)")
                         self.send_json(PRODUCT_CACHE["data"])
                         return
+
+                    # Check failure cooldown to prevent login spam
+                    if not PRODUCT_CACHE["data"] and (now - PRODUCT_CACHE.get("last_attempt", 0) < FAILURE_COOLDOWN):
+                        print("⏳ Recent scrape failed. Serving error/empty to prevent login spam.")
+                        self.send_json({"data": [], "error": True, "message": "Scrape cooldown active"})
+                        return
+
+                    # Mark attempt start
+                    PRODUCT_CACHE["last_attempt"] = now
 
                     # --- Scrape for new data ---
                     print("🔄 Fetching products from chadsflooring.bz...")
