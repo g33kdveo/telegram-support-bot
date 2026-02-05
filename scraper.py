@@ -41,6 +41,15 @@ class ChadsFlooringScraper:
 
     def get_products(self):
         print("🚀 Starting Playwright Browser...")
+        
+        # Debug: Check if browser binaries exist
+        browser_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+        print(f"DEBUG: PLAYWRIGHT_BROWSERS_PATH is set to: {browser_path}")
+        if browser_path and os.path.exists(browser_path):
+            print(f"DEBUG: Contents of {browser_path}: {os.listdir(browser_path)}")
+        else:
+            print(f"DEBUG: Browser path {browser_path} does not exist!")
+
         products = []
         
         with sync_playwright() as p:
