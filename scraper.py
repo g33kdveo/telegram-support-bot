@@ -1,12 +1,8 @@
+from playwright.sync_api import sync_playwright
+import time
 import json
 import os
-import urllib.request
-import urllib.parse
-import urllib.error
-import http.cookiejar
-from html.parser import HTMLParser
 import re
-import time
 
 try:
     from dotenv import load_dotenv
@@ -18,499 +14,297 @@ class ChadsFlooringScraper:
     def __init__(self, username=None, password=None, cookie_string=None):
         self.username = username
         self.password = password
-        self.cookie_string = cookie_string
         self.base_url = "https://chadsflooring.bz"
-        
-        # Setup cookie handling for session management
-        self.cookie_jar = http.cookiejar.CookieJar()
-        self.opener = urllib.request.build_opener(
-            urllib.request.HTTPCookieProcessor(self.cookie_jar)
-        )
-        
-        # If manual cookie string provided, load it immediately
-        if self.cookie_string:
-            self.load_manual_cookies(self.cookie_string)
-            
-    def load_manual_cookies(self, cookie_str):
-        """Parse a browser cookie string and add to the jar"""
-        try:
-            from http.cookiejar import Cookie
-            print("🍪 Loading manual cookies...")
-            for item in cookie_str.split(';'):
-                if '=' in item:
-                    name, value = item.strip().split('=', 1)
-                    # Create a cookie object that mimics a real session
-                    c = Cookie(
-                        version=0, name=name, value=value,
-                        port=None, port_specified=False,
-                        domain="chadsflooring.bz", domain_specified=True, domain_initial_dot=False,
-                        path="/", path_specified=True,
-                        secure=True, expires=None, discard=True,
-                        comment=None, comment_url=None, rest={'HttpOnly': None}, rfc2109=False
-                    )
-                    self.cookie_jar.set_cookie(c)
-            print(f"✅ Loaded {len(self.cookie_jar)} cookies from environment variable")
-        except Exception as e:
-            print(f"❌ Failed to parse manual cookies: {e}")
-        
+
     def find_products_in_json(self, data):
         """Recursively search for product-like objects in JSON data"""
         products = []
-        
         if isinstance(data, dict):
-            # Check if this dict looks like a product
             if 'name' in data:
                 name = data['name']
-                # A simple check to avoid matching random 'name' fields, and ensure it's a product
                 if isinstance(name, str) and 2 < len(name) < 100 and ('id' in data or 'slug' in data or 'image' in data or 'description' in data):
                     p = {
                         'name': name,
                         'image': data.get('image', data.get('img', data.get('imageUrl', '')))
                     }
                     products.append(p)
-            
             for value in data.values():
                 products.extend(self.find_products_in_json(value))
         elif isinstance(data, list):
             for item in data:
                 products.extend(self.find_products_in_json(item))
         return products
-        
-    def login(self):
-        """Login to chadsflooring.bz and get session cookies"""
-        if not self.username or not self.password:
-            return False
-            
-        # Potential login pages to check
-        login_pages = [
-            "/login?callbackUrl=https%3A%2F%2Fchadsflooring.bz",
-            "/login", 
-            "/signin", 
-            "/auth/login", 
-            "/user/login"
-        ]
-        login_page = ""
-        login_page_url = f"{self.base_url}/login" # Default
-        
-        print("🔐 Detecting login page...")
-        
-        try:
-            # ATTEMPT 0: NextAuth.js (Common with callbackUrl)
-            # Try to fetch CSRF from API first, as this is cleaner than scraping HTML for Next.js
-            try:
-                csrf_url = f"{self.base_url}/api/auth/csrf"
-                req = urllib.request.Request(csrf_url, headers={'User-Agent': 'Mozilla/5.0'})
-                with self.opener.open(req) as response:
-                    resp_text = response.read().decode('utf-8')
-                    try:
-                        data = json.loads(resp_text)
-                    except json.JSONDecodeError:
-                        print(f"⚠️ CSRF endpoint returned non-JSON: {resp_text[:100]}...")
-                        data = {}
-                    csrf_token = data.get('csrfToken')
-                    
-                if csrf_token:
-                    print(f"✅ Found NextAuth CSRF token: {csrf_token[:10]}...")
-                    # Perform NextAuth Login
-                    login_url = f"{self.base_url}/api/auth/callback/credentials"
-                    payload = {
-                        'redirect': 'false',
-                        'csrfToken': csrf_token,
-                        'username': self.username,
-                        'password': self.password,
-                        'callbackUrl': self.base_url
-                    }
-                    data_encoded = urllib.parse.urlencode(payload).encode('utf-8')
-                    req = urllib.request.Request(
-                        login_url, 
-                        data=data_encoded,
-                        headers={
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                            'Content-Type': 'application/x-www-form-urlencoded'
-                        }
-                    )
-                    with self.opener.open(req) as response:
-                        print("✅ NextAuth Login successful")
-                        resp_text = response.read().decode('utf-8')
-                        print(f"✅ NextAuth Login Response: {resp_text}")
-                        print(f"🍪 Cookies captured: {len(self.cookie_jar)}")
-                        for cookie in self.cookie_jar:
-                            print(f"   - {cookie.name}")
-                        return True
-            except Exception as e:
-                print(f"⚠️ NextAuth attempt failed: {e}")
 
-            for path in login_pages:
-                try:
-                    url = f"{self.base_url}{path}"
-                    req = urllib.request.Request(
-                        url,
-                        headers={
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                        }
-                    )
-                    with self.opener.open(req) as response:
-                        login_page = response.read().decode('utf-8')
-                        login_page_url = url
-                        print(f"✅ Found login page at: {path}")
-                        break
-                except Exception:
-                    continue
-            
-            # Try to extract any tokens from the page
-            # Look for common patterns like csrf_token, authenticity_token, etc.
-            token_patterns = [
-                r'name="csrf_token"\s+value="([^"]+)"',
-                r'name="_token"\s+value="([^"]+)"',
-                r'name="authenticity_token"\s+value="([^"]+)"',
-                r'"csrfToken":"([^"]+)"',
-                r'window\.csrfToken\s*=\s*"([^"]+)"'
-            ]
-            
-            csrf_token = None
-            for pattern in token_patterns:
-                match = re.search(pattern, login_page)
-                if match:
-                    csrf_token = match.group(1)
-                    break
-            
-            # Prepare login data
-            login_data = {
-                'username': self.username,
-                'password': self.password,
-            }
-            
-            # If username looks like email, add email field too
-            if '@' in self.username:
-                login_data['email'] = self.username
-            
-            # Add CSRF token if found
-            if csrf_token:
-                login_data['csrf_token'] = csrf_token
-                login_data['_token'] = csrf_token
-                login_data['authenticity_token'] = csrf_token
-            
-            # Determine POST URL from form action or defaults
-            login_url = f"{self.base_url}/api/auth/login" # Default
-            
-            if login_page:
-                action_match = re.search(r'<form[^>]+action=["\']([^"\']+)["\']', login_page, re.IGNORECASE)
-                if action_match:
-                    action = action_match.group(1)
-                    if not action.startswith('http'):
-                        if action.startswith('/'):
-                            login_url = f"{self.base_url}{action}"
-                        else:
-                            login_url = f"{self.base_url}/{action}"
-                    else:
-                        login_url = action
-                    print(f"✅ Detected login action URL: {login_url}")
-            
-            # ATTEMPT 1: JSON Login (Most likely for /api/ endpoints)
-            try:
-                json_data = json.dumps(login_data).encode('utf-8')
-                headers = {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json, text/plain, */*',
-                    'Origin': self.base_url,
-                    'Referer': login_page_url,
-                }
-                # Add XSRF-TOKEN from cookies if present
-                for cookie in self.cookie_jar:
-                    if cookie.name == 'XSRF-TOKEN':
-                        headers['X-XSRF-TOKEN'] = urllib.parse.unquote(cookie.value)
-                        break
-                
-                req = urllib.request.Request(login_url, data=json_data, headers=headers)
-                with self.opener.open(req) as response:
-                    print(f"✅ Login successful (JSON)")
-                    return True
-            except Exception as e:
-                print(f"⚠️ JSON Login failed: {e}, trying Form Data...")
-
-            # ATTEMPT 2: Form Data Login (Fallback)
-            login_data_encoded = urllib.parse.urlencode(login_data).encode('utf-8')
-            req = urllib.request.Request(
-                login_url,
-                data=login_data_encoded,
-                headers={
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'Accept': 'application/json, text/plain, */*',
-                    'Origin': self.base_url,
-                    'Referer': login_page_url,
-                }
-            )
-            
-            with self.opener.open(req) as response:
-                result = response.read().decode('utf-8')
-                print(f"✅ Login successful (Form)")
-                return True
-                
-        except Exception as e:
-            print(f"❌ Login failed: {str(e)}")
-            return False
-    
-    def fetch_products_api(self):
-        """Try to fetch products using the API with authentication"""
-        try:
-            # Try different API endpoints
-            api_endpoints = [
-                "/api/products/scrape",
-                "/api/products",
-                "/api/inventory",
-                "/products/api/all",
-                "/api/v1/products",
-                "/api/products/all"
-            ]
-            
-            for endpoint in api_endpoints:
-                try:
-                    url = f"{self.base_url}{endpoint}"
-                    req = urllib.request.Request(
-                        url,
-                        headers={
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                            'Accept': 'application/json, text/plain, */*',
-                            'Referer': self.base_url,
-                        }
-                    )
-                    
-                    with self.opener.open(req, timeout=20) as response:
-                        data = response.read().decode('utf-8')
-                        
-                        # Check if it's JSON
-                        try:
-                            json_data = json.loads(data)
-                            print(f"✅ Successfully fetched from API: {endpoint}")
-                            return json_data
-                        except json.JSONDecodeError:
-                            print(f"⚠️ API {endpoint} returned non-JSON data")
-                            continue
-                except urllib.error.HTTPError as e:
-                    print(f"⚠️ API {endpoint} failed with status {e.code}")
-                    continue
-                except Exception as e:
-                    print(f"⚠️ API {endpoint} error: {str(e)}")
-                    continue
-                    
-            return None
-            
-        except Exception as e:
-            print(f"❌ API fetch failed: {str(e)}")
-            return None
-    
-    def scrape_products_html(self):
-        """Scrape products directly from HTML pages"""
-        try:
-            products = []
-            
-            # Common product listing URLs to try
-            product_urls = [
-                "/products/scrape",
-                "/",
-                "/products",
-                "/shop",
-                "/menu",
-                "/inventory",
-                "/store"
-            ]
-            
-            for product_path in product_urls:
-                try:
-                    url = f"{self.base_url}{product_path}"
-                    req = urllib.request.Request(
-                        url,
-                        headers={
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                        }
-                    )
-                    
-                    with self.opener.open(req, timeout=20) as response:
-                        html = response.read().decode('utf-8')
-                        
-                        # DEBUG: Save HTML to file to see what the bot actually sees
-                        try:
-                            with open("last_scrape.html", "w", encoding="utf-8") as f:
-                                f.write(html)
-                            print(f"📄 Saved HTML from {product_path} to last_scrape.html")
-                        except Exception:
-                            pass
-                        
-                        # Debug: Print title
-                        title_match = re.search(r'<title>(.*?)</title>', html, re.IGNORECASE)
-                        if title_match:
-                            print(f"📄 Scraped {product_path}: {title_match.group(1)}")
-                            
-                            if "Login" in title_match.group(1):
-                                print("❌ BOT IS LOGGED OUT (Redirected to Login Page)")
-                            
-                            # Check for Cloudflare/Blockers
-                            if "Just a moment" in title_match.group(1) or "Access denied" in title_match.group(1) or "Challenge" in title_match.group(1):
-                                print("❌ BLOCKED BY CLOUDFLARE/WAF")
-                        
-                        # Parse products from HTML
-                        # Look for common patterns in product listings
-                        product_patterns = [
-                            # JSON-LD structured data
-                            r'<script type="application/ld\+json">(.*?)</script>',
-                            # Next.js Data
-                            r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
-                            # Data attributes
-                            r'data-product=\'({.*?})\'',
-                            r'data-product="({.*?})"',
-                            # JavaScript variables
-                            r'var products\s*=\s*(\[.*?\]);',
-                            r'window\.products\s*=\s*(\[.*?\]);',
-                        ]
-                        
-                        for pattern in product_patterns:
-                            matches = re.findall(pattern, html, re.DOTALL)
-                            for match in matches:
-                                try:
-                                    # DEBUG: Save the raw JSON data found to a file
-                                    if "NEXT_DATA" in pattern:
-                                        try:
-                                            with open("debug_data.json", "w", encoding="utf-8") as f:
-                                                f.write(match)
-                                            print("📄 Saved raw data to debug_data.json")
-                                        except: pass
-
-                                    # Try to parse as JSON
-                                    data = json.loads(match)
-                                    found = self.find_products_in_json(data)
-                                    if found:
-                                        products.extend(found)
-                                except:
-                                    continue
-                        
-                        # If we found products, return them
-                        if products:
-                            print(f"✅ Found {len(products)} products from {product_path}")
-                            return {"data": products}
-                            
-                except Exception as e:
-                    continue
-                    
-            # If no structured data found, try to parse HTML elements
-            if not products:
-                products = self.parse_product_cards(html)
-                if products:
-                    return {"data": products}
-                    
-            return None
-            
-        except Exception as e:
-            print(f"❌ HTML scraping failed: {str(e)}")
-            return None
-    
-    def parse_product_cards(self, html):
-        """Parse product information from HTML cards/divs"""
+    def get_products(self):
+        print("🚀 Starting Playwright Browser...")
         products = []
         
-        # Common product card patterns
-        product_card_patterns = [
-            r'<div[^>]*class="[^"]*product[^"]*"[^>]*>(.*?)</div>',
-            r'<article[^>]*class="[^"]*product[^"]*"[^>]*>(.*?)</article>',
-            r'<li[^>]*class="[^"]*product[^"]*"[^>]*>(.*?)</li>',
-            # Material UI patterns (React)
-            r'<div[^>]*class="[^"]*MuiGrid-item[^"]*"[^>]*>(.*?)</div>',
-            r'<div[^>]*class="[^"]*MuiPaper-root[^"]*"[^>]*>(.*?)</div>',
-        ]
-        
-        # Extract product info patterns
-        name_pattern = r'(?:title|name)="([^"]+)"|>([^<]+)</(?:h\d|a|span|p|div)>'
-        image_pattern = r'(?:src|data-src)="([^"]+)"'
-        
-        for card_pattern in product_card_patterns:
-            cards = re.findall(card_pattern, html, re.DOTALL)
+        with sync_playwright() as p:
+            # Launch Chromium
+            # args=['--no-sandbox'] is often needed in container environments
+            browser = p.chromium.launch(headless=True, args=['--no-sandbox'])
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+            )
+            page = context.new_page()
+
+            # Setup API Interception
+            captured_data = []
+            def handle_response(response):
+                # Capture anything that looks like a product list API
+                if ("api/products" in response.url or "products.list" in response.url or "scrape" in response.url) and response.status == 200:
+                    try:
+                        print(f"📥 Captured API response: {response.url}")
+                        json_body = response.json()
+                        captured_data.append(json_body)
+                    except: pass
             
-            for card in cards:
-                product = {}
+            page.on("response", handle_response)
+
+            try:
+                # 1. Go to Login Page
+                print("🔐 Navigating to login...")
+                page.goto(f"{self.base_url}/login", timeout=60000)
+                page.wait_for_load_state("domcontentloaded")
                 
-                # Extract name
-                name_match = re.search(name_pattern, card)
-                if name_match:
-                    product['name'] = name_match.group(1) or name_match.group(2)
-                
-                # Extract image
-                image_match = re.search(image_pattern, card)
-                if image_match:
-                    product['image'] = image_match.group(1)
-                    if not product['image'].startswith('http'):
-                        product['image'] = self.base_url + product['image']
-                
-                if product.get('name'):
-                    products.append(product)
-        
-        # Fallback: If no cards found, try to find specific Material UI titles directly
-        if not products:
-            # Pattern matches: <p ... title="Product Name">
-            mui_titles = re.findall(r'<p[^>]*class="[^"]*title[^"]*"[^>]*title="([^"]+)"', html)
-            
-            # Try to find images that look like product images to pair with titles
-            # This assumes the order of images matches the order of titles
-            product_images = re.findall(r'<img[^>]+src="([^"]*uploads/products/[^"]+)"', html)
-            
-            if mui_titles:
-                print(f"✅ Found {len(mui_titles)} products via Mui Title match")
-                for i, title in enumerate(mui_titles):
-                    img = product_images[i] if i < len(product_images) else ""
-                    if img and not img.startswith('http'):
-                        img = self.base_url + img
+                # Give the page a moment to render overlays (Age Gate)
+                time.sleep(1.5)
+
+                # Check for Maintenance
+                content = page.content()
+                if "performing updates" in content or "Maintenance" in content or "Under Maintenance" in content:
+                    print("⚠️ Site is Under Maintenance. Skipping browser scrape.")
+                    raise Exception("Site Under Maintenance")
+
+                # 2. Handle "21+" Age Gate
+                try:
+                    print("🔞 Checking for Age Gate...")
+                    # Check any visible checkboxes (often required)
+                    checkboxes = page.locator("input[type='checkbox']")
+                    if checkboxes.count() > 0:
+                        for i in range(checkboxes.count()):
+                            if checkboxes.nth(i).is_visible():
+                                checkboxes.nth(i).check()
+                                time.sleep(0.2)
+                    
+                    # Click "Yes" / "Enter" / "Continue" buttons
+                    # Use get_by_text with .last to find the specific button/label, not the container
+                    clicked_age = False
+                    possible_texts = [
+                        re.compile(r"Yes, I Am 21\+", re.IGNORECASE),
+                        re.compile(r"I Am 21\+", re.IGNORECASE),
+                        re.compile(r"Yes, I am 21", re.IGNORECASE),
+                        re.compile(r"Enter Site", re.IGNORECASE)
+                    ]
+                    
+                    for p_text in possible_texts:
+                        if clicked_age: break
+                        # .last selects the deepest element (the text node/button) instead of the wrapper
+                        btn = page.get_by_text(p_text).last
+                        if btn.is_visible():
+                            print(f"   Clicking Age Gate button: {btn.inner_text()}")
+                            btn.click()
+                            clicked_age = True
+                            time.sleep(2)
+                except Exception as e:
+                    print(f"⚠️ Age gate interaction warning: {e}")
+
+                # 3. Login
+                if self.username and self.password:
+                    print("⌨️ Filling credentials...")
+                    # Wait for password field (most reliable indicator of login form)
+                    try:
+                        page.wait_for_selector("input[type='password']", timeout=5000)
+                    except:
+                        print("⚠️ Password field wait timeout - attempting to fill anyway...")
+
+                    # Fill Username - Try multiple common selectors
+                    user_filled = False
+                    user_selectors = [
+                        "input[name='username']", "input[name='email']", "input[type='email']",
+                        "input[placeholder*='User']", "input[placeholder*='Email']"
+                    ]
+                    
+                    for sel in user_selectors:
+                        if page.locator(sel).first.is_visible():
+                            page.fill(sel, self.username)
+                            user_filled = True
+                            break
+                    
+                    if not user_filled:
+                        # Fallback to first text input
+                        text_inputs = page.locator("input[type='text']")
+                        if text_inputs.count() > 0 and text_inputs.first.is_visible():
+                            text_inputs.first.fill(self.username)
+
+                    # Fill Password
+                    if page.locator("input[name='password']").is_visible():
+                        page.fill("input[name='password']", self.password)
+                    elif page.locator("input[type='password']").is_visible():
+                        page.fill("input[type='password']", self.password)
+                    
+                    # Hit Enter to login
+                    print("↵ Pressing Enter to login...")
+                    page.keyboard.press("Enter")
+                    
+                    # Scan to see if shop opened (moved away from login)
+                    login_success = False
+                    try:
+                        # Scan for up to 30s (increased for slow loading)
+                        page.wait_for_url(lambda u: "/login" not in u, timeout=30000)
+                        print("✅ Navigation detected (Login successful).")
+                        login_success = True
+                    except:
+                        print("⚠️ Still on login page after Enter. Checking for obstacles...")
                         
-                    products.append({
-                        'name': title,
-                        'image': img
-                    })
+                        # Check for Age Gate again
+                        try:
+                            possible_texts = [
+                                re.compile(r"Yes, I Am 21\+", re.IGNORECASE),
+                                re.compile(r"I Am 21\+", re.IGNORECASE),
+                                re.compile(r"Yes, I am 21", re.IGNORECASE),
+                                re.compile(r"Enter Site", re.IGNORECASE)
+                            ]
+                            for p_text in possible_texts:
+                                btn = page.get_by_text(p_text).last
+                                if btn.is_visible():
+                                    print(f"   Found Age Gate again. Clicking: {btn.inner_text()}")
+                                    btn.click()
+                        except: pass
+
+                        # Try clicking Login button explicitly
+                        # Only if visible (avoid clicking if already transitioning)
+                        login_btn = page.get_by_role("button", name=re.compile(r"Login|Sign In", re.IGNORECASE))
+                        if login_btn.is_visible():
+                            print("   Clicking Login button explicitly...")
+                            try:
+                                login_btn.click(timeout=5000)
+                            except: pass
+                            try:
+                                page.wait_for_url(lambda u: "/login" not in u, timeout=10000)
+                                print("✅ Navigation detected after click.")
+                                login_success = True
+                            except: pass
+                        else:
+                            print("ℹ️ Login button not visible. Assuming login in progress...")
+                    
+                    if login_success:
+                        print("⏳ Shop opened. Waiting 2s for full load...")
+                        time.sleep(2)
+                    
+                    if "/login" in page.url and not login_success:
+                        print("⚠️ Warning: Still on login page. Login might have failed.")
+
+                # 4. Navigate to Shop to trigger API
+                print("📂 Loading Shop page to grab API...")
+                page.goto(f"{self.base_url}/explore", timeout=60000)
+                page.wait_for_load_state("networkidle", timeout=30000)
+                
+                # Wait a bit extra for any lazy-loaded APIs
+                print("⏳ Waiting 2s for shop to fully open...")
+                time.sleep(2)
+
+                # 5. Find "Products API (JSON)" link at the bottom
+                if not captured_data:
+                    print("⚠️ No API data captured yet. Looking for 'Products API (JSON)' link...")
+                    try:
+                        # Scroll to bottom to ensure footer is loaded
+                        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                        print("⬇️ Scrolled to bottom. Waiting for footer...")
+                        try:
+                            page.wait_for_selector("a[href='/api/products/scrape']", timeout=5000)
+                        except:
+                            time.sleep(2)
+                        
+                        # Find the link
+                        # Try specific href first (more reliable), then text
+                        api_link = page.locator("a[href='/api/products/scrape']").first
+                        if not api_link.is_visible():
+                            api_link = page.get_by_text("Products API (JSON)").first
+                            
+                        if api_link.is_visible():
+                            print("✅ Found API link. Attempting to click...")
+                            
+                            current_url = page.url
+                            clicked_success = False
+                            
+                            for i in range(5):
+                                try:
+                                    print(f"   Click attempt {i+1}...")
+                                    api_link.click(timeout=2000)
+                                    time.sleep(2)
+                                    
+                                    # Check if URL changed or body is JSON
+                                    text = page.locator("body").inner_text()
+                                    if page.url != current_url or text.strip().startswith("{") or text.strip().startswith("["):
+                                        print("✅ Link opened successfully!")
+                                        clicked_success = True
+                                        break
+                                    print("⚠️ No change detected. Retrying...")
+                                except Exception as e:
+                                    print(f"⚠️ Click attempt failed: {e}")
+                                    time.sleep(1)
+                            
+                            if clicked_success:
+                                page.wait_for_load_state("networkidle", timeout=10000)
+                                text = page.locator("body").inner_text()
+                                if text.strip().startswith("{") or text.strip().startswith("["):
+                                    json_data = json.loads(text)
+                                    print("📥 Captured JSON from API page body")
+                                    captured_data.append(json_data)
+                        else:
+                            print("❌ 'Products API (JSON)' link not found after scrolling.")
+                    except Exception as e:
+                        print(f"⚠️ Failed to find/click API link: {e}")
+
+            except Exception as e:
+                print(f"⚠️ Browser interaction error: {e}")
+                time.sleep(10) # Keep browser open for 10s so you can see the error
+
+            browser.close()
+            
+            # Process captured data
+            print(f"📊 Processing {len(captured_data)} captured API responses...")
+            for data in captured_data:
+                found = self.find_products_in_json(data)
+                if found:
+                    products.extend(found)
+            
+            # Deduplicate by name
+            unique_products = {p['name']: p for p in products}.values()
+            products = list(unique_products)
+
+        if products:
+            print(f"✅ Successfully found {len(products)} products via Playwright!")
+            return {"data": products}
+        else:
+            print("❌ No products found via Playwright.")
+            return {"data": [], "error": True}
         
-        return products
-    
-    def get_products(self):
-        """Main method to get products using all available methods"""
-        
-        # Try to login if credentials provided AND we don't have manual cookies
-        # If we have manual cookies, we assume they are valid and skip the login (which might trigger captcha)
-        if self.cookie_string:
-            print("ℹ️ Using manual cookies (Skipping automated login)")
-        elif self.username and self.password:
-            print("🔐 Attempting login...")
-            self.login()
-        
-        # Try API first
-        print("🔍 Trying API endpoints...")
-        data = self.fetch_products_api()
-        if data:
-            return data
-        
-        # Fallback to HTML scraping
-        print("🔍 Trying HTML scraping...")
-        data = self.scrape_products_html()
-        if data:
-            return data
-        
-        # Return empty if all methods fail
-        print("⚠️ All methods failed")
-        return {
-            "data": [],
-            "error": "Unable to fetch products",
-            "message": "Could not retrieve product data from chadsflooring.bz"
-        }
+        # Fallback to Manual File
+        if os.path.exists("manual_products.json"):
+            print("⚠️ Network scrape failed/Maintenance. Loading from manual_products.json...")
+            try:
+                with open("manual_products.json", "r", encoding="utf-8") as f:
+                    raw_data = json.load(f)
+                    found_products = self.find_products_in_json(raw_data)
+                    if found_products:
+                        print(f"✅ Loaded {len(found_products)} products from manual file")
+                        return {"data": found_products}
+            except Exception as e:
+                print(f"❌ Failed to load manual file: {e}")
+
+        print("❌ No products found via Playwright.")
+        return {"data": [], "error": True}
 
 # Test function
 if __name__ == "__main__":
-    # Test without credentials
-    scraper = ChadsFlooringScraper()
-    result = scraper.get_products()
-    print(f"Found {len(result.get('data', []))} products")
-    
-    # To test with credentials:
     username = os.getenv("CHADS_USERNAME")
     password = os.getenv("CHADS_PASSWORD")
     
     if username and password:
         scraper = ChadsFlooringScraper(username=username, password=password)
         result = scraper.get_products()
+        print(f"Found {len(result.get('data', []))} products")
+    else:
+        print("Please set CHADS_USERNAME and CHADS_PASSWORD env vars to test.")

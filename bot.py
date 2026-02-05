@@ -2079,7 +2079,7 @@ PRODUCT_CACHE = {
     "data": None,
     "timestamp": 0
 }
-CACHE_DURATION = 300  # 5 minutes
+CACHE_DURATION = 60  # 1 minute
 
 class BotRequestHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
@@ -2092,49 +2092,58 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
             
         if self.path.startswith('/api/products'):
             try:
-                # Check cache first (unless nocache is requested)
-                if PRODUCT_CACHE["data"] and (time.time() - PRODUCT_CACHE["timestamp"] < CACHE_DURATION) and "nocache" not in self.path:
+                # If cache is fresh and not a forced refresh, serve it immediately.
+                is_forced_refresh = "nocache" in self.path
+                if not is_forced_refresh and PRODUCT_CACHE["data"] and (time.time() - PRODUCT_CACHE["timestamp"] < CACHE_DURATION):
                     print("✅ Serving products from cache")
                     self.send_json(PRODUCT_CACHE["data"])
                     return
 
-                # Use the scraper to get products
+                # --- Scrape for new data ---
+                print("🔄 Fetching products from chadsflooring.bz...")
                 scraper = ChadsFlooringScraper(
                     username=CHADS_USERNAME,
                     password=CHADS_PASSWORD,
                     cookie_string=CHADS_COOKIE
                 )
+                fresh_result = scraper.get_products()
                 
-                print("🔄 Fetching products from chadsflooring.bz...")
-                result = scraper.get_products()
+                # --- Decide what to do with the new data ---
+                # Check if the new data is valid and has products
+                if fresh_result and isinstance(fresh_result.get('data'), list) and len(fresh_result.get('data')) > 0:
+                    print(f"✅ Fetched {len(fresh_result['data'])} new products. Updating cache.")
+                    
+                    if not fresh_result.get('imagePathPrefix'):
+                        fresh_result['imagePathPrefix'] = "/uploads/products/"
+                    
+                    # Update cache with the fresh data
+                    PRODUCT_CACHE = { "data": fresh_result, "timestamp": time.time() }
+                    self.send_json(fresh_result)
                 
-                # Ensure proper format for webapp
-                if not result.get('imagePathPrefix'):
-                    result['imagePathPrefix'] = "/uploads/products/"
+                # If scrape failed but we have old data in cache, serve the old data.
+                elif PRODUCT_CACHE["data"]:
+                    print("⚠️ Scrape failed. Serving stale data from cache as a fallback.")
+                    self.send_json(PRODUCT_CACHE["data"])
                 
-                # Update cache if successful
-                if result and result.get('data'):
-                    PRODUCT_CACHE = {
-                        "data": result,
-                        "timestamp": time.time()
-                    }
-                
-                self.send_json(result)
+                # If scrape failed AND we have no old data, we must show the error.
+                else:
+                    print("❌ Scrape failed and cache is empty. Sending error response.")
+                    self.send_json(fresh_result)
                 
             except Exception as e:
                 print(f"❌ Critical error in API proxy: {str(e)}")
                 import traceback
                 traceback.print_exc()
                 
-                # Return error response
-                error_data = {
-                    "data": [],
-                    "imagePathPrefix": "/uploads/products/",
-                    "error": True,
-                    "message": f"Error fetching products: {str(e)}"
-                }
-                
-                self.send_json(error_data)
+                # On critical error, still try to serve from cache.
+                if PRODUCT_CACHE["data"]:
+                    print("⚠️ Serving stale cache due to critical error.")
+                    self.send_json(PRODUCT_CACHE["data"])
+                else:
+                    error_data = {
+                        "data": [], "error": True, "message": f"Error fetching products: {str(e)}"
+                    }
+                    self.send_json(error_data)
             return
         return super().do_GET()
         
