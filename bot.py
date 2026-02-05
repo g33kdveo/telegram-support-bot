@@ -2073,10 +2073,30 @@ async def set_commands(app):
             BotCommand("help", "Admin Help")
         ], scope=BotCommandScopeChatAdministrators(chat_id=SUPPORT_GROUP_ID))
 
+# Global cache for products to prevent login spam
+PRODUCT_CACHE = {
+    "data": None,
+    "timestamp": 0
+}
+CACHE_DURATION = 300  # 5 minutes
+
 class BotRequestHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
+        global PRODUCT_CACHE
+        
+        if self.path == '/favicon.ico':
+            self.send_response(204)
+            self.end_headers()
+            return
+            
         if self.path.startswith('/api/products'):
             try:
+                # Check cache first (unless nocache is requested)
+                if PRODUCT_CACHE["data"] and (time.time() - PRODUCT_CACHE["timestamp"] < CACHE_DURATION) and "nocache" not in self.path:
+                    print("✅ Serving products from cache")
+                    self.send_json(PRODUCT_CACHE["data"])
+                    return
+
                 # Use the scraper to get products
                 scraper = ChadsFlooringScraper(
                     username=CHADS_USERNAME,
@@ -2090,17 +2110,14 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
                 if not result.get('imagePathPrefix'):
                     result['imagePathPrefix'] = "/uploads/products/"
                 
-                data = json.dumps(result).encode('utf-8')
+                # Update cache if successful
+                if result and result.get('data'):
+                    PRODUCT_CACHE = {
+                        "data": result,
+                        "timestamp": time.time()
+                    }
                 
-                # Send response with cache prevention headers
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
-                self.send_header('Pragma', 'no-cache')
-                self.send_header('Expires', '0')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                self.wfile.write(data)
+                self.send_json(result)
                 
             except Exception as e:
                 print(f"❌ Critical error in API proxy: {str(e)}")
@@ -2115,13 +2132,19 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
                     "message": f"Error fetching products: {str(e)}"
                 }
                 
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                self.wfile.write(json.dumps(error_data).encode('utf-8'))
+                self.send_json(error_data)
             return
         return super().do_GET()
+        
+    def send_json(self, data):
+        """Helper to send JSON response"""
+        response = json.dumps(data).encode('utf-8')
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Cache-Control', 'no-cache')
+        self.end_headers()
+        self.wfile.write(response)
 
 def run_simple_server():
     # Railway provides PORT, default to 8080 if not set

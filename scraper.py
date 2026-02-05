@@ -2,6 +2,7 @@ import json
 import os
 import urllib.request
 import urllib.parse
+import urllib.error
 import http.cookiejar
 from html.parser import HTMLParser
 import re
@@ -24,6 +25,29 @@ class ChadsFlooringScraper:
         self.opener = urllib.request.build_opener(
             urllib.request.HTTPCookieProcessor(self.cookie_jar)
         )
+        
+    def find_products_in_json(self, data):
+        """Recursively search for product-like objects in JSON data"""
+        products = []
+        
+        if isinstance(data, dict):
+            # Check if this dict looks like a product
+            if 'name' in data:
+                name = data['name']
+                # A simple check to avoid matching random 'name' fields, and ensure it's a product
+                if isinstance(name, str) and 2 < len(name) < 100 and ('id' in data or 'slug' in data or 'image' in data or 'description' in data):
+                    p = {
+                        'name': name,
+                        'image': data.get('image', data.get('img', data.get('imageUrl', '')))
+                    }
+                    products.append(p)
+            
+            for value in data.values():
+                products.extend(self.find_products_in_json(value))
+        elif isinstance(data, list):
+            for item in data:
+                products.extend(self.find_products_in_json(item))
+        return products
         
     def login(self):
         """Login to chadsflooring.bz and get session cookies"""
@@ -50,7 +74,12 @@ class ChadsFlooringScraper:
                 csrf_url = f"{self.base_url}/api/auth/csrf"
                 req = urllib.request.Request(csrf_url, headers={'User-Agent': 'Mozilla/5.0'})
                 with self.opener.open(req) as response:
-                    data = json.loads(response.read().decode('utf-8'))
+                    resp_text = response.read().decode('utf-8')
+                    try:
+                        data = json.loads(resp_text)
+                    except json.JSONDecodeError:
+                        print(f"⚠️ CSRF endpoint returned non-JSON: {resp_text[:100]}...")
+                        data = {}
                     csrf_token = data.get('csrfToken')
                     
                 if csrf_token:
@@ -197,6 +226,7 @@ class ChadsFlooringScraper:
         try:
             # Try different API endpoints
             api_endpoints = [
+                "/products/scrape", # From user
                 "/api/products/scrape",
                 "/api/products",
                 "/api/inventory",
@@ -226,9 +256,13 @@ class ChadsFlooringScraper:
                             print(f"✅ Successfully fetched from API: {endpoint}")
                             return json_data
                         except json.JSONDecodeError:
+                            print(f"⚠️ API {endpoint} returned non-JSON data")
                             continue
-                            
+                except urllib.error.HTTPError as e:
+                    print(f"⚠️ API {endpoint} failed with status {e.code}")
+                    continue
                 except Exception as e:
+                    print(f"⚠️ API {endpoint} error: {str(e)}")
                     continue
                     
             return None
@@ -244,6 +278,7 @@ class ChadsFlooringScraper:
             
             # Common product listing URLs to try
             product_urls = [
+                "/",
                 "/products",
                 "/shop",
                 "/menu",
@@ -265,11 +300,30 @@ class ChadsFlooringScraper:
                     with self.opener.open(req, timeout=10) as response:
                         html = response.read().decode('utf-8')
                         
+                        # DEBUG: Save HTML to file to see what the bot actually sees
+                        try:
+                            with open("last_scrape.html", "w", encoding="utf-8") as f:
+                                f.write(html)
+                            print(f"📄 Saved HTML from {product_path} to last_scrape.html")
+                        except Exception:
+                            pass
+                        
+                        # Debug: Print title
+                        title_match = re.search(r'<title>(.*?)</title>', html, re.IGNORECASE)
+                        if title_match:
+                            print(f"📄 Scraped {product_path}: {title_match.group(1)}")
+                            
+                            # Check for Cloudflare/Blockers
+                            if "Just a moment" in title_match.group(1) or "Access denied" in title_match.group(1) or "Challenge" in title_match.group(1):
+                                print("❌ BLOCKED BY CLOUDFLARE/WAF")
+                        
                         # Parse products from HTML
                         # Look for common patterns in product listings
                         product_patterns = [
                             # JSON-LD structured data
                             r'<script type="application/ld\+json">(.*?)</script>',
+                            # Next.js Data
+                            r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
                             # Data attributes
                             r'data-product=\'({.*?})\'',
                             r'data-product="({.*?})"',
@@ -282,12 +336,19 @@ class ChadsFlooringScraper:
                             matches = re.findall(pattern, html, re.DOTALL)
                             for match in matches:
                                 try:
+                                    # DEBUG: Save the raw JSON data found to a file
+                                    if "NEXT_DATA" in pattern:
+                                        try:
+                                            with open("debug_data.json", "w", encoding="utf-8") as f:
+                                                f.write(match)
+                                            print("📄 Saved raw data to debug_data.json")
+                                        except: pass
+
                                     # Try to parse as JSON
                                     data = json.loads(match)
-                                    if isinstance(data, list):
-                                        products.extend(data)
-                                    elif isinstance(data, dict):
-                                        products.append(data)
+                                    found = self.find_products_in_json(data)
+                                    if found:
+                                        products.extend(found)
                                 except:
                                     continue
                         
@@ -320,11 +381,13 @@ class ChadsFlooringScraper:
             r'<div[^>]*class="[^"]*product[^"]*"[^>]*>(.*?)</div>',
             r'<article[^>]*class="[^"]*product[^"]*"[^>]*>(.*?)</article>',
             r'<li[^>]*class="[^"]*product[^"]*"[^>]*>(.*?)</li>',
+            # Material UI patterns (React)
+            r'<div[^>]*class="[^"]*MuiGrid-item[^"]*"[^>]*>(.*?)</div>',
+            r'<div[^>]*class="[^"]*MuiPaper-root[^"]*"[^>]*>(.*?)</div>',
         ]
         
         # Extract product info patterns
-        name_pattern = r'(?:title|name)="([^"]+)"|>([^<]+)</(?:h\d|a|span)>'
-        price_pattern = r'\$?([\d,]+\.?\d*)'
+        name_pattern = r'(?:title|name)="([^"]+)"|>([^<]+)</(?:h\d|a|span|p|div)>'
         image_pattern = r'(?:src|data-src)="([^"]+)"'
         
         for card_pattern in product_card_patterns:
@@ -338,11 +401,6 @@ class ChadsFlooringScraper:
                 if name_match:
                     product['name'] = name_match.group(1) or name_match.group(2)
                 
-                # Extract price
-                price_match = re.search(price_pattern, card)
-                if price_match:
-                    product['price'] = price_match.group(1).replace(',', '')
-                
                 # Extract image
                 image_match = re.search(image_pattern, card)
                 if image_match:
@@ -352,6 +410,18 @@ class ChadsFlooringScraper:
                 
                 if product.get('name'):
                     products.append(product)
+        
+        # Fallback: If no cards found, try to find specific Material UI titles directly
+        if not products:
+            # Pattern matches: <p ... title="Product Name">
+            mui_titles = re.findall(r'<p[^>]*class="[^"]*title[^"]*"[^>]*title="([^"]+)"', html)
+            if mui_titles:
+                print(f"✅ Found {len(mui_titles)} products via Mui Title match")
+                for title in mui_titles:
+                    products.append({
+                        'name': title,
+                        'image': ''
+                    })
         
         return products
     
