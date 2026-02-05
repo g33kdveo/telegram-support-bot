@@ -1,5 +1,5 @@
-# Use a specific, stable Python version (3.12-slim is lightweight and reliable)
-FROM python:3.12-slim
+# Use the official Playwright Python image (includes all OS dependencies)
+FROM mcr.microsoft.com/playwright/python:v1.49.1-noble
 
 # Set environment variables
 # PYTHONDONTWRITEBYTECODE: Prevents Python from writing pyc files to disc
@@ -12,6 +12,9 @@ WORKDIR /app
 # Install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Install Chromium browser into the container
+RUN playwright install chromium
 
 # Copy application code
 COPY . .

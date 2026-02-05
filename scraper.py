@@ -1,7 +1,4 @@
 import os
-import sys
-import shutil
-import subprocess
 
 from playwright.sync_api import sync_playwright
 import time
@@ -41,75 +38,12 @@ class ChadsFlooringScraper:
 
     def get_products(self):
         print("🚀 Starting Playwright Browser...")
-        
-        # 1. Find System Chromium (Essential for Railway/Nixpacks)
-        system_chromium = shutil.which("chromium") or shutil.which("chromium-browser")
-        
-        # If not in PATH, check specific Nix/Linux locations
-        if not system_chromium:
-            search_paths = [
-                "/nix/var/nix/profiles/default/bin",
-                "/run/current-system/sw/bin",
-                "/usr/bin",
-                "/bin",
-                "/app/.nix-profile/bin" # Common in some Nix setups
-            ]
-
-            # Check where python is installed - chromium is often in the same bin dir in Nix
-            if sys.executable:
-                search_paths.insert(0, os.path.dirname(sys.executable))
-            
-            possible_names = ["chromium", "chromium-browser", "google-chrome-stable"]
-            
-            print(f"DEBUG: Searching for chromium in: {search_paths}")
-            
-            for path in search_paths:
-                if os.path.exists(path):
-                    print(f"DEBUG: Checking {path}...")
-                for name in possible_names:
-                    candidate = os.path.join(path, name)
-                    if os.path.exists(candidate) and os.access(candidate, os.X_OK):
-                        system_chromium = candidate
-                        print(f"✅ Found system chromium at: {candidate}")
-                        break
-                if system_chromium: break
-
-        launch_kwargs = {"headless": True, "args": ['--no-sandbox']}
-        
-        if system_chromium:
-            print(f"ℹ️ Using system Chromium at: {system_chromium}")
-            launch_kwargs["executable_path"] = system_chromium
-        else:
-            print("❌ CRITICAL: System Chromium not found. Please ensure 'chromium' is in nixpacks.toml")
-            # List contents of likely bin dirs to help debug
-            for p in ["/usr/bin", "/nix/var/nix/profiles/default/bin"]:
-                if os.path.exists(p):
-                    print(f"DEBUG: Listing {p}: {os.listdir(p)[:20]}...")
-            print("⚠️ System Chromium not found. Will attempt to use bundled browser.")
-
         products = []
         
         with sync_playwright() as p:
             # Launch Chromium
             # args=['--no-sandbox'] is often needed in container environments
-            try:
-                browser = p.chromium.launch(**launch_kwargs)
-            except Exception as e:
-                # Fallback: If launch fails due to missing executable, install and retry
-                # Only try to install if we weren't trying to use a specific system executable
-                if "Executable doesn't exist" in str(e) and "executable_path" not in launch_kwargs:
-                    print("⚠️ Browser binary missing. Installing Chromium & Headless Shell...")
-                    try:
-                        # Install BOTH chromium and the headless shell
-                        subprocess.run(["playwright", "install", "chromium", "chromium-headless-shell"], check=True)
-                        print("✅ Installation complete. Retrying launch...")
-                        browser = p.chromium.launch(**launch_kwargs)
-                    except Exception as install_e:
-                        print(f"❌ Failed to install/launch after install: {install_e}")
-                        raise e
-                else:
-                    print(f"❌ Browser Launch Failed: {e}")
-                    raise e
+            browser = p.chromium.launch(headless=True, args=['--no-sandbox'])
 
             context = browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
