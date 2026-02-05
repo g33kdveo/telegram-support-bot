@@ -15,9 +15,10 @@ except ImportError:
     pass
 
 class ChadsFlooringScraper:
-    def __init__(self, username=None, password=None):
+    def __init__(self, username=None, password=None, cookie_string=None):
         self.username = username
         self.password = password
+        self.cookie_string = cookie_string
         self.base_url = "https://chadsflooring.bz"
         
         # Setup cookie handling for session management
@@ -25,6 +26,32 @@ class ChadsFlooringScraper:
         self.opener = urllib.request.build_opener(
             urllib.request.HTTPCookieProcessor(self.cookie_jar)
         )
+        
+        # If manual cookie string provided, load it immediately
+        if self.cookie_string:
+            self.load_manual_cookies(self.cookie_string)
+            
+    def load_manual_cookies(self, cookie_str):
+        """Parse a browser cookie string and add to the jar"""
+        try:
+            from http.cookiejar import Cookie
+            print("🍪 Loading manual cookies...")
+            for item in cookie_str.split(';'):
+                if '=' in item:
+                    name, value = item.strip().split('=', 1)
+                    # Create a cookie object that mimics a real session
+                    c = Cookie(
+                        version=0, name=name, value=value,
+                        port=None, port_specified=False,
+                        domain="chadsflooring.bz", domain_specified=True, domain_initial_dot=False,
+                        path="/", path_specified=True,
+                        secure=True, expires=None, discard=True,
+                        comment=None, comment_url=None, rest={'HttpOnly': None}, rfc2109=False
+                    )
+                    self.cookie_jar.set_cookie(c)
+            print(f"✅ Loaded {len(self.cookie_jar)} cookies from environment variable")
+        except Exception as e:
+            print(f"❌ Failed to parse manual cookies: {e}")
         
     def find_products_in_json(self, data):
         """Recursively search for product-like objects in JSON data"""
@@ -104,6 +131,11 @@ class ChadsFlooringScraper:
                     )
                     with self.opener.open(req) as response:
                         print("✅ NextAuth Login successful")
+                        resp_text = response.read().decode('utf-8')
+                        print(f"✅ NextAuth Login Response: {resp_text}")
+                        print(f"🍪 Cookies captured: {len(self.cookie_jar)}")
+                        for cookie in self.cookie_jar:
+                            print(f"   - {cookie.name}")
                         return True
             except Exception as e:
                 print(f"⚠️ NextAuth attempt failed: {e}")
@@ -226,7 +258,6 @@ class ChadsFlooringScraper:
         try:
             # Try different API endpoints
             api_endpoints = [
-                "/products/scrape", # From user
                 "/api/products/scrape",
                 "/api/products",
                 "/api/inventory",
@@ -247,7 +278,7 @@ class ChadsFlooringScraper:
                         }
                     )
                     
-                    with self.opener.open(req, timeout=10) as response:
+                    with self.opener.open(req, timeout=20) as response:
                         data = response.read().decode('utf-8')
                         
                         # Check if it's JSON
@@ -278,6 +309,7 @@ class ChadsFlooringScraper:
             
             # Common product listing URLs to try
             product_urls = [
+                "/products/scrape",
                 "/",
                 "/products",
                 "/shop",
@@ -297,7 +329,7 @@ class ChadsFlooringScraper:
                         }
                     )
                     
-                    with self.opener.open(req, timeout=10) as response:
+                    with self.opener.open(req, timeout=20) as response:
                         html = response.read().decode('utf-8')
                         
                         # DEBUG: Save HTML to file to see what the bot actually sees
@@ -312,6 +344,9 @@ class ChadsFlooringScraper:
                         title_match = re.search(r'<title>(.*?)</title>', html, re.IGNORECASE)
                         if title_match:
                             print(f"📄 Scraped {product_path}: {title_match.group(1)}")
+                            
+                            if "Login" in title_match.group(1):
+                                print("❌ BOT IS LOGGED OUT (Redirected to Login Page)")
                             
                             # Check for Cloudflare/Blockers
                             if "Just a moment" in title_match.group(1) or "Access denied" in title_match.group(1) or "Challenge" in title_match.group(1):
@@ -415,12 +450,21 @@ class ChadsFlooringScraper:
         if not products:
             # Pattern matches: <p ... title="Product Name">
             mui_titles = re.findall(r'<p[^>]*class="[^"]*title[^"]*"[^>]*title="([^"]+)"', html)
+            
+            # Try to find images that look like product images to pair with titles
+            # This assumes the order of images matches the order of titles
+            product_images = re.findall(r'<img[^>]+src="([^"]*uploads/products/[^"]+)"', html)
+            
             if mui_titles:
                 print(f"✅ Found {len(mui_titles)} products via Mui Title match")
-                for title in mui_titles:
+                for i, title in enumerate(mui_titles):
+                    img = product_images[i] if i < len(product_images) else ""
+                    if img and not img.startswith('http'):
+                        img = self.base_url + img
+                        
                     products.append({
                         'name': title,
-                        'image': ''
+                        'image': img
                     })
         
         return products
@@ -428,8 +472,11 @@ class ChadsFlooringScraper:
     def get_products(self):
         """Main method to get products using all available methods"""
         
-        # Try to login if credentials provided
-        if self.username and self.password:
+        # Try to login if credentials provided AND we don't have manual cookies
+        # If we have manual cookies, we assume they are valid and skip the login (which might trigger captcha)
+        if self.cookie_string:
+            print("ℹ️ Using manual cookies (Skipping automated login)")
+        elif self.username and self.password:
             print("🔐 Attempting login...")
             self.login()
         

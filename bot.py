@@ -34,6 +34,7 @@ WEBAPP_URL = os.getenv("WEBAPP_URL")
 # Chadsflooring credentials for API access
 CHADS_USERNAME = os.getenv("CHADS_USERNAME")
 CHADS_PASSWORD = os.getenv("CHADS_PASSWORD")
+CHADS_COOKIE = os.getenv("CHADS_COOKIE")
 
 # Auto-configure WEBAPP_URL for Railway if not set manually
 if not WEBAPP_URL and os.getenv("RAILWAY_PUBLIC_DOMAIN"):
@@ -2100,7 +2101,8 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
                 # Use the scraper to get products
                 scraper = ChadsFlooringScraper(
                     username=CHADS_USERNAME,
-                    password=CHADS_PASSWORD
+                    password=CHADS_PASSWORD,
+                    cookie_string=CHADS_COOKIE
                 )
                 
                 print("🔄 Fetching products from chadsflooring.bz...")
