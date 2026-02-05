@@ -1,4 +1,5 @@
 import os
+import sys
 import shutil
 import subprocess
 # Force Playwright to look in the persistent directory for browsers
@@ -49,16 +50,27 @@ class ChadsFlooringScraper:
         
         # If not in PATH, check common locations
         if not system_chromium:
-            common_paths = [
-                "/usr/bin/chromium",
-                "/usr/bin/chromium-browser",
-                "/nix/var/nix/profiles/default/bin/chromium",
-                "/run/current-system/sw/bin/chromium"
+            search_paths = [
+                "/nix/var/nix/profiles/default/bin",
+                "/run/current-system/sw/bin",
+                "/usr/bin",
+                "/bin"
             ]
-            for path in common_paths:
-                if os.path.exists(path):
-                    system_chromium = path
-                    break
+            # Check where python is installed - chromium is often in the same bin dir in Nix
+            if sys.executable:
+                search_paths.insert(0, os.path.dirname(sys.executable))
+            
+            possible_names = ["chromium", "chromium-browser", "google-chrome-stable"]
+            
+            print(f"DEBUG: Python at {sys.executable}. Searching for chromium in: {search_paths}")
+            
+            for path in search_paths:
+                for name in possible_names:
+                    candidate = os.path.join(path, name)
+                    if os.path.exists(candidate) and os.access(candidate, os.X_OK):
+                        system_chromium = candidate
+                        break
+                if system_chromium: break
 
         launch_kwargs = {"headless": True, "args": ['--no-sandbox']}
         
