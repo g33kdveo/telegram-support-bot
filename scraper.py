@@ -4,7 +4,7 @@ import shutil
 import subprocess
 # Force Playwright to look in the persistent directory for browsers
 # This must be set before importing playwright or launching browsers
-# os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/app/pw-browsers" # Not needed if using system browser
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/app/pw-browsers"
 
 from playwright.sync_api import sync_playwright
 import time
@@ -83,11 +83,7 @@ class ChadsFlooringScraper:
             print(f"ℹ️ Using system Chromium at: {system_chromium}")
             launch_kwargs["executable_path"] = system_chromium
         else:
-            print("❌ CRITICAL: System Chromium not found. Scraper will likely fail.")
-            # List contents of likely bin dirs to help debug
-            for p in ["/usr/bin", "/nix/var/nix/profiles/default/bin"]:
-                if os.path.exists(p):
-                    print(f"DEBUG: Listing {p}: {os.listdir(p)[:20]}...")
+            print("⚠️ System Chromium not found. Will attempt to use bundled browser.")
 
         products = []
         
@@ -97,8 +93,25 @@ class ChadsFlooringScraper:
             try:
                 browser = p.chromium.launch(**launch_kwargs)
             except Exception as e:
-                print(f"❌ Browser Launch Failed: {e}")
-                raise e
+                # Fallback: If launch fails due to missing executable, install and retry
+                # Only try to install if we weren't trying to use a specific system executable
+                if "Executable doesn't exist" in str(e) and "executable_path" not in launch_kwargs:
+                    print("⚠️ Browser binary missing. Installing Chromium & Headless Shell...")
+                    try:
+                        # Clean up potential corrupt installs to avoid ETXTBSY errors
+                        if os.path.exists("/app/pw-browsers"):
+                            shutil.rmtree("/app/pw-browsers", ignore_errors=True)
+                        
+                        # Install BOTH chromium and the headless shell
+                        subprocess.run(["playwright", "install", "chromium", "chromium-headless-shell"], check=True)
+                        print("✅ Installation complete. Retrying launch...")
+                        browser = p.chromium.launch(**launch_kwargs)
+                    except Exception as install_e:
+                        print(f"❌ Failed to install/launch after install: {install_e}")
+                        raise e
+                else:
+                    print(f"❌ Browser Launch Failed: {e}")
+                    raise e
 
             context = browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
