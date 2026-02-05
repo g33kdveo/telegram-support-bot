@@ -233,7 +233,7 @@ class ChadsFlooringScraper:
                             for i in range(5):
                                 try:
                                     print(f"   Click attempt {i+1}...")
-                                    api_link.click(timeout=2000)
+                                    api_link.click(timeout=5000)
                                     time.sleep(2)
                                     
                                     # Check if URL changed or body is JSON
@@ -245,6 +245,11 @@ class ChadsFlooringScraper:
                                     print("⚠️ No change detected. Retrying...")
                                 except Exception as e:
                                     print(f"⚠️ Click attempt failed: {e}")
+                                    # Check if we actually succeeded despite the error (e.g. navigation happened)
+                                    if page.url != current_url:
+                                         print("✅ Navigation detected despite click error.")
+                                         clicked_success = True
+                                         break
                                     time.sleep(1)
                             
                             if clicked_success:

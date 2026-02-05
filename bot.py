@@ -2080,6 +2080,7 @@ PRODUCT_CACHE = {
     "timestamp": 0
 }
 CACHE_DURATION = 60  # 1 minute
+SCRAPE_LOCK = threading.Lock()
 
 class BotRequestHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
@@ -2099,36 +2100,44 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
                     self.send_json(PRODUCT_CACHE["data"])
                     return
 
-                # --- Scrape for new data ---
-                print("🔄 Fetching products from chadsflooring.bz...")
-                scraper = ChadsFlooringScraper(
-                    username=CHADS_USERNAME,
-                    password=CHADS_PASSWORD,
-                    cookie_string=CHADS_COOKIE
-                )
-                fresh_result = scraper.get_products()
-                
-                # --- Decide what to do with the new data ---
-                # Check if the new data is valid and has products
-                if fresh_result and isinstance(fresh_result.get('data'), list) and len(fresh_result.get('data')) > 0:
-                    print(f"✅ Fetched {len(fresh_result['data'])} new products. Updating cache.")
+                # Acquire lock to prevent multiple browsers from launching at once
+                with SCRAPE_LOCK:
+                    # Double-check cache inside lock (another thread might have just finished)
+                    if PRODUCT_CACHE["data"] and (time.time() - PRODUCT_CACHE["timestamp"] < CACHE_DURATION) and "nocache" not in self.path:
+                        print("✅ Serving products from cache (after lock)")
+                        self.send_json(PRODUCT_CACHE["data"])
+                        return
+
+                    # --- Scrape for new data ---
+                    print("🔄 Fetching products from chadsflooring.bz...")
+                    scraper = ChadsFlooringScraper(
+                        username=CHADS_USERNAME,
+                        password=CHADS_PASSWORD,
+                        cookie_string=CHADS_COOKIE
+                    )
+                    fresh_result = scraper.get_products()
                     
-                    if not fresh_result.get('imagePathPrefix'):
-                        fresh_result['imagePathPrefix'] = "/uploads/products/"
+                    # --- Decide what to do with the new data ---
+                    # Check if the new data is valid and has products
+                    if fresh_result and isinstance(fresh_result.get('data'), list) and len(fresh_result.get('data')) > 0:
+                        print(f"✅ Fetched {len(fresh_result['data'])} new products. Updating cache.")
+                        
+                        if not fresh_result.get('imagePathPrefix'):
+                            fresh_result['imagePathPrefix'] = "/uploads/products/"
+                        
+                        # Update cache with the fresh data
+                        PRODUCT_CACHE = { "data": fresh_result, "timestamp": time.time() }
+                        self.send_json(fresh_result)
                     
-                    # Update cache with the fresh data
-                    PRODUCT_CACHE = { "data": fresh_result, "timestamp": time.time() }
-                    self.send_json(fresh_result)
-                
-                # If scrape failed but we have old data in cache, serve the old data.
-                elif PRODUCT_CACHE["data"]:
-                    print("⚠️ Scrape failed. Serving stale data from cache as a fallback.")
-                    self.send_json(PRODUCT_CACHE["data"])
-                
-                # If scrape failed AND we have no old data, we must show the error.
-                else:
-                    print("❌ Scrape failed and cache is empty. Sending error response.")
-                    self.send_json(fresh_result)
+                    # If scrape failed but we have old data in cache, serve the old data.
+                    elif PRODUCT_CACHE["data"]:
+                        print("⚠️ Scrape failed. Serving stale data from cache as a fallback.")
+                        self.send_json(PRODUCT_CACHE["data"])
+                    
+                    # If scrape failed AND we have no old data, we must show the error.
+                    else:
+                        print("❌ Scrape failed and cache is empty. Sending error response.")
+                        self.send_json(fresh_result)
                 
             except Exception as e:
                 print(f"❌ Critical error in API proxy: {str(e)}")
