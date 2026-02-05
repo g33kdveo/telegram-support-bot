@@ -84,27 +84,29 @@ class ChadsFlooringScraper:
         if system_chromium:
             print(f"ℹ️ Using system Chromium at: {system_chromium}")
             launch_kwargs["executable_path"] = system_chromium
-        else:
-            print(f"⚠️ System Chromium not found in PATH: {os.environ.get('PATH')}")
-            # 2. Fallback: Self-healing download (Runtime Fix)
-            browser_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
-            if not os.path.exists(browser_path) or not os.listdir(browser_path):
-                print(f"⚠️ System Chromium not found and local browser missing. Installing...")
-                try:
-                    subprocess.run(["playwright", "install", "chromium"], check=True)
-                    print("✅ Chromium installed successfully.")
-                    # Force use of the main chromium binary, not the headless shell
-                    # because the logs show chromium-1208 is what gets downloaded
-                    launch_kwargs["channel"] = "chromium"
-                except Exception as e:
-                    print(f"❌ Failed to install Chromium: {e}")
 
         products = []
         
         with sync_playwright() as p:
             # Launch Chromium
             # args=['--no-sandbox'] is often needed in container environments
-            browser = p.chromium.launch(**launch_kwargs)
+            try:
+                browser = p.chromium.launch(**launch_kwargs)
+            except Exception as e:
+                # Fallback: If launch fails due to missing executable, install and retry
+                if "Executable doesn't exist" in str(e) and not system_chromium:
+                    print("⚠️ Browser binary missing or incomplete. Installing Chromium & Headless Shell...")
+                    try:
+                        # Install BOTH chromium and the headless shell
+                        subprocess.run(["playwright", "install", "chromium", "chromium-headless-shell"], check=True)
+                        print("✅ Installation complete. Retrying launch...")
+                        browser = p.chromium.launch(**launch_kwargs)
+                    except Exception as install_e:
+                        print(f"❌ Failed to install/launch after install: {install_e}")
+                        raise e
+                else:
+                    raise e
+
             context = browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
             )
