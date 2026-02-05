@@ -12,6 +12,7 @@ import urllib.parse
 import threading
 import urllib.request
 from http.server import SimpleHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
+from scraper import ChadsFlooringScraper
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -29,6 +30,10 @@ TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()]
 SUPPORT_GROUP_ID = int(os.getenv("SUPPORT_GROUP_ID") or 0)
 WEBAPP_URL = os.getenv("WEBAPP_URL")
+
+# Chadsflooring credentials for API access
+CHADS_USERNAME = os.getenv("CHADS_USERNAME")
+CHADS_PASSWORD = os.getenv("CHADS_PASSWORD")
 
 # Auto-configure WEBAPP_URL for Railway if not set manually
 if not WEBAPP_URL and os.getenv("RAILWAY_PUBLIC_DOMAIN"):
@@ -2072,21 +2077,20 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith('/api/products'):
             try:
-                # Note: The chadsflooring.bz API appears to have changed or is no longer publicly accessible
-                # The /api/products endpoint requires login, and /api/products/scrape returns errors
-                # For now, return sample data or empty menu
+                # Use the scraper to get products
+                scraper = ChadsFlooringScraper(
+                    username=CHADS_USERNAME,
+                    password=CHADS_PASSWORD
+                )
                 
-                print("⚠️ External API is currently unavailable. Returning fallback menu.")
+                print("🔄 Fetching products from chadsflooring.bz...")
+                result = scraper.get_products()
                 
-                # Return empty menu with informative message
-                fallback_data = {
-                    "data": [],
-                    "imagePathPrefix": "/uploads/products/",
-                    "message": "Menu temporarily unavailable. The external API (chadsflooring.bz) has changed and requires authentication.",
-                    "error": False
-                }
+                # Ensure proper format for webapp
+                if not result.get('imagePathPrefix'):
+                    result['imagePathPrefix'] = "/uploads/products/"
                 
-                data = json.dumps(fallback_data).encode('utf-8')
+                data = json.dumps(result).encode('utf-8')
                 
                 # Send response with cache prevention headers
                 self.send_response(200)
@@ -2102,7 +2106,20 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
                 print(f"❌ Critical error in API proxy: {str(e)}")
                 import traceback
                 traceback.print_exc()
-                self.send_error(500, str(e))
+                
+                # Return error response
+                error_data = {
+                    "data": [],
+                    "imagePathPrefix": "/uploads/products/",
+                    "error": True,
+                    "message": f"Error fetching products: {str(e)}"
+                }
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps(error_data).encode('utf-8'))
             return
         return super().do_GET()
 
