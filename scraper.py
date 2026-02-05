@@ -46,12 +46,27 @@ class ChadsFlooringScraper:
         
         # 1. Try to find System Chromium (Best for Railway/Nixpacks)
         system_chromium = shutil.which("chromium") or shutil.which("chromium-browser")
+        
+        # If not in PATH, check common locations
+        if not system_chromium:
+            common_paths = [
+                "/usr/bin/chromium",
+                "/usr/bin/chromium-browser",
+                "/nix/var/nix/profiles/default/bin/chromium",
+                "/run/current-system/sw/bin/chromium"
+            ]
+            for path in common_paths:
+                if os.path.exists(path):
+                    system_chromium = path
+                    break
+
         launch_kwargs = {"headless": True, "args": ['--no-sandbox']}
         
         if system_chromium:
             print(f"ℹ️ Using system Chromium at: {system_chromium}")
             launch_kwargs["executable_path"] = system_chromium
         else:
+            print(f"⚠️ System Chromium not found in PATH: {os.environ.get('PATH')}")
             # 2. Fallback: Self-healing download (Runtime Fix)
             browser_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
             if not os.path.exists(browser_path) or not os.listdir(browser_path):
