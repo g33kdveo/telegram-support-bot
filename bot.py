@@ -2072,13 +2072,30 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith('/api/products'):
             try:
-                # Add timestamp to bypass external caching
-                url = f"https://chadsflooring.bz/api/products/scrape?t={int(time.time())}"
-                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                # Add timestamp and random value to bypass all caching layers
+                import random
+                cache_buster = f"{int(time.time())}_{random.randint(1000, 9999)}"
+                url = f"https://chadsflooring.bz/api/products/scrape?t={cache_buster}&nocache={cache_buster}"
+                
+                # Add headers to prevent caching at any level
+                headers = {
+                    'User-Agent': 'Mozilla/5.0',
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                }
+                
+                req = urllib.request.Request(url, headers=headers)
                 with urllib.request.urlopen(req) as response:
                     data = response.read()
+                    
+                    # Send response with cache prevention headers
                     self.send_response(200)
                     self.send_header('Content-type', 'application/json')
+                    self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+                    self.send_header('Pragma', 'no-cache')
+                    self.send_header('Expires', '0')
+                    self.send_header('Access-Control-Allow-Origin', '*')
                     self.end_headers()
                     self.wfile.write(data)
             except Exception as e:

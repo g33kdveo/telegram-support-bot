@@ -455,14 +455,37 @@
         // 2. Fetch Data
         await fetchData();
 
-        // 3. Start Polling (every 10 seconds)
-        setInterval(() => fetchData(true), 10000);
+        // 3. Start Polling (every 5 seconds for faster updates)
+        setInterval(() => fetchData(true), 5000);
+        
+        // 4. Also fetch on visibility change (when user returns to tab/app)
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                console.log('App visible - fetching fresh data');
+                fetchData(true);
+            }
+        });
     });
 
     async function fetchData(isBackground = false) {
         try {
-            // Add timestamp to prevent caching
-            const response = await fetch(API_URL + "?t=" + new Date().getTime(), { cache: "no-store" });
+            // Add timestamp and random value to prevent all caching
+            const timestamp = new Date().getTime();
+            const random = Math.floor(Math.random() * 10000);
+            const cacheBreaker = `${timestamp}_${random}`;
+            
+            // Fetch with aggressive cache bypass headers
+            const response = await fetch(
+                `${API_URL}?t=${cacheBreaker}&nocache=${random}`,
+                {
+                    method: 'GET',
+                    cache: 'no-store',
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache'
+                    }
+                }
+            );
             const json = await response.json();
             
             // Get dynamic prefix from JSON, fallback if missing
@@ -470,10 +493,14 @@
             
             const newData = json.data || [];
             const newHash = JSON.stringify(newData);
-
-            // Check for updates
-            if (newHash === lastDataHash) return;
             
+            // Check for updates - only compare data, not the hash to ensure we catch all changes
+            if (isBackground && newHash === lastDataHash) {
+                console.log('No menu changes detected');
+                return;
+            }
+            
+            console.log('Menu data updated:', new Date().toLocaleTimeString());
             lastDataHash = newHash;
             rawData = newData;
             
