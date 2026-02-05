@@ -12,7 +12,7 @@ import urllib.parse
 import threading
 import urllib.request
 from http.server import SimpleHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
-from scraper import ChadsFlooringScraper
+from manual_scraper import ManualScraper
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -2121,36 +2121,29 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
                     # Mark attempt start
                     PRODUCT_CACHE["last_attempt"] = now
 
-                    # --- Scrape for new data ---
-                    print("🔄 Fetching products from chadsflooring.bz...")
-                    scraper = ChadsFlooringScraper(
-                        username=CHADS_USERNAME,
-                        password=CHADS_PASSWORD,
-                        cookie_string=CHADS_COOKIE
-                    )
+                    # --- Manual Load (No Scraping) ---
+                    print("📂 Loading products from manual file...")
+                    scraper = ManualScraper() # Uses manual_products.json by default
                     fresh_result = scraper.get_products()
                     
                     # --- Decide what to do with the new data ---
-                    # Check if the new data is valid and has products
-                    if fresh_result and isinstance(fresh_result.get('data'), list) and len(fresh_result.get('data')) > 0:
-                        print(f"✅ Fetched {len(fresh_result['data'])} new products. Updating cache.")
+                    if fresh_result and isinstance(fresh_result.get('data'), list):
+                        print(f"✅ Loaded {len(fresh_result['data'])} products from file.")
                         
+                        # Ensure image path prefix is set
                         if not fresh_result.get('imagePathPrefix'):
                             fresh_result['imagePathPrefix'] = "/uploads/products/"
                         
-                        # Update cache with the fresh data
+                        # Update cache
                         PRODUCT_CACHE = { "data": fresh_result, "timestamp": time.time() }
                         self.send_json(fresh_result)
-                    
-                    # If scrape failed but we have old data in cache, serve the old data.
-                    elif PRODUCT_CACHE["data"]:
-                        print("⚠️ Scrape failed. Serving stale data from cache as a fallback.")
-                        self.send_json(PRODUCT_CACHE["data"])
-                    
-                    # If scrape failed AND we have no old data, we must show the error.
                     else:
-                        print("❌ Scrape failed and cache is empty. Sending error response.")
-                        self.send_json(fresh_result)
+                        print("❌ Failed to load manual data or data is empty.")
+                        # Fallback to existing cache if available
+                        if PRODUCT_CACHE["data"]:
+                             self.send_json(PRODUCT_CACHE["data"])
+                        else:
+                             self.send_json({"error": True, "message": "Could not load product data"})
                 
             except Exception as e:
                 print(f"❌ Critical error in API proxy: {str(e)}")
