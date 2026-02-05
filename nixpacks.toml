@@ -1,6 +1,3 @@
-[variables]
-PLAYWRIGHT_BROWSERS_PATH = "/app/pw-browsers"
-
 [phases.setup]
 nixPkgs = ["python3", "chromium", "glib", "nss", "nspr", "expat", "libdrm", "mesa", "alsa-lib", "dbus", "libxkbcommon", "pango", "cairo", "gdk-pixbuf", "gtk3", "at-spi2-core", "libxcomposite", "libxdamage", "libxrandr", "libgbm"]
 
@@ -8,4 +5,4 @@ nixPkgs = ["python3", "chromium", "glib", "nss", "nspr", "expat", "libdrm", "mes
 cmds = ["pip install -r requirements.txt"]
 
 [start]
-cmd = "PLAYWRIGHT_BROWSERS_PATH=/app/pw-browsers python bot.py"
+cmd = "python bot.py"

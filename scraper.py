@@ -4,7 +4,7 @@ import shutil
 import subprocess
 # Force Playwright to look in the persistent directory for browsers
 # This must be set before importing playwright or launching browsers
-os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/app/pw-browsers"
+# os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/app/pw-browsers" # Not needed if using system browser
 
 from playwright.sync_api import sync_playwright
 import time
@@ -45,23 +45,18 @@ class ChadsFlooringScraper:
     def get_products(self):
         print("🚀 Starting Playwright Browser...")
         
-        # 1. Try to find System Chromium (Best for Railway/Nixpacks)
+        # 1. Find System Chromium (Essential for Railway/Nixpacks)
         system_chromium = shutil.which("chromium") or shutil.which("chromium-browser")
         
-        # If not in PATH, check common locations
+        # If not in PATH, check specific Nix/Linux locations
         if not system_chromium:
             search_paths = [
                 "/nix/var/nix/profiles/default/bin",
                 "/run/current-system/sw/bin",
                 "/usr/bin",
-                "/bin"
+                "/bin",
+                "/app/.nix-profile/bin" # Common in some Nix setups
             ]
-            
-            # DEBUG: List contents of Nix bin to see what's actually there
-            nix_bin = "/nix/var/nix/profiles/default/bin"
-            if os.path.exists(nix_bin):
-                print(f"DEBUG: Contents of {nix_bin}:")
-                print(os.listdir(nix_bin))
 
             # Check where python is installed - chromium is often in the same bin dir in Nix
             if sys.executable:
@@ -69,13 +64,16 @@ class ChadsFlooringScraper:
             
             possible_names = ["chromium", "chromium-browser", "google-chrome-stable"]
             
-            print(f"DEBUG: Python at {sys.executable}. Searching for chromium in: {search_paths}")
+            print(f"DEBUG: Searching for chromium in: {search_paths}")
             
             for path in search_paths:
+                if os.path.exists(path):
+                    print(f"DEBUG: Checking {path}...")
                 for name in possible_names:
                     candidate = os.path.join(path, name)
                     if os.path.exists(candidate) and os.access(candidate, os.X_OK):
                         system_chromium = candidate
+                        print(f"✅ Found system chromium at: {candidate}")
                         break
                 if system_chromium: break
 
@@ -84,6 +82,12 @@ class ChadsFlooringScraper:
         if system_chromium:
             print(f"ℹ️ Using system Chromium at: {system_chromium}")
             launch_kwargs["executable_path"] = system_chromium
+        else:
+            print("❌ CRITICAL: System Chromium not found. Scraper will likely fail.")
+            # List contents of likely bin dirs to help debug
+            for p in ["/usr/bin", "/nix/var/nix/profiles/default/bin"]:
+                if os.path.exists(p):
+                    print(f"DEBUG: Listing {p}: {os.listdir(p)[:20]}...")
 
         products = []
         
@@ -93,19 +97,8 @@ class ChadsFlooringScraper:
             try:
                 browser = p.chromium.launch(**launch_kwargs)
             except Exception as e:
-                # Fallback: If launch fails due to missing executable, install and retry
-                if "Executable doesn't exist" in str(e) and not system_chromium:
-                    print("⚠️ Browser binary missing or incomplete. Installing Chromium & Headless Shell...")
-                    try:
-                        # Install BOTH chromium and the headless shell
-                        subprocess.run(["playwright", "install", "chromium", "chromium-headless-shell"], check=True)
-                        print("✅ Installation complete. Retrying launch...")
-                        browser = p.chromium.launch(**launch_kwargs)
-                    except Exception as install_e:
-                        print(f"❌ Failed to install/launch after install: {install_e}")
-                        raise e
-                else:
-                    raise e
+                print(f"❌ Browser Launch Failed: {e}")
+                raise e
 
             context = browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
