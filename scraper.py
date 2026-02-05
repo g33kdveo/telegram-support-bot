@@ -1,4 +1,5 @@
 import os
+import subprocess
 # Force Playwright to look in the persistent directory for browsers
 # This must be set before importing playwright or launching browsers
 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/app/pw-browsers"
@@ -42,13 +43,15 @@ class ChadsFlooringScraper:
     def get_products(self):
         print("🚀 Starting Playwright Browser...")
         
-        # Debug: Check if browser binaries exist
+        # Self-healing: Install browser if missing (Runtime Fix)
         browser_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
-        print(f"DEBUG: PLAYWRIGHT_BROWSERS_PATH is set to: {browser_path}")
-        if browser_path and os.path.exists(browser_path):
-            print(f"DEBUG: Contents of {browser_path}: {os.listdir(browser_path)}")
-        else:
-            print(f"DEBUG: Browser path {browser_path} does not exist!")
+        if not os.path.exists(browser_path) or not os.listdir(browser_path):
+            print(f"⚠️ Browser directory {browser_path} missing. Installing Chromium...")
+            try:
+                subprocess.run(["playwright", "install", "chromium"], check=True)
+                print("✅ Chromium installed successfully.")
+            except Exception as e:
+                print(f"❌ Failed to install Chromium: {e}")
 
         products = []
         
