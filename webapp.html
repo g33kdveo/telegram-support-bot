@@ -418,7 +418,10 @@
     tg.expand();
 
     // CONFIG
-    const API_URL = "/api/products";
+    // Use absolute URL for Railway deployment
+    const API_URL = window.location.hostname === 'localhost' 
+        ? "/api/products" 
+        : `${window.location.protocol}//${window.location.hostname}/api/products`;
     const BASE_IMG_URL = "https://chadsflooring.bz";
 
     const CATEGORIES = ["Accessories", "In-House", "Carts", "Concentrates", "Disposables", "Edibles", "Flower", "Pre-rolls"];
@@ -486,6 +489,11 @@
                     }
                 }
             );
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             const json = await response.json();
             
             // Get dynamic prefix from JSON, fallback if missing
@@ -512,9 +520,16 @@
             render();
             if (isBackground) window.scrollTo(0, scrollY);
         } catch (e) {
-            console.error(e);
+            console.error('Failed to fetch data:', e);
+            console.error('API URL:', API_URL);
             if (!isBackground) {
-                document.getElementById('main-container').innerHTML = `<div style="text-align:center; margin-top:50px;">Failed to load menu.<br>Please try again later.</div>`;
+                document.getElementById('main-container').innerHTML = `
+                    <div style="text-align:center; margin-top:50px;">
+                        Failed to load menu.<br>
+                        <span style="font-size:12px; color:#888;">Error: ${e.message}</span><br>
+                        <span style="font-size:12px; color:#888;">API: ${API_URL}</span><br>
+                        Please try again later.
+                    </div>`;
             }
         }
     }
