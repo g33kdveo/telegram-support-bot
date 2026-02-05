@@ -1,6 +1,7 @@
 import os
 import sys
 import shutil
+import subprocess
 
 from playwright.sync_api import sync_playwright
 import time
@@ -84,14 +85,31 @@ class ChadsFlooringScraper:
             for p in ["/usr/bin", "/nix/var/nix/profiles/default/bin"]:
                 if os.path.exists(p):
                     print(f"DEBUG: Listing {p}: {os.listdir(p)[:20]}...")
-            return {"data": [], "error": True, "message": "System browser missing"}
+            print("⚠️ System Chromium not found. Will attempt to use bundled browser.")
 
         products = []
         
         with sync_playwright() as p:
             # Launch Chromium
             # args=['--no-sandbox'] is often needed in container environments
-            browser = p.chromium.launch(**launch_kwargs)
+            try:
+                browser = p.chromium.launch(**launch_kwargs)
+            except Exception as e:
+                # Fallback: If launch fails due to missing executable, install and retry
+                # Only try to install if we weren't trying to use a specific system executable
+                if "Executable doesn't exist" in str(e) and "executable_path" not in launch_kwargs:
+                    print("⚠️ Browser binary missing. Installing Chromium & Headless Shell...")
+                    try:
+                        # Install BOTH chromium and the headless shell
+                        subprocess.run(["playwright", "install", "chromium", "chromium-headless-shell"], check=True)
+                        print("✅ Installation complete. Retrying launch...")
+                        browser = p.chromium.launch(**launch_kwargs)
+                    except Exception as install_e:
+                        print(f"❌ Failed to install/launch after install: {install_e}")
+                        raise e
+                else:
+                    print(f"❌ Browser Launch Failed: {e}")
+                    raise e
 
             context = browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
