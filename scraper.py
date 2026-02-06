@@ -81,6 +81,13 @@ class ChadsFlooringScraper:
                 # 2. Handle "21+" Age Gate
                 try:
                     print("🔞 Checking for Age Gate...")
+                    # Specific check for Y/N box as requested
+                    yes_btn_specific = page.locator("button, input[type='button'], input[type='submit']").filter(has_text=re.compile(r"^Yes$|^Y$", re.IGNORECASE)).first
+                    if yes_btn_specific.is_visible():
+                        print("   Clicking 'Yes' button (Specific)...")
+                        yes_btn_specific.click()
+                        time.sleep(1.5)
+
                     # Check any visible checkboxes (often required)
                     checkboxes = page.locator("input[type='checkbox']")
                     if checkboxes.count() > 0:
@@ -120,10 +127,15 @@ class ChadsFlooringScraper:
                     except:
                         print("⚠️ Password field wait timeout - attempting to fill anyway...")
 
-                    # Fill Username - Try multiple common selectors
+                    # Fill Username - User specified it is listed as "email"
                     user_filled = False
+                    
+                    if page.locator("input[name='email']").is_visible():
+                        print("   Filling username into 'email' field...")
+                        page.fill("input[name='email']", self.username)
+                        user_filled = True
+                    
                     user_selectors = [
-                        "input[name='username']", "input[name='email']", "input[type='email']",
                         "input[placeholder*='User']", "input[placeholder*='Email']"
                     ]
                     

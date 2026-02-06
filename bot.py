@@ -12,7 +12,7 @@ import urllib.parse
 import threading
 import urllib.request
 from http.server import SimpleHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
-from manual_scraper import ManualScraper
+from scraper import ChadsFlooringScraper
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -1935,12 +1935,25 @@ async def refresh_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status_msg = await update.message.reply_text("🔄 Reloading product file...")
     
     try:
-        scraper = ManualScraper()
-        fresh_result = scraper.get_products()
+        # Run scraper in a separate thread to avoid blocking the bot
+        def run_scrape():
+            scraper = ChadsFlooringScraper(username=CHADS_USERNAME, password=CHADS_PASSWORD)
+            # get_products is now a sync wrapper around the async pyppeteer logic
+            return scraper.get_products()
+
+        loop = asyncio.get_running_loop()
+        fresh_result = await loop.run_in_executor(None, run_scrape)
         
         if fresh_result and isinstance(fresh_result.get('data'), list):
             if not fresh_result.get('imagePathPrefix'):
                 fresh_result['imagePathPrefix'] = "/uploads/products/"
+            
+            # Save scraped data to file so it's visible
+            try:
+                with open("scraped_products.json", "w", encoding="utf-8") as f:
+                    json.dump(fresh_result, f, indent=2)
+            except Exception as e:
+                print(f"⚠️ Could not save scraped_products.json: {e}")
             
             PRODUCT_CACHE["data"] = fresh_result
             PRODUCT_CACHE["timestamp"] = time.time()
@@ -2155,14 +2168,20 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
                     # Mark attempt start
                     PRODUCT_CACHE["last_attempt"] = now
 
-                    # --- Manual Load (No Scraping) ---
-                    print("📂 Loading products from manual file...")
-                    scraper = ManualScraper() # Uses manual_products.json by default
+                    # --- Auto Scrape ---
+                    print("📂 Auto-scraping products from site...")
+                    scraper = ChadsFlooringScraper(username=CHADS_USERNAME, password=CHADS_PASSWORD)
                     fresh_result = scraper.get_products()
                     
                     # --- Decide what to do with the new data ---
                     if fresh_result and isinstance(fresh_result.get('data'), list):
-                        print(f"✅ Loaded {len(fresh_result['data'])} products from file.")
+                        print(f"✅ Loaded {len(fresh_result['data'])} products from scrape.")
+                        
+                        # Save to file for inspection
+                        try:
+                            with open("scraped_products.json", "w", encoding="utf-8") as f:
+                                json.dump(fresh_result, f, indent=2)
+                        except: pass
                         
                         # Ensure image path prefix is set
                         if not fresh_result.get('imagePathPrefix'):
