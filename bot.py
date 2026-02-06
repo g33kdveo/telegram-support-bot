@@ -1927,12 +1927,10 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("🛍️ Open Shop", web_app=WebAppInfo(url=url))]]
     await update.message.reply_text("👇 <b>Tap below to open the shop:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
 
-# ===== REFRESH COMMAND =====
-async def refresh_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in ADMIN_IDS: return
-    
+# ===== AUTO REFRESH JOB =====
+async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
     global PRODUCT_CACHE
-    status_msg = await update.message.reply_text("🔄 Reloading product file...")
+    print("🔄 Auto-refreshing product cache...")
     
     try:
         # Run scraper in a separate thread to avoid blocking the bot
@@ -1959,11 +1957,11 @@ async def refresh_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             PRODUCT_CACHE["timestamp"] = time.time()
             PRODUCT_CACHE["last_attempt"] = time.time()
             
-            await status_msg.edit_text(f"✅ <b>Cache Refreshed!</b>\nLoaded {len(fresh_result['data'])} products.\nNext auto-reload in 1 hour.", parse_mode='HTML')
+            print(f"✅ Cache Refreshed! Loaded {len(fresh_result['data'])} products.")
         else:
-            await status_msg.edit_text("❌ Failed to load products. Please check the JSON file format.")
+            print("❌ Failed to load products during auto-refresh.")
     except Exception as e:
-        await status_msg.edit_text(f"❌ Error: {str(e)}")
+        print(f"❌ Error during auto-refresh: {str(e)}")
 
 # ===== BACKGROUND JOBS =====
 async def check_timeouts(context: ContextTypes.DEFAULT_TYPE):
@@ -2090,7 +2088,6 @@ async def set_commands(app):
         BotCommand("review", "Leave a review"),
         BotCommand("refer", "Get Referral Code"),
         BotCommand("myreferrals", "Check Referral Points"),
-        BotCommand("refresh", "Reload Product File"),
         BotCommand("help", "Show available commands")
     ], scope=BotCommandScopeAllPrivateChats())
 
@@ -2100,7 +2097,6 @@ async def set_commands(app):
             BotCommand("reply", "Reply to a ticket"),
             BotCommand("settings", "Admin Settings"),
             BotCommand("appsettings", "Manage Web App"),
-            BotCommand("refresh", "Reload Product File"),
             BotCommand("help", "Admin Help")
         ], scope=BotCommandScopeChatAdministrators(chat_id=SUPPORT_GROUP_ID))
     except ChatMigrated as e:
@@ -2111,7 +2107,6 @@ async def set_commands(app):
             BotCommand("reply", "Reply to a ticket"),
             BotCommand("settings", "Admin Settings"),
             BotCommand("appsettings", "Manage Web App"),
-            BotCommand("refresh", "Reload Product File"),
             BotCommand("help", "Admin Help")
         ], scope=BotCommandScopeChatAdministrators(chat_id=SUPPORT_GROUP_ID))
 
@@ -2286,7 +2281,6 @@ def main():
     app.add_handler(CommandHandler("refer", refer_command))
     app.add_handler(CommandHandler("myreferrals", myreferrals_command))
     app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(CommandHandler("refresh", refresh_command))
     
     app.add_handler(CallbackQueryHandler(handle_reply_selection, pattern=r"^reply_[\w-]+$"))
     app.add_handler(CallbackQueryHandler(handle_ping_selection, pattern=r"^ping_[\w-]+$"))
@@ -2309,6 +2303,9 @@ def main():
 
     # Job Queue for Timeouts (runs every 60 seconds)
     app.job_queue.run_repeating(check_timeouts, interval=60, first=10)
+
+    # Job Queue for Auto Refresh (runs every 1 hour)
+    app.job_queue.run_repeating(auto_refresh_job, interval=3600, first=10)
 
     # Job Queue for Database Cleanup (runs every 24 hours)
     app.job_queue.run_repeating(cleanup_database, interval=86400, first=60)
