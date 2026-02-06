@@ -1,9 +1,8 @@
-import os
-
-from playwright.sync_api import sync_playwright
-import time
+import asyncio
 import json
-import re
+import os
+import time
+from pyppeteer import launch
 
 try:
     from dotenv import load_dotenv
@@ -36,307 +35,153 @@ class ChadsFlooringScraper:
                 products.extend(self.find_products_in_json(item))
         return products
 
-    def get_products(self):
-        print("🚀 Starting Playwright Browser...")
+    async def _scrape_async(self):
+        print("🚀 Starting Pyppeteer (Puppeteer)...")
         products = []
-        
-        with sync_playwright() as p:
-            # Launch Chromium
-            # args=['--no-sandbox'] is often needed in container environments
-            browser = p.chromium.launch(headless=True, args=['--no-sandbox'])
-
-            context = browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+        browser = None
+        try:
+            # Launch Chromium with arguments to bypass container restrictions
+            browser = await launch(
+                headless=True,
+                args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+                autoClose=False
             )
-            page = context.new_page()
-
-            # Setup API Interception
-            captured_data = []
-            def handle_response(response):
-                # Capture anything that looks like a product list API
-                if ("api/products" in response.url or "products.list" in response.url or "scrape" in response.url) and response.status == 200:
-                    try:
-                        print(f"📥 Captured API response: {response.url}")
-                        json_body = response.json()
-                        captured_data.append(json_body)
-                    except: pass
+            page = await browser.newPage()
             
-            page.on("response", handle_response)
+            # Set a realistic User Agent
+            await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36")
+            await page.setViewport({'width': 1280, 'height': 800})
 
-            try:
-                # 1. Go to Login Page
-                print("🔐 Navigating to login...")
-                page.goto(f"{self.base_url}/login", timeout=60000)
-                page.wait_for_load_state("domcontentloaded")
-                
-                # Give the page a moment to render overlays (Age Gate)
-                time.sleep(1.5)
+            captured_data = []
 
-                # Check for Maintenance
-                content = page.content()
-                if "performing updates" in content or "Maintenance" in content or "Under Maintenance" in content:
-                    print("⚠️ Site is Under Maintenance. Skipping browser scrape.")
-                    raise Exception("Site Under Maintenance")
-
-                # 2. Handle "21+" Age Gate
+            # Setup Response Interception
+            async def process_response(response):
                 try:
-                    print("🔞 Checking for Age Gate...")
-                    # Specific check for Y/N box as requested
-                    yes_btn_specific = page.locator("button, input[type='button'], input[type='submit']").filter(has_text=re.compile(r"^Yes$|^Y$", re.IGNORECASE)).first
-                    if yes_btn_specific.is_visible():
-                        print("   Clicking 'Yes' button (Specific)...")
-                        yes_btn_specific.click()
-                        time.sleep(1.5)
+                    if "api/products" in response.url or "products.list" in response.url or "scrape" in response.url:
+                        if response.status == 200:
+                            try:
+                                json_body = await response.json()
+                                print(f"📥 Captured API response: {response.url}")
+                                captured_data.append(json_body)
+                            except: pass
+                except: pass
+            
+            page.on('response', lambda res: asyncio.ensure_future(process_response(res)))
 
-                    # Check any visible checkboxes (often required)
-                    checkboxes = page.locator("input[type='checkbox']")
-                    if checkboxes.count() > 0:
-                        for i in range(checkboxes.count()):
-                            if checkboxes.nth(i).is_visible():
-                                checkboxes.nth(i).check()
-                                time.sleep(0.2)
-                    
-                    # Click "Yes" / "Enter" / "Continue" buttons
-                    # Use get_by_text with .last to find the specific button/label, not the container
-                    clicked_age = False
-                    possible_texts = [
-                        re.compile(r"Yes, I Am 21\+", re.IGNORECASE),
-                        re.compile(r"I Am 21\+", re.IGNORECASE),
-                        re.compile(r"Yes, I am 21", re.IGNORECASE),
-                        re.compile(r"Enter Site", re.IGNORECASE)
-                    ]
-                    
-                    for p_text in possible_texts:
-                        if clicked_age: break
-                        # .last selects the deepest element (the text node/button) instead of the wrapper
-                        btn = page.get_by_text(p_text).last
-                        if btn.is_visible():
-                            print(f"   Clicking Age Gate button: {btn.inner_text()}")
-                            btn.click()
-                            clicked_age = True
-                            time.sleep(2)
-                except Exception as e:
-                    print(f"⚠️ Age gate interaction warning: {e}")
+            # 1. Navigate to Login
+            print("🔐 Navigating to login...")
+            await page.goto(f"{self.base_url}/login", {'waitUntil': 'networkidle2', 'timeout': 60000})
+            await asyncio.sleep(2)
 
-                # 3. Login
-                if self.username and self.password:
-                    print("⌨️ Filling credentials...")
-                    # Wait for password field (most reliable indicator of login form)
-                    try:
-                        page.wait_for_selector("input[type='password']", timeout=5000)
-                    except:
-                        print("⚠️ Password field wait timeout - attempting to fill anyway...")
+            # Check for Maintenance
+            content = await page.content()
+            if "performing updates" in content or "Maintenance" in content:
+                print("⚠️ Site is Under Maintenance.")
+                raise Exception("Site Under Maintenance")
 
-                    # Fill Username - User specified it is listed as "email"
-                    user_filled = False
-                    
-                    if page.locator("input[name='email']").is_visible():
-                        print("   Filling username into 'email' field...")
-                        page.fill("input[name='email']", self.username)
-                        user_filled = True
-                    
-                    user_selectors = [
-                        "input[placeholder*='User']", "input[placeholder*='Email']"
-                    ]
-                    
-                    for sel in user_selectors:
-                        if page.locator(sel).first.is_visible():
-                            page.fill(sel, self.username)
-                            user_filled = True
-                            break
-                    
-                    if not user_filled:
-                        # Fallback to first text input
-                        text_inputs = page.locator("input[type='text']")
-                        if text_inputs.count() > 0 and text_inputs.first.is_visible():
-                            text_inputs.first.fill(self.username)
+            # 2. Handle Age Gate (Click Yes)
+            print("🔞 Checking for Age Gate...")
+            try:
+                # XPath to find buttons containing "Yes" or "Enter"
+                yes_buttons = await page.xpath("//button[contains(., 'Yes')] | //input[@type='button' and contains(@value, 'Yes')] | //button[contains(., 'Enter')]")
+                if yes_buttons:
+                    print("   Clicking 'Yes' button...")
+                    await yes_buttons[0].click()
+                    await asyncio.sleep(2)
+                
+                # Handle Checkboxes if any
+                checkboxes = await page.querySelectorAll("input[type='checkbox']")
+                for cb in checkboxes:
+                    await cb.click()
+            except Exception as e:
+                print(f"⚠️ Age gate check warning: {e}")
 
-                    # Fill Password
-                    if page.locator("input[name='password']").is_visible():
-                        page.fill("input[name='password']", self.password)
-                    elif page.locator("input[type='password']").is_visible():
-                        page.fill("input[type='password']", self.password)
+            # 3. Login Process
+            if self.username and self.password:
+                print("⌨️ Filling credentials...")
+                
+                # Wait for password field to ensure form is loaded
+                try:
+                    await page.waitForSelector("input[type='password']", {'timeout': 5000})
+                except: pass
+
+                # Fill Username (Try 'email' first as requested, then fallback)
+                email_input = await page.querySelector("input[name='email']")
+                if email_input:
+                    await page.type("input[name='email']", self.username)
+                else:
+                    await page.type("input[type='text']", self.username)
+
+                # Fill Password
+                await page.type("input[type='password']", self.password)
+                
+                print("↵ Pressing Enter to login...")
+                await page.keyboard.press('Enter')
+                
+                # Wait for navigation
+                try:
+                    await page.waitForNavigation({'waitUntil': 'networkidle2', 'timeout': 30000})
+                    print("✅ Login navigation detected.")
+                except:
+                    print("⚠️ Navigation timeout (might have loaded dynamically).")
+
+            # 4. Navigate to Shop/Explore to trigger API
+            print("📂 Loading Shop page...")
+            await page.goto(f"{self.base_url}/explore", {'waitUntil': 'networkidle2', 'timeout': 60000})
+            await asyncio.sleep(3)
+
+            # 5. Fallback: Look for API Link if no data captured automatically
+            if not captured_data:
+                print("⚠️ No API data captured yet. Looking for 'Products API' link...")
+                await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                await asyncio.sleep(1)
+                
+                # Try to find link by text
+                links = await page.xpath("//a[contains(., 'Products API') or contains(., 'JSON')]")
+                if links:
+                    print("✅ Found API link. Clicking...")
+                    await links[0].click()
+                    await asyncio.sleep(2)
                     
-                    # Hit Enter to login
-                    print("↵ Pressing Enter to login...")
-                    page.keyboard.press("Enter")
-                    
-                    # Scan to see if shop opened (moved away from login)
-                    login_success = False
-                    try:
-                        # Scan for up to 30s (increased for slow loading)
-                        page.wait_for_url(lambda u: "/login" not in u, timeout=30000)
-                        print("✅ Navigation detected (Login successful).")
-                        login_success = True
-                    except:
-                        print("⚠️ Still on login page after Enter. Checking for obstacles...")
-                        
-                        # Check for Age Gate again
+                    # Check if body contains JSON
+                    body_text = await page.evaluate('document.body.innerText')
+                    if body_text.strip().startswith('{') or body_text.strip().startswith('['):
                         try:
-                            possible_texts = [
-                                re.compile(r"Yes, I Am 21\+", re.IGNORECASE),
-                                re.compile(r"I Am 21\+", re.IGNORECASE),
-                                re.compile(r"Yes, I am 21", re.IGNORECASE),
-                                re.compile(r"Enter Site", re.IGNORECASE)
-                            ]
-                            for p_text in possible_texts:
-                                btn = page.get_by_text(p_text).last
-                                if btn.is_visible():
-                                    print(f"   Found Age Gate again. Clicking: {btn.inner_text()}")
-                                    btn.click()
+                            captured_data.append(json.loads(body_text))
+                            print("📥 Captured JSON from page body.")
                         except: pass
 
-                        # Try clicking Login button explicitly
-                        # Only if visible (avoid clicking if already transitioning)
-                        login_btn = page.get_by_role("button", name=re.compile(r"Login|Sign In", re.IGNORECASE))
-                        if login_btn.is_visible():
-                            print("   Clicking Login button explicitly...")
-                            try:
-                                login_btn.click(timeout=5000)
-                            except: pass
-                            try:
-                                page.wait_for_url(lambda u: "/login" not in u, timeout=10000)
-                                print("✅ Navigation detected after click.")
-                                login_success = True
-                            except: pass
-                        else:
-                            print("ℹ️ Login button not visible. Assuming login in progress...")
-                    
-                    if login_success:
-                        print("⏳ Shop opened. Waiting 2s for full load...")
-                        time.sleep(2)
-                    
-                    if "/login" in page.url and not login_success:
-                        print("⚠️ Warning: Still on login page. Login might have failed.")
-
-                # 4. Navigate to Shop to trigger API
-                print("📂 Loading Shop page to grab API...")
-                page.goto(f"{self.base_url}/explore", timeout=60000)
-                page.wait_for_load_state("networkidle", timeout=30000)
-                
-                # Wait a bit extra for any lazy-loaded APIs
-                print("⏳ Waiting 2s for shop to fully open...")
-                time.sleep(2)
-
-                # NEW: Try to grab __NEXT_DATA__ or similar JSON blobs from the page
-                # This is often more reliable than clicking links for modern sites
-                print("🔍 Checking page for JSON data blobs...")
-                scripts = page.locator("script[type='application/json'], script[id='__NEXT_DATA__']").all()
-                for script in scripts:
-                    try:
-                        content = script.inner_text()
-                        if content:
-                            json_data = json.loads(content)
-                            print("📥 Captured JSON from script tag")
-                            captured_data.append(json_data)
-                    except: pass
-
-                # 5. Find "Products API (JSON)" link at the bottom
-                if not captured_data:
-                    print("⚠️ No API data captured yet. Looking for 'Products API (JSON)' link...")
-                    try:
-                        # Scroll to bottom to ensure footer is loaded
-                        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                        print("⬇️ Scrolled to bottom. Waiting for footer...")
-                        try:
-                            page.wait_for_selector("a[href='/api/products/scrape']", timeout=5000)
-                        except:
-                            time.sleep(2)
-                        
-                        # Find the link
-                        # Try specific href first (more reliable), then text
-                        api_link = page.locator("a[href='/api/products/scrape']").first
-                        if not api_link.is_visible():
-                            api_link = page.get_by_text("Products API (JSON)").first
-                            
-                        if api_link.is_visible():
-                            print("✅ Found API link. Attempting to click...")
-                            
-                            current_url = page.url
-                            clicked_success = False
-                            
-                            for i in range(5):
-                                try:
-                                    print(f"   Click attempt {i+1}...")
-                                    api_link.click(timeout=5000)
-                                    time.sleep(2)
-                                    
-                                    # Check if URL changed or body is JSON
-                                    text = page.locator("body").inner_text()
-                                    if page.url != current_url or text.strip().startswith("{") or text.strip().startswith("["):
-                                        print("✅ Link opened successfully!")
-                                        clicked_success = True
-                                        break
-                                    print("⚠️ No change detected. Retrying...")
-                                except Exception as e:
-                                    print(f"⚠️ Click attempt failed: {e}")
-                                    # Check if we actually succeeded despite the error (e.g. navigation happened)
-                                    if page.url != current_url:
-                                         print("✅ Navigation detected despite click error.")
-                                         clicked_success = True
-                                         break
-                                    time.sleep(1)
-                            
-                            if clicked_success:
-                                page.wait_for_load_state("networkidle", timeout=10000)
-                                text = page.locator("body").inner_text()
-                                if text.strip().startswith("{") or text.strip().startswith("["):
-                                    json_data = json.loads(text)
-                                    print("📥 Captured JSON from API page body")
-                                    captured_data.append(json_data)
-                        else:
-                            print("❌ 'Products API (JSON)' link not found after scrolling.")
-                    except Exception as e:
-                        print(f"⚠️ Failed to find/click API link: {e}")
-
-            except Exception as e:
-                print(f"⚠️ Browser interaction error: {e}")
-                time.sleep(10) # Keep browser open for 10s so you can see the error
-
-            browser.close()
+            await browser.close()
             
-            # Process captured data
-            print(f"📊 Processing {len(captured_data)} captured API responses...")
+            # Process Data
+            print(f"📊 Processing {len(captured_data)} captured responses...")
             for data in captured_data:
                 found = self.find_products_in_json(data)
                 if found:
                     products.extend(found)
             
-            # Deduplicate by name
+            # Deduplicate
             unique_products = {p['name']: p for p in products}.values()
             products = list(unique_products)
 
-        if products:
-            print(f"✅ Successfully found {len(products)} products via Playwright!")
-            return {"data": products}
-        else:
-            print("❌ No products found via Playwright.")
-            return {"data": [], "error": True}
+        except Exception as e:
+            print(f"❌ Pyppeteer Error: {e}")
+            if browser:
+                await browser.close()
         
-        # Fallback to Manual File
-        if os.path.exists("manual_products.json"):
-            print("⚠️ Network scrape failed/Maintenance. Loading from manual_products.json...")
+        return {"data": products}
+
+    def get_products(self):
+        """Synchronous wrapper for the async scraper to work with bot.py"""
+        try:
+            # Create a new event loop for this thread
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            return loop.run_until_complete(self._scrape_async())
+        except Exception as e:
+            print(f"❌ Scraper Wrapper Error: {e}")
+            return {"data": [], "error": True}
+        finally:
             try:
-                with open("manual_products.json", "r", encoding="utf-8") as f:
-                    raw_data = json.load(f)
-                    found_products = self.find_products_in_json(raw_data)
-                    if found_products:
-                        print(f"✅ Loaded {len(found_products)} products from manual file")
-                        return {"data": found_products}
-            except Exception as e:
-                print(f"❌ Failed to load manual file: {e}")
-
-        print("❌ No products found via Playwright.")
-        return {"data": [], "error": True}
-
-# Test function
-if __name__ == "__main__":
-    username = os.getenv("CHADS_USERNAME")
-    password = os.getenv("CHADS_PASSWORD")
-    
-    if username and password:
-        scraper = ChadsFlooringScraper(username=username, password=password)
-        result = scraper.get_products()
-        print(f"Found {len(result.get('data', []))} products")
-    else:
-        print("Please set CHADS_USERNAME and CHADS_PASSWORD env vars to test.")
+                loop.close()
+            except: pass
