@@ -1927,6 +1927,31 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("🛍️ Open Shop", web_app=WebAppInfo(url=url))]]
     await update.message.reply_text("👇 <b>Tap below to open the shop:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
 
+# ===== REFRESH COMMAND =====
+async def refresh_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in ADMIN_IDS: return
+    
+    global PRODUCT_CACHE
+    status_msg = await update.message.reply_text("🔄 Reloading product file...")
+    
+    try:
+        scraper = ManualScraper()
+        fresh_result = scraper.get_products()
+        
+        if fresh_result and isinstance(fresh_result.get('data'), list):
+            if not fresh_result.get('imagePathPrefix'):
+                fresh_result['imagePathPrefix'] = "/uploads/products/"
+            
+            PRODUCT_CACHE["data"] = fresh_result
+            PRODUCT_CACHE["timestamp"] = time.time()
+            PRODUCT_CACHE["last_attempt"] = time.time()
+            
+            await status_msg.edit_text(f"✅ <b>Cache Refreshed!</b>\nLoaded {len(fresh_result['data'])} products.\nNext auto-reload in 1 hour.", parse_mode='HTML')
+        else:
+            await status_msg.edit_text("❌ Failed to load products. Please check the JSON file format.")
+    except Exception as e:
+        await status_msg.edit_text(f"❌ Error: {str(e)}")
+
 # ===== BACKGROUND JOBS =====
 async def check_timeouts(context: ContextTypes.DEFAULT_TYPE):
     now = time.time()
@@ -2052,6 +2077,7 @@ async def set_commands(app):
         BotCommand("review", "Leave a review"),
         BotCommand("refer", "Get Referral Code"),
         BotCommand("myreferrals", "Check Referral Points"),
+        BotCommand("refresh", "Reload Product File"),
         BotCommand("help", "Show available commands")
     ], scope=BotCommandScopeAllPrivateChats())
 
@@ -2061,6 +2087,7 @@ async def set_commands(app):
             BotCommand("reply", "Reply to a ticket"),
             BotCommand("settings", "Admin Settings"),
             BotCommand("appsettings", "Manage Web App"),
+            BotCommand("refresh", "Reload Product File"),
             BotCommand("help", "Admin Help")
         ], scope=BotCommandScopeChatAdministrators(chat_id=SUPPORT_GROUP_ID))
     except ChatMigrated as e:
@@ -2071,6 +2098,7 @@ async def set_commands(app):
             BotCommand("reply", "Reply to a ticket"),
             BotCommand("settings", "Admin Settings"),
             BotCommand("appsettings", "Manage Web App"),
+            BotCommand("refresh", "Reload Product File"),
             BotCommand("help", "Admin Help")
         ], scope=BotCommandScopeChatAdministrators(chat_id=SUPPORT_GROUP_ID))
 
@@ -2080,7 +2108,7 @@ PRODUCT_CACHE = {
     "timestamp": 0,
     "last_attempt": 0
 }
-CACHE_DURATION = 300  # 5 minutes
+CACHE_DURATION = 3600  # 1 hour
 FAILURE_COOLDOWN = 30 # 30 seconds cooldown on failure
 SCRAPE_LOCK = threading.Lock()
 
@@ -2233,6 +2261,7 @@ def main():
     app.add_handler(CommandHandler("refer", refer_command))
     app.add_handler(CommandHandler("myreferrals", myreferrals_command))
     app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("refresh", refresh_command))
     
     app.add_handler(CallbackQueryHandler(handle_reply_selection, pattern=r"^reply_[\w-]+$"))
     app.add_handler(CallbackQueryHandler(handle_ping_selection, pattern=r"^ping_[\w-]+$"))
