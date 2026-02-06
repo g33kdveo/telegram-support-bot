@@ -34,6 +34,10 @@ class ManualScraper:
                                 parent_img = v
                                 break
                     
+                    # Get parent metadata (Category, Brand)
+                    parent_cat = group.get("cat")
+                    parent_brand = group.get("brand")
+                    
                     # Process variants
                     if "products" in group and isinstance(group["products"], list):
                         for variant in group["products"]:
@@ -50,12 +54,31 @@ class ManualScraper:
                                 except:
                                     product["qty"] = 0
                             
+                            # Inherit Category and Brand if missing in the variant
+                            if parent_cat and not product.get("category"):
+                                product["category"] = parent_cat
+                                # Also set 'cat' key as some frontends might use it
+                                product["cat"] = parent_cat
+                            
+                            if parent_brand and not product.get("brand"):
+                                product["brand"] = parent_brand
+                                
+                            # Ensure ID is a string (compatibility)
+                            if "id" in product:
+                                product["id"] = str(product["id"])
+                            
                             # Fallback for images: if variant has no images, use parent's
                             if "images" not in product or not product["images"]:
                                 if parent_img:
                                     product["images"] = [parent_img]
                                 else:
                                     product["images"] = []
+                            
+                            # Backward compatibility: Ensure 'image' field exists (first image)
+                            if product.get("images") and len(product["images"]) > 0:
+                                product["image"] = product["images"][0]
+                            else:
+                                product["image"] = ""
                             
                             flattened_products.append(product)
                 
