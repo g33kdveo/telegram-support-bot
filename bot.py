@@ -2128,7 +2128,8 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
                 if PRODUCT_CACHE["data"] and (time.time() - PRODUCT_CACHE["timestamp"] < CACHE_DURATION):
                     print("✅ Serving products from cache")
                     if PRODUCT_CACHE["data"].get("data") and len(PRODUCT_CACHE["data"]["data"]) > 0:
-                         print(f"📦 Serving {len(PRODUCT_CACHE['data']['data'])} items. Sample: {PRODUCT_CACHE['data']['data'][0].get('name', 'Unknown')}")
+                         sample = PRODUCT_CACHE['data']['data'][0]
+                         print(f"📦 Serving {len(PRODUCT_CACHE['data']['data'])} items. Sample: {sample.get('name')} | ID Type: {type(sample.get('id'))} | Price Type: {type(sample.get('price'))}")
                     self.send_json(PRODUCT_CACHE["data"])
                     return
 
@@ -2140,7 +2141,8 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
                     if PRODUCT_CACHE["data"] and (now - PRODUCT_CACHE["timestamp"] < CACHE_DURATION):
                         print("✅ Serving products from cache (after lock)")
                         if PRODUCT_CACHE["data"].get("data") and len(PRODUCT_CACHE["data"]["data"]) > 0:
-                             print(f"📦 Serving {len(PRODUCT_CACHE['data']['data'])} items. Sample: {PRODUCT_CACHE['data']['data'][0].get('name', 'Unknown')}")
+                             sample = PRODUCT_CACHE['data']['data'][0]
+                             print(f"📦 Serving {len(PRODUCT_CACHE['data']['data'])} items. Sample: {sample.get('name')} | ID Type: {type(sample.get('id'))} | Price Type: {type(sample.get('price'))}")
                         self.send_json(PRODUCT_CACHE["data"])
                         return
 

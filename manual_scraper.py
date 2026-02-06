@@ -54,6 +54,12 @@ class ManualScraper:
                                 except:
                                     product["qty"] = 0
                             
+                            # Ensure price is a float (number), not a string
+                            try:
+                                product["price"] = float(product.get("price", 0))
+                            except:
+                                product["price"] = 0.0
+                            
                             # Inherit Category and Brand if missing in the variant
                             if parent_cat and not product.get("category"):
                                 product["category"] = parent_cat
@@ -68,9 +74,11 @@ class ManualScraper:
                             if parent_brand and not product.get("brand"):
                                 product["brand"] = parent_brand
                                 
-                            # Ensure ID is a string (compatibility)
-                            if "id" in product:
-                                product["id"] = str(product["id"])
+                            # ID Handling: Leave as is (usually int) to prevent frontend mismatch
+                            # If missing, generate one to prevent crashes
+                            if "id" not in product:
+                                import uuid
+                                product["id"] = str(uuid.uuid4())
                             
                             # Fallback for images: if variant has no images, use parent's
                             if "images" not in product or not product["images"]:
@@ -88,6 +96,10 @@ class ManualScraper:
                             # Extra Compatibility Fields (Just in case frontend uses these names)
                             product["img"] = product.get("image", "")
                             product["quantity"] = product.get("qty", 0)
+                            product["stock"] = product.get("qty", 0)
+                            product["inStock"] = product.get("qty", 0) > 0
+                            product["status"] = "active"
+                            product["isVisible"] = True
                             
                             flattened_products.append(product)
                 
