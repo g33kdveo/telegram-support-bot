@@ -12,6 +12,17 @@ import urllib.parse
 import threading
 import urllib.request
 from http.server import SimpleHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
+
+# Monkey patch Pyppeteer to allow running in threads (disables signal handlers)
+import pyppeteer.launcher
+original_launcher_init = pyppeteer.launcher.Launcher.__init__
+def patched_launcher_init(self, *args, **kwargs):
+    kwargs['handleSIGINT'] = False
+    kwargs['handleSIGTERM'] = False
+    kwargs['handleSIGHUP'] = False
+    original_launcher_init(self, *args, **kwargs)
+pyppeteer.launcher.Launcher.__init__ = patched_launcher_init
+
 from scraper import ChadsFlooringScraper
 try:
     from dotenv import load_dotenv
