@@ -22,10 +22,29 @@ class ChadsFlooringScraper:
         if isinstance(data, dict):
             if 'name' in data:
                 name = data['name']
-                if isinstance(name, str) and 2 < len(name) < 100 and ('id' in data or 'slug' in data or 'image' in data or 'description' in data):
+                # Expanded criteria to catch more product variants
+                if isinstance(name, str) and 2 < len(name) < 100:
+                    # Try to find image in various keys
+                    img = data.get('image', data.get('img', data.get('imageUrl', '')))
+                    if not img and 'imgs' in data and isinstance(data['imgs'], dict):
+                        # Handle {"imgs": {"b123": "filename.jpg"}} format
+                        for v in data['imgs'].values():
+                            if isinstance(v, str):
+                                img = v
+                                break
+
+                    # Ensure price is a number
+                    price = data.get('price', 0)
+                    try:
+                        price = float(price)
+                    except:
+                        price = 0
+
                     p = {
                         'name': name,
-                        'image': data.get('image', data.get('img', data.get('imageUrl', '')))
+                        'image': img,
+                        'price': price,
+                        'id': data.get('id', '')
                     }
                     products.append(p)
             for value in data.values():
@@ -40,12 +59,38 @@ class ChadsFlooringScraper:
         products = []
         browser = None
         try:
-            # Launch Chromium with arguments to bypass container restrictions
-            browser = await launch(
-                headless=True,
-                args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-                autoClose=False
-            )
+            # Smart executable path detection to avoid download errors
+            exec_path = os.getenv("PUPPETEER_EXECUTABLE_PATH")
+            if not exec_path:
+                if os.name == 'nt': # Windows
+                    possible_paths = [
+                        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+                        os.path.expanduser(r"~\AppData\Local\Google\Chrome\Application\chrome.exe")
+                    ]
+                    for p in possible_paths:
+                        if os.path.exists(p):
+                            exec_path = p
+                            break
+                else: # Linux/Railway
+                    possible_paths = ["/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome"]
+                    for p in possible_paths:
+                        if os.path.exists(p):
+                            exec_path = p
+                            break
+
+            launch_kwargs = {
+                'headless': False if os.name == 'nt' else True, # Visible on Windows, Headless on Linux
+                'args': ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+                'autoClose': False
+            }
+
+            if exec_path:
+                print(f"ℹ️ Using detected browser: {exec_path}")
+                launch_kwargs['executablePath'] = exec_path
+
+            # Launch Chromium
+            browser = await launch(**launch_kwargs)
             page = await browser.newPage()
             
             # Set a realistic User Agent
@@ -53,20 +98,27 @@ class ChadsFlooringScraper:
             await page.setViewport({'width': 1280, 'height': 800})
 
             captured_data = []
+            background_tasks = set()
 
             # Setup Response Interception
             async def process_response(response):
                 try:
-                    if "api/products" in response.url or "products.list" in response.url or "scrape" in response.url:
-                        if response.status == 200:
+                    # Filter for JSON responses
+                    if response.request.resourceType in ['xhr', 'fetch', 'document']:
+                        if "api" in response.url or "json" in response.url or "products" in response.url:
                             try:
                                 json_body = await response.json()
-                                print(f"📥 Captured API response: {response.url}")
-                                captured_data.append(json_body)
+                                if isinstance(json_body, (dict, list)):
+                                    captured_data.append(json_body)
                             except: pass
                 except: pass
             
-            page.on('response', lambda res: asyncio.ensure_future(process_response(res)))
+            def handle_response(res):
+                task = asyncio.create_task(process_response(res))
+                background_tasks.add(task)
+                task.add_done_callback(background_tasks.discard)
+
+            page.on('response', handle_response)
 
             # 1. Navigate to Login
             print("🔐 Navigating to login...")
@@ -130,18 +182,48 @@ class ChadsFlooringScraper:
             await page.goto(f"{self.base_url}/explore", {'waitUntil': 'networkidle2', 'timeout': 60000})
             await asyncio.sleep(3)
 
-            # 5. Fallback: Look for API Link if no data captured automatically
-            if not captured_data:
-                print("⚠️ No API data captured yet. Looking for 'Products API' link...")
+            # 5. Look for 'Products API' link (Always check to ensure full catalog)
+            print("🔎 Looking for 'Products API' link...")
+            try:
                 await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
                 await asyncio.sleep(1)
                 
-                # Try to find link by text
-                links = await page.xpath("//a[contains(., 'Products API') or contains(., 'JSON')]")
+                # Try to find link by text - Prioritize "JSON" to avoid HTML documentation links
+                links = await page.xpath("//a[contains(., 'JSON')]")
+                
+                if not links:
+                    links = await page.xpath("//a[contains(., 'Products API')]")
+
                 if links:
-                    print("✅ Found API link. Clicking...")
-                    await links[0].click()
-                    await asyncio.sleep(2)
+                    target_link = links[0]
+                    link_text = await page.evaluate('(el) => el.innerText', target_link)
+                    print(f"✅ Found link: '{link_text}'. Clicking...")
+                    
+                    # Scroll into view to ensure clickability
+                    await page.evaluate('(el) => el.scrollIntoView()', target_link)
+                    await asyncio.sleep(1)
+                    
+                    # Click using JS
+                    try:
+                        await page.evaluate('(el) => el.click()', target_link)
+                    except: pass
+                    
+                    print("⏳ Waiting for URL change/load...")
+                    try:
+                        await page.waitForNavigation({'waitUntil': 'networkidle2', 'timeout': 20000})
+                        print("✅ Navigation detected.")
+                    except:
+                        print("⚠️ No navigation detected (might be new tab or same page).")
+
+                    print(f"📄 Current URL: {page.url}")
+                    await asyncio.sleep(15) # Wait for JSON to render
+                    
+                    # Check if a new tab opened
+                    pages = await browser.pages()
+                    if len(pages) > 1:
+                        print("📑 New tab detected, switching...")
+                        page = pages[-1]
+                        await page.bringToFront()
                     
                     # Check if body contains JSON
                     body_text = await page.evaluate('document.body.innerText')
@@ -149,8 +231,14 @@ class ChadsFlooringScraper:
                         try:
                             captured_data.append(json.loads(body_text))
                             print("📥 Captured JSON from page body.")
-                        except: pass
+                        except: 
+                            print(f"⚠️ Failed to parse body JSON. Start: {body_text[:50]}...")
+            except Exception as e:
+                print(f"⚠️ API Link interaction failed: {e}")
 
+            # Cleanup tasks
+            for task in background_tasks:
+                task.cancel()
             await browser.close()
             
             # Process Data
@@ -185,3 +273,15 @@ class ChadsFlooringScraper:
             try:
                 loop.close()
             except: pass
+
+if __name__ == "__main__":
+    print("🕷️ Running local scraper test...")
+    scraper = ChadsFlooringScraper(username=os.getenv("CHADS_USERNAME"), password=os.getenv("CHADS_PASSWORD"))
+    result = scraper.get_products()
+    count = len(result.get('data', []))
+    print(f"✅ Test Complete! Found {count} products.")
+    
+    # Save to file for inspection
+    with open("scraped_products_test.json", "w", encoding="utf-8") as f:
+        json.dump(result, f, indent=2)
+    print("📁 Saved results to scraped_products_test.json (Check this file to verify images/prices)")
