@@ -60,6 +60,11 @@ class ManualScraper:
                                 # Also set 'cat' key as some frontends might use it
                                 product["cat"] = parent_cat
                             
+                            # Default category if still missing (prevents items from being hidden)
+                            if not product.get("category"):
+                                product["category"] = "General"
+                                product["cat"] = "General"
+                            
                             if parent_brand and not product.get("brand"):
                                 product["brand"] = parent_brand
                                 
@@ -80,9 +85,15 @@ class ManualScraper:
                             else:
                                 product["image"] = ""
                             
+                            # Extra Compatibility Fields (Just in case frontend uses these names)
+                            product["img"] = product.get("image", "")
+                            product["quantity"] = product.get("qty", 0)
+                            
                             flattened_products.append(product)
                 
                 print(f"✅ Flattened {len(flattened_products)} products from manual file.")
+                if len(flattened_products) > 0:
+                    print(f"🔍 Sample Product Data: {json.dumps(flattened_products[0], default=str)[:200]}...")
                 # Return in the expected format, preserving metadata
                 return {**raw_data, "data": flattened_products}
             

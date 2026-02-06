@@ -2127,6 +2127,8 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
                 # We ignore client-side 'nocache' params to prevent login loops
                 if PRODUCT_CACHE["data"] and (time.time() - PRODUCT_CACHE["timestamp"] < CACHE_DURATION):
                     print("✅ Serving products from cache")
+                    if PRODUCT_CACHE["data"].get("data") and len(PRODUCT_CACHE["data"]["data"]) > 0:
+                         print(f"📦 Serving {len(PRODUCT_CACHE['data']['data'])} items. Sample: {PRODUCT_CACHE['data']['data'][0].get('name', 'Unknown')}")
                     self.send_json(PRODUCT_CACHE["data"])
                     return
 
@@ -2137,6 +2139,8 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
                     # Double-check cache inside lock (another thread might have just finished)
                     if PRODUCT_CACHE["data"] and (now - PRODUCT_CACHE["timestamp"] < CACHE_DURATION):
                         print("✅ Serving products from cache (after lock)")
+                        if PRODUCT_CACHE["data"].get("data") and len(PRODUCT_CACHE["data"]["data"]) > 0:
+                             print(f"📦 Serving {len(PRODUCT_CACHE['data']['data'])} items. Sample: {PRODUCT_CACHE['data']['data'][0].get('name', 'Unknown')}")
                         self.send_json(PRODUCT_CACHE["data"])
                         return
 
