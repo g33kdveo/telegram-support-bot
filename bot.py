@@ -2470,13 +2470,16 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
         self.send_json({"error": True, "message": "Not found"}, status=404)
 
     def send_json(self, data, status=200):
-        response = json.dumps(data).encode('utf-8')
-        self.send_response(status)
-        self.send_header('Content-type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Cache-Control', 'no-cache')
-        self.end_headers()
-        self.wfile.write(response)
+        try:
+            response = json.dumps(data).encode('utf-8')
+            self.send_response(status)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Cache-Control', 'no-cache')
+            self.end_headers()
+            self.wfile.write(response)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
 
 def run_simple_server():
     # Railway provides PORT, default to 8080 if not set
