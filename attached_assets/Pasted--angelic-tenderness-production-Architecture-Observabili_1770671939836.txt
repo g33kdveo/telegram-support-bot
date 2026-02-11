@@ -1,0 +1,225 @@
+
+
+angelic-tenderness
+
+production
+Architecture
+Observability
+Logs
+Settings
+
+13 days or $3.99 left
+
+
+
+
+
+
+
+
+
+
+worker
+Deployments
+Backups
+Variables
+Metrics
+Settings
+worker-production-ed30.up.railway.app
+3.13.11python@3.13.11
+us-east4-eqdc4a
+1 Replica
+
+
+
+
+History
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+worker
+/
+28cdd432
+Active
+
+Feb 9, 2026, 4:13 PM EST
+worker-production-ed30.up.railway.app
+Details
+Build Logs
+Deploy Logs
+HTTP Logs
+Network Flow Logs
+Filter and search logs
+
+  Trying: https://chadsflooring.bz/api/products
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+📋 explore.json pageProps structure: {}
+  Not a JSON response
+  Trying: https://chadsflooring.bz/products
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+  Not a JSON response
+  Trying: https://chadsflooring.bz/api/catalog
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+[4:32:0209/211738.595952:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+  Not a JSON response
+  Trying: https://chadsflooring.bz/api/shop
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+  Not a JSON response
+  Trying: https://chadsflooring.bz/explore/api
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+  Not a JSON response
+  Trying: https://chadsflooring.bz/api/explore
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Direct API endpoints didn't work. Trying Next.js data endpoints...
+  Trying Next.js data: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json (timeout: 30.0s)
+📋 explore.json pageProps structure: {'flags': "dict[['rewards']]", 'homepageData': "dict[['topProducts', 'topCarts', 'newProducts', 'newFlavors', 'logoUrl']]", 'session': "dict[['user', 'expires', 'sub', 'iat', 'exp']]", 'shop': "dict[['categories']]"}
+  Got JSON but no grouped products (pageProps keys: ['flags', 'homepageData', 'session', 'shop'])
+Captured API response from: https://chadsflooring.bz/api/auth/session
+  Trying Next.js data: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/products.json (timeout: 30.0s)
+Captured API response from: https://chadsflooring.bz/api/misc/title
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+  Not a JSON response
+  Trying Next.js data: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/shop.json (timeout: 30.0s)
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Found grouped product response (24 groups) from: https://chadsflooring.bz/api/products/search?query=&limit=500
+  topProducts: 10 items
+    topProducts[0] keys: ['id', 'stock', 'thresholds', 'name', 'shopId', 'price', 'buyingOptionId', 'shop', 'BuyingOption', 'ProductTag', 'rating', 'reviewCount', 'bFormulation', 'bVolume', 'brand']
+    newProducts[0] keys: ['id', 'stock', 'thresholds', 'name', 'shopId', 'price', 'buyingOptionId', 'shop', 'BuyingOption', 'ProductTag', 'rating', 'reviewCount', 'bFormulation', 'bVolume', 'brand']
+  newProducts: 10 items
+  topCarts: 5 items
+    topCarts[0] keys: ['id', 'stock', 'thresholds', 'name', 'shopId', 'price', 'buyingOptionId', 'shop', 'BuyingOption', 'ProductTag', 'rating', 'reviewCount', 'bVolume', 'brand', 'bName']
+Trying /api/products/search endpoint...
+  Trying: /api/products/search?query=&limit=500
+  Not a JSON response
+Checking homepageData for product data...
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    24 new groups via find_product_groups (total: 24)
+  Trying: /api/products/search?query=&limit=500&categoryId=4
+  Trying: /api/products/search?query=&limit=500&category=4
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    0 new groups via find_product_groups (total: 24)
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    19 new groups via find_product_groups (total: 43)
+  Trying: /api/products/search?query=&limit=500&categoryId=11
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    0 new groups via find_product_groups (total: 43)
+  Trying: /api/products/search?query=&limit=500&category=11
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    7 new groups via find_product_groups (total: 50)
+  Trying: /api/products/search?query=&limit=500&categoryId=1
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    0 new groups via find_product_groups (total: 50)
+  Trying: /api/products/search?query=&limit=500&category=1
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    22 new groups via find_product_groups (total: 72)
+  Trying: /api/products/search?query=&limit=500&categoryId=3
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    0 new groups via find_product_groups (total: 72)
+  Trying: /api/products/search?query=&limit=500&category=3
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    20 new groups via find_product_groups (total: 92)
+  Trying: /api/products/search?query=&limit=500&categoryId=6
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    0 new groups via find_product_groups (total: 92)
+  Trying: /api/products/search?query=&limit=500&category=6
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    15 new groups via find_product_groups (total: 107)
+  Trying: /api/products/search?query=&limit=500&categoryId=7
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    0 new groups via find_product_groups (total: 107)
+  Trying: /api/products/search?query=&limit=500&category=7
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    24 new groups via find_product_groups (total: 131)
+  Trying: /api/products/search?query=&limit=500&categoryId=2
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    0 new groups via find_product_groups (total: 131)
+  Trying: /api/products/search?query=&limit=500&category=2
+[4:32:0209/211833.597096:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    23 new groups via find_product_groups (total: 154)
+  Trying: /api/products/search?query=&limit=500&categoryId=8
+    0 new groups via find_product_groups (total: 154)
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+Captured API response from: https://chadsflooring.bz/api/products/search?query=&limit=500&category=8
+  Trying: /api/products/search?query=&limit=500&category=8
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    0 new flat items (total: 154)
+  SUCCESS via search API: 154 items (grouped=True)
+Using complete API response with 154 product groups.
+⚠️ Scrape returned 154 products but cache has 1740. Keeping existing cache to prevent data loss.
+
+
+worker

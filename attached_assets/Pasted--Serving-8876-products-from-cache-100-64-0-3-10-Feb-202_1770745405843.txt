@@ -1,0 +1,111 @@
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:16:26] "GET /api/products?t=1770743785862_8592&nocache=8592 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:16:31] "GET /api/products?t=1770743790864_8072&nocache=8072 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:16:36] "GET /api/products?t=1770743795860_2327&nocache=2327 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:16:41] "GET /api/products?t=1770743800869_7388&nocache=7388 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:16:46] "GET /api/products?t=1770743805864_9240&nocache=9240 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:16:51] "GET /api/products?t=1770743810860_1179&nocache=1179 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:16:56] "GET /api/products?t=1770743815865_5852&nocache=5852 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:17:01] "GET /api/products?t=1770743820857_6072&nocache=6072 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:17:06] "GET /api/products?t=1770743825867_9607&nocache=9607 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:17:11] "GET /api/products?t=1770743830864_8302&nocache=8302 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:17:16] "GET /api/products?t=1770743835863_7312&nocache=7312 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:17:21] "GET /api/products?t=1770743840858_8425&nocache=8425 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:17:26] "GET /api/products?t=1770743845865_6266&nocache=6266 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:17:31] "GET /api/products?t=1770743850864_1771&nocache=1771 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:17:36] "GET /api/products?t=1770743855859_9919&nocache=9919 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:17:41] "GET /api/products?t=1770743860857_6026&nocache=6026 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:17:46] "GET /api/products?t=1770743865854_872&nocache=872 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:17:51] "GET /api/products?t=1770743870863_1705&nocache=1705 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:17:56] "GET /api/products?t=1770743875861_4649&nocache=4649 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:18:01] "GET /api/products?t=1770743880860_5756&nocache=5756 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:18:06] "GET /api/products?t=1770743885867_9042&nocache=9042 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:18:11] "GET /api/products?t=1770743890867_5441&nocache=5441 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:18:16] "GET /api/products?t=1770743895863_9578&nocache=9578 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:18:21] "GET /api/products?t=1770743900866_7320&nocache=7320 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:18:26] "GET /api/products?t=1770743905857_1818&nocache=1818 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:18:31] "GET /api/products?t=1770743910867_9867&nocache=9867 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:18:36] "GET /api/products?t=1770743915856_4266&nocache=4266 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:18:41] "GET /api/products?t=1770743920858_5969&nocache=5969 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:18:46] "GET /api/products?t=1770743925856_65&nocache=65 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:18:51] "GET /api/products?t=1770743930859_686&nocache=686 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:18:56] "GET /api/products?t=1770743935865_643&nocache=643 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:19:01] "GET /api/products?t=1770743940854_1714&nocache=1714 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:19:06] "GET /api/products?t=1770743945857_6956&nocache=6956 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:19:11] "GET /api/products?t=1770743950868_1969&nocache=1969 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:19:16] "GET /api/products?t=1770743955868_1419&nocache=1419 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:19:21] "GET /api/products?t=1770743960855_5769&nocache=5769 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:19:26] "GET /api/products?t=1770743965856_7067&nocache=7067 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:19:31] "GET /api/products?t=1770743970865_9678&nocache=9678 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:19:36] "GET /api/products?t=1770743975860_1628&nocache=1628 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:19:41] "GET /api/products?t=1770743980862_3835&nocache=3835 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:19:46] "GET /api/products?t=1770743985863_6713&nocache=6713 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:19:51] "GET /api/products?t=1770743990858_3499&nocache=3499 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:19:56] "GET /api/products?t=1770743995855_8204&nocache=8204 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:20:01] "GET /api/products?t=1770744000863_6318&nocache=6318 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:20:06] "GET /api/products?t=1770744005868_1117&nocache=1117 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:20:11] "GET /api/products?t=1770744010865_3361&nocache=3361 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:20:16] "GET /api/products?t=1770744015855_8986&nocache=8986 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:20:21] "GET /api/products?t=1770744020855_7815&nocache=7815 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:20:26] "GET /api/products?t=1770744025857_441&nocache=441 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:20:31] "GET /api/products?t=1770744030864_3835&nocache=3835 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:20:36] "GET /api/products?t=1770744035859_9589&nocache=9589 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:20:41] "GET /api/products?t=1770744040863_1826&nocache=1826 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:20:46] "GET /api/products?t=1770744045868_9586&nocache=9586 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:20:51] "GET /api/products?t=1770744050859_4762&nocache=4762 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache
+100.64.0.3 - - [10/Feb/2026 17:20:56] "GET /api/products?t=1770744055856_2069&nocache=2069 HTTP/1.1" 200 -
+✅ Serving 8876 products from cache

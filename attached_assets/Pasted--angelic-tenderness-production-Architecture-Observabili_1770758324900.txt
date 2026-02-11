@@ -1,0 +1,226 @@
+
+
+angelic-tenderness
+
+production
+Architecture
+Observability
+Logs
+Settings
+
+12 days or $2.96 left
+
+
+
+
+
+
+
+
+
+
+worker
+Deployments
+Backups
+Variables
+Metrics
+Settings
+worker-production-ed30.up.railway.app
+3.13.11python@3.13.11
+us-east4-eqdc4a
+1 Replica
+
+
+
+
+History
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+worker
+/
+a2316001
+Active
+
+Feb 10, 2026, 4:15 PM EST
+worker-production-ed30.up.railway.app
+Details
+Build Logs
+Deploy Logs
+HTTP Logs
+Network Flow Logs
+Filter and search logs
+
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  Prefix 'b' + product ID matches: 7
+  Prefix 'b' + buyingOptionId matches: 293
+  [images] Mapped 3/312 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  [images] Mapped 24/24 groups from top-level images dict
+  Query searches: +0 new (total: 312)
+--- FINAL IMAGE MAPPING PASS ---
+  Total captured top-level image entries: 293
+  Sample image keys: ['b3201', 'b4600', 'b4686', 'b4495', 'b4197', 'b4654', 'b3820', 'b4349', 'b3919', 'b3650']
+  Product IDs sample: ['14315', '19183', '11093', '7819', '9384', '18594', '11752', '18187', '18688', '11087']
+  buyingOptionId sample: ['4523', '3024', '4157', '2251', '3912', '4376', '4719', '4080', '4757', '4572']
+============================================================
+FINAL: 312 product groups, 1306 variants
+IMAGES: 305/312 groups have images
+STOCK: total qty across all variants = 28537
+TAGS: 0/312 groups have tags
+  'MM Gen3 AIO':
+    imgs: {}
+    tags: []
+    variant[0] id=19324, extra_ids={'buyingOptionId': 4709}
+    variant[0] tags: []
+  'Disposable 2g':
+    imgs: {}
+    tags: []
+    variant[0] id=18388, extra_ids={'buyingOptionId': 4659}
+    variant[0] tags: []
+  'HITZ Infinity':
+    imgs: {'4747': 'x-img-35-1769656400503.png.webp'}
+    tags: []
+    variant[0] id=19784, extra_ids={'buyingOptionId': 4747}
+    variant[0] tags: []
+============================================================
+  None: 68 groups
+  Edibles: 42 groups
+  Flower: 39 groups
+  Accessories: 34 groups
+  Concentrates: 33 groups
+  Disposables: 30 groups
+  Carts: 28 groups
+  Pre-rolls: 27 groups
+  BYOB: 7 groups
+  Topical: 4 groups
+📊 Scrape found: 312 groups
+✅ Cache Refreshed! 312 groups.
+
+
+worker

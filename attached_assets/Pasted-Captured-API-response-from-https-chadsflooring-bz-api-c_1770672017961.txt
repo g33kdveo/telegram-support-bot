@@ -1,0 +1,70 @@
+Captured API response from: https://chadsflooring.bz/api/cart
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Found grouped product response (24 groups) from: https://chadsflooring.bz/api/products/search?query=&limit=500
+  topProducts: 10 items
+    topProducts[0] keys: ['id', 'stock', 'thresholds', 'name', 'shopId', 'price', 'buyingOptionId', 'shop', 'BuyingOption', 'ProductTag', 'rating', 'reviewCount', 'bFormulation', 'bVolume', 'brand']
+    newProducts[0] keys: ['id', 'stock', 'thresholds', 'name', 'shopId', 'price', 'buyingOptionId', 'shop', 'BuyingOption', 'ProductTag', 'rating', 'reviewCount', 'bFormulation', 'bVolume', 'brand']
+  newProducts: 10 items
+  topCarts: 5 items
+    topCarts[0] keys: ['id', 'stock', 'thresholds', 'name', 'shopId', 'price', 'buyingOptionId', 'shop', 'BuyingOption', 'ProductTag', 'rating', 'reviewCount', 'bVolume', 'brand', 'bName']
+Trying /api/products/search endpoint...
+  Trying: /api/products/search?query=&limit=500
+  Not a JSON response
+Checking homepageData for product data...
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    24 new groups via find_product_groups (total: 24)
+  Trying: /api/products/search?query=&limit=500&categoryId=4
+  Trying: /api/products/search?query=&limit=500&category=4
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    0 new groups via find_product_groups (total: 24)
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    19 new groups via find_product_groups (total: 43)
+  Trying: /api/products/search?query=&limit=500&categoryId=11
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    0 new groups via find_product_groups (total: 43)
+  Trying: /api/products/search?query=&limit=500&category=11
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    7 new groups via find_product_groups (total: 50)
+  Trying: /api/products/search?query=&limit=500&categoryId=1
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    0 new groups via find_product_groups (total: 50)
+  Trying: /api/products/search?query=&limit=500&category=1
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    22 new groups via find_product_groups (total: 72)
+  Trying: /api/products/search?query=&limit=500&categoryId=3
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    0 new groups via find_product_groups (total: 72)
+  Trying: /api/products/search?query=&limit=500&category=3
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    20 new groups via find_product_groups (total: 92)
+  Trying: /api/products/search?query=&limit=500&categoryId=6
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    0 new groups via find_product_groups (total: 92)
+  Trying: /api/products/search?query=&limit=500&category=6
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    15 new groups via find_product_groups (total: 107)
+  Trying: /api/products/search?query=&limit=500&categoryId=7
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    0 new groups via find_product_groups (total: 107)
+  Trying: /api/products/search?query=&limit=500&category=7
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    24 new groups via find_product_groups (total: 131)
+  Trying: /api/products/search?query=&limit=500&categoryId=2
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    0 new groups via find_product_groups (total: 131)
+  Trying: /api/products/search?query=&limit=500&category=2
+[4:32:0209/211833.597096:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    23 new groups via find_product_groups (total: 154)
+  Trying: /api/products/search?query=&limit=500&categoryId=8
+    0 new groups via find_product_groups (total: 154)
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+Captured API response from: https://chadsflooring.bz/api/products/search?query=&limit=500&category=8
+  Trying: /api/products/search?query=&limit=500&category=8
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    0 new flat items (total: 154)
+  SUCCESS via search API: 154 items (grouped=True)
+Using complete API response with 154 product groups.
+⚠️ Scrape returned 154 products but cache has 1740. Keeping existing cache to prevent data loss

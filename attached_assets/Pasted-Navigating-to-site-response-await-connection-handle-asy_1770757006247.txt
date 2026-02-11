@@ -1,0 +1,89 @@
+Navigating to site...
+    response = await connection.handle_async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/httpcore/_async/connection.py", line 101, in handle_async_request
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/site-packages/httpx/_transports/default.py", line 67, in map_httpcore_exceptions
+    raise exc
+  File "/usr/local/lib/python3.12/site-packages/httpcore/_async/connection_pool.py", line 256, in handle_async_request
+    yield
+  File "/usr/local/lib/python3.12/site-packages/httpcore/_async/connection.py", line 78, in handle_async_request
+  File "/usr/local/lib/python3.12/site-packages/httpx/_transports/default.py", line 371, in handle_async_request
+    raise exc from None
+    resp = await self._pool.handle_async_request(req)
+  File "/usr/local/lib/python3.12/site-packages/httpcore/_async/connection_pool.py", line 236, in handle_async_request
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    stream = await self._connect(request)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^
+  File "/usr/local/lib/python3.12/site-packages/httpcore/_async/connection.py", line 124, in _connect
+    stream = await self._network_backend.connect_tcp(**kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/httpcore/_backends/auto.py", line 31, in connect_tcp
+    return await self._backend.connect_tcp(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^
+  File "/usr/local/lib/python3.12/site-packages/httpcore/_backends/anyio.py", line 113, in connect_tcp
+    with map_exceptions(exc_map):
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "/usr/local/lib/python3.12/site-packages/httpcore/_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ConnectTimeout
+The above exception was the direct cause of the following exception:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/site-packages/telegram/request/_httpxrequest.py", line 268, in do_request
+    res = await self._client.request(
+  File "/usr/local/lib/python3.12/site-packages/httpx/_client.py", line 1711, in _send_handling_redirects
+    response = await self._send_single_request(request)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/httpx/_client.py", line 1559, in request
+^^^^^^^^^^^^^^^^^^^^^
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+  File "/usr/local/lib/python3.12/site-packages/httpx/_client.py", line 1646, in send
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    response = await self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/httpx/_client.py", line 1674, in _send_handling_auth
+    response = await self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/httpx/_client.py", line 1748, in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/httpx/_transports/default.py", line 370, in handle_async_request
+    with map_httpcore_exceptions():
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/contextlib.py", line 158, in __exit__
+Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/706d0a4c-1c06-4091-b778-018522230b2f/vol_qdiouarqmwuwv1r1
+           ^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_application.py", line 495, in initialize
+    raise exc
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_application.py", line 1025, in __run
+Traceback (most recent call last):
+    loop.run_until_complete(self.initialize())
+  File "/app/bot.py", line 2435, in <module>
+  File "/usr/local/lib/python3.12/asyncio/base_events.py", line 691, in run_until_complete
+    main()
+  File "/app/bot.py", line 2431, in main
+    return future.result()
+    app.run_polling(drop_pending_updates=True)
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_application.py", line 836, in run_polling
+    return self.__run(
+           ^^^^^^^^^^^
+    self.gen.throw(value)
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_application.py", line 1036, in __run
+  File "/usr/local/lib/python3.12/site-packages/httpx/_transports/default.py", line 84, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ConnectTimeout
+The above exception was the direct cause of the following exception:
+    await self.bot.initialize()
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_extbot.py", line 293, in initialize
+    await super().initialize()
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 768, in initialize
+    await self.get_me()
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_extbot.py", line 1873, in get_me
+    return await super().get_me(

@@ -1,0 +1,230 @@
+
+
+angelic-tenderness
+
+production
+Architecture
+Observability
+Logs
+Settings
+
+13 days or $3.99 left
+
+
+
+
+
+
+
+
+
+
+worker
+Deployments
+Backups
+Variables
+Metrics
+Settings
+worker-production-ed30.up.railway.app
+3.13.11python@3.13.11
+us-east4-eqdc4a
+1 Replica
+
+
+
+
+History
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+worker
+/
+120dfa1d
+Active
+
+Feb 9, 2026, 3:46 PM EST
+worker-production-ed30.up.railway.app
+Details
+Build Logs
+Deploy Logs
+HTTP Logs
+Network Flow Logs
+Filter and search logs
+
+    Sample: name=HBIC, has_products=False, has_price=True
+Trying category-based product fetching...
+  Category[0] full keys: ['id', 'name']
+  Category[0] data: {'id': 4, 'name': 'Accessories'}
+  Fetching category: Accessories (slug=accessories, id=4)
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+  __NEXT_DATA__ pageProps keys: []
+  __NEXT_DATA__ found but no product data extracted
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+    No __NEXT_DATA__ found (page title: Nothing found | Shop)
+  Fetching category: BYOB (slug=byob, id=11)
+Captured API response from: https://chadsflooring.bz/api/auth/session
+  __NEXT_DATA__ pageProps keys: []
+  __NEXT_DATA__ found but no product data extracted
+    No __NEXT_DATA__ found (page title: Nothing found | Shop)
+  Fetching category: Carts (slug=carts, id=1)
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/api/cart
+  __NEXT_DATA__ pageProps keys: []
+  __NEXT_DATA__ found but no product data extracted
+    No __NEXT_DATA__ found (page title: Nothing found | Shop)
+  Fetching category: Concentrates (slug=concentrates, id=3)
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+📋 explore.json pageProps structure: {}
+  __NEXT_DATA__ pageProps keys: []
+  __NEXT_DATA__ found but no product data extracted
+    No __NEXT_DATA__ found (page title: Nothing found | Shop)
+  Fetching category: Disposables (slug=disposables, id=6)
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+  Fetching category: Edibles (slug=edibles, id=7)
+  __NEXT_DATA__ pageProps keys: []
+  __NEXT_DATA__ found but no product data extracted
+    No __NEXT_DATA__ found (page title: Nothing found | Shop)
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+  __NEXT_DATA__ pageProps keys: []
+  Fetching category: Flower (slug=flower, id=2)
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+  __NEXT_DATA__ pageProps keys: []
+  __NEXT_DATA__ found but no product data extracted
+    No __NEXT_DATA__ found (page title: Nothing found | Shop)
+  Fetching category: Merch (slug=merch, id=8)
+[4:34:0209/204919.811643:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+  __NEXT_DATA__ pageProps keys: []
+  __NEXT_DATA__ found but no product data extracted
+    No __NEXT_DATA__ found (page title: Nothing found | Shop)
+  Fetching category: Munchies (slug=munchies, id=13)
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+  __NEXT_DATA__ pageProps keys: []
+  __NEXT_DATA__ found but no product data extracted
+    No __NEXT_DATA__ found (page title: Nothing found | Shop)
+  Fetching category: Pre-rolls (slug=pre-rolls, id=9)
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+  __NEXT_DATA__ pageProps keys: []
+  __NEXT_DATA__ found but no product data extracted
+    No __NEXT_DATA__ found (page title: Nothing found | Shop)
+  Fetching category: Topical (slug=topical, id=10)
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+📋 explore.json pageProps structure: {}
+  __NEXT_DATA__ pageProps keys: []
+  __NEXT_DATA__ found but no product data extracted
+    No __NEXT_DATA__ found (page title: Nothing found | Shop)
+Trying page navigation with __NEXT_DATA__ extraction...
+  Navigating to: https://chadsflooring.bz/explore (timeout: 60.0s)
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18689.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/19983.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18993.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18233.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18429.json?slu
+📋 explore.json pageProps structure: {}
+  __NEXT_DATA__ pageProps keys: ['flags', 'homepageData', 'session', 'shop']
+  pageProps['homepageData']['topProducts']: 10 items, keys=['id', 'stock', 'thresholds', 'name', 'shopId', 'price', 'buyingOptionId', 'shop']
+  pageProps['homepageData']['newProducts']: 10 items, keys=['id', 'stock', 'thresholds', 'name', 'shopId', 'price', 'buyingOptionId', 'shop']
+  pageProps['homepageData']['topCarts']: 5 items, keys=['id', 'stock', 'thresholds', 'name', 'shopId', 'price', 'buyingOptionId', 'shop']
+  __NEXT_DATA__ found but no product data extracted
+Trying explore page with scrolling to trigger product loading...
+Scrolling page to load all products...
+  Finished scrolling after 4 scrolls
+Trying explore page with link discovery...
+  Found potential API link: 'Products API (HTML)' -> https://chadsflooring.bz/products/scrape
+[4:34:0209/205044.122732:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+Warning: vkCreateInstance: Found no drivers!
+Warning: vkCreateInstance failed with VK_ERROR_INCOMPATIBLE_DRIVER
+    at CheckVkSuccessImpl (../../third_party/dawn/src/dawn/native/vulkan/VulkanError.cpp:106)
+
+
+worker

@@ -1,0 +1,241 @@
+
+
+angelic-tenderness
+
+production
+Architecture
+Observability
+Logs
+Settings
+
+13 days or $4.04 left
+
+
+
+
+
+
+
+
+
+
+worker
+Deployments
+Backups
+Variables
+Metrics
+Settings
+worker-production-ed30.up.railway.app
+3.13.11python@3.13.11
+us-east4-eqdc4a
+1 Replica
+
+
+
+
+History
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+worker
+/
+6f359910
+Active
+
+Feb 9, 2026, 2:31 PM EST
+worker-production-ed30.up.railway.app
+Details
+Build Logs
+Deploy Logs
+HTTP Logs
+Network Flow Logs
+Filter and search logs
+
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Current URL after login: https://chadsflooring.bz/explore
+Login appears successful (redirected away from login page).
+Trying direct API endpoints for product data...
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 19:35:00] "GET /api/products?t=1770665699731_2292&nocache=2292 HTTP/1.1" 200 -
+  Not a JSON response
+  Trying: https://chadsflooring.bz/products
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 19:35:05] "GET /api/products?t=1770665704720_3204&nocache=3204 HTTP/1.1" 200 -
+  Not a JSON response
+  Trying: https://chadsflooring.bz/api/catalog
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+[16:46:0209/193508.853640:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+  Not a JSON response
+  Trying: https://chadsflooring.bz/api/shop
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 19:35:10] "GET /api/products?t=1770665709727_7045&nocache=7045 HTTP/1.1" 200 -
+  Not a JSON response
+  Trying: https://chadsflooring.bz/explore/api
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 19:35:15] "GET /api/products?t=1770665714727_168&nocache=168 HTTP/1.1" 200 -
+  Not a JSON response
+  Trying: https://chadsflooring.bz/api/explore
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/api/cart
+  Not a JSON response
+Direct API endpoints didn't work. Navigating to explore page...
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18993.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/19983.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18689.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18429.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18233.json?slu
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 19:35:20] "GET /api/products?t=1770665719719_3703&nocache=3703 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 19:35:25] "GET /api/products?t=1770665724728_8742&nocache=8742 HTTP/1.1" 200 -
+Looking for Products API link on page...
+  Found potential API link: 'Products API (HTML)' -> https://chadsflooring.bz/products/scrape
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 19:35:30] "GET /api/products?t=1770665729722_4138&nocache=4138 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 19:35:35] "GET /api/products?t=1770665734720_390&nocache=390 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 19:35:40] "GET /api/products?t=1770665739719_1049&nocache=1049 HTTP/1.1" 200 -
+No API data found. Trying HTML scraping from explore page...
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 19:35:45] "GET /api/products?t=1770665744723_8667&nocache=8667 HTTP/1.1" 200 -
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18233.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18689.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18993.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/19983.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18429.json?slu
+Scrolling page to load all products...
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 19:35:50] "GET /api/products?t=1770665749730_5356&nocache=5356 HTTP/1.1" 200 -
+  Finished scrolling after 4 scrolls
+Scraping products from HTML DOM...
+  Extracted 0 products from HTML DOM
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 19:35:55] "GET /api/products?t=1770665754730_8995&nocache=8995 HTTP/1.1" 200 -
+Processing 73 captured responses...
+WARNING: No grouped product data found. Falling back to flat extraction.
+Found 95 unique products (flat mode).
+✅ Cache Refreshed! Loaded 95 products.
+✅ Serving products from cache
+Serving 95 items. Sample: Credentials
+100.64.0.2 - - [09/Feb/2026 19:36:00] "GET /api/products?t=1770665759733_815&nocache=815 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 95 items. Sample: Credentials
+100.64.0.2 - - [09/Feb/2026 19:36:05] "GET /api/products?t=1770665764725_8126&nocache=8126 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 95 items. Sample: Credentials
+100.64.0.2 - - [09/Feb/2026 19:36:10] "GET /api/products?t=1770665769731_74&nocache=74 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 95 items. Sample: Credentials
+100.64.0.2 - - [09/Feb/2026 19:36:15] "GET /api/products?t=1770665774728_2640&nocache=2640 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 95 items. Sample: Credentials
+100.64.0.2 - - [09/Feb/2026 19:36:20] "GET /api/products?t=1770665779732_8264&nocache=8264 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 95 items. Sample: Credentials
+100.64.0.2 - - [09/Feb/2026 19:36:25] "GET /api/products?t=1770665784728_5507&nocache=5507 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 95 items. Sample: Credentials
+100.64.0.2 - - [09/Feb/2026 19:36:30] "GET /api/products?t=1770665789730_3129&nocache=3129 HTTP/1.1" 200 -
+100.64.0.2 - - [09/Feb/2026 19:36:35] "GET /api/products?t=1770665794722_5423&nocache=5423 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 95 items. Sample: Credentials
+✅ Serving products from cache
+Serving 95 items. Sample: Credentials
+100.64.0.2 - - [09/Feb/2026 19:36:40] "GET /api/products?t=1770665799732_5909&nocache=5909 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 95 items. Sample: Credentials
+100.64.0.2 - - [09/Feb/2026 19:36:45] "GET /api/products?t=1770665804730_7326&nocache=7326 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 95 items. Sample: Credentials
+100.64.0.2 - - [09/Feb/2026 19:36:50] "GET /api/products?t=1770665809733_7621&nocache=7621 HTTP/1.1" 200 -
+
+
+worker

@@ -1,0 +1,231 @@
+
+
+angelic-tenderness
+
+production
+Architecture
+Observability
+Logs
+Settings
+
+13 days or $3.99 left
+
+
+
+
+
+
+
+
+
+
+worker
+Deployments
+Backups
+Variables
+Metrics
+Settings
+worker-production-ed30.up.railway.app
+3.13.11python@3.13.11
+us-east4-eqdc4a
+1 Replica
+
+
+
+
+History
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+worker
+/
+fd412aa9
+Active
+
+Feb 9, 2026, 3:27 PM EST
+worker-production-ed30.up.railway.app
+Details
+Build Logs
+Deploy Logs
+HTTP Logs
+Network Flow Logs
+Filter and search logs
+
+  Not a JSON response
+  Trying: https://chadsflooring.bz/explore/api
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+  Not a JSON response
+  Trying: https://chadsflooring.bz/api/explore
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+  Not a JSON response
+Direct API endpoints didn't work. Trying Next.js data endpoints...
+  Trying Next.js data: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json (timeout: 30.0s)
+📋 explore.json pageProps structure: {'flags': "dict[['rewards']]", 'homepageData': "dict[['topProducts', 'topCarts', 'newProducts', 'logoUrl', 'domain']]", 'session': "dict[['user', 'expires', 'sub', 'iat', 'exp']]", 'shop': "dict[['categories']]"}
+  Got JSON but no grouped products (pageProps keys: ['flags', 'homepageData', 'session', 'shop'])
+  Trying Next.js data: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/products.json (timeout: 30.0s)
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/api/cart
+  Not a JSON response
+  Trying Next.js data: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/shop.json (timeout: 30.0s)
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/api/cart
+  Not a JSON response
+Trying category-based product fetching...
+  Fetching category: Accessories (4)
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/api/cart
+  Fetching category: BYOB (11)
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+  Fetching category: Carts (1)
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/cart
+  Fetching category: Concentrates (3)
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/api/cart
+  Fetching category: Disposables (6)
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+  Fetching category: Edibles (7)
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+  Fetching category: Flower (2)
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+  Fetching category: Merch (8)
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+📋 explore.json pageProps structure: {}
+  Fetching category: Munchies (13)
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/api/cart
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+  Fetching category: Pre-rolls (9)
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+📋 explore.json pageProps structure: {}
+  Fetching category: Topical (10)
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+  Fetching category: Rewards (-1)
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/api/cart
+[4:34:0209/203006.944359:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+Trying page navigation with __NEXT_DATA__ extraction...
+  Navigating to: https://chadsflooring.bz/explore (timeout: 60.0s)
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18993.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18689.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18233.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18429.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/19983.json?slu
+  __NEXT_DATA__ pageProps keys: ['flags', 'homepageData', 'session', 'shop']
+  __NEXT_DATA__ found but no product data extracted
+Trying explore page with scrolling to trigger product loading...
+Scrolling page to load all products...
+  Finished scrolling after 4 scrolls
+Trying explore page with link discovery...
+  Found potential API link: 'Products API (HTML)' -> https://chadsflooring.bz/products/scrape
+
+
+worker

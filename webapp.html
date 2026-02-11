@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Menu</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg-color: var(--tg-theme-bg-color, #fff);
+            --text-color: var(--tg-theme-text-color, #000);
+            --hint-color: var(--tg-theme-hint-color, #999);
+            --button-color: var(--tg-theme-button-color, #3390ec);
+            --button-text-color: var(--tg-theme-button-text-color, #fff);
+            --secondary-bg: var(--tg-theme-secondary-bg-color, #f4f4f5);
+            --destructive: #ff3b30;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding-bottom: 80px;
+        }
+
+        .container {
+            padding: 10px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* Categories */
+        .category-section {
+            margin-bottom: 25px;
+        }
+
+        .category-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid var(--secondary-bg);
+        }
+
+        .category-title {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        /* Products */
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        @media (min-width: 600px) {
+            .products-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        @media (min-width: 900px) {
+            .products-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            background: var(--bg-color);
+            z-index: 100;
+            padding-bottom: 5px;
+            border-bottom: 1px solid var(--secondary-bg);
+        }
+
+        .product-card {
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-color);
+            border: 1px solid var(--secondary-bg);
+            border-radius: 12px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            padding: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            transition: transform 0.1s ease-in-out;
+        }
+
+        .product-card:active {
+            transform: scale(0.98);
+        }
+
+        .product-card.hidden-item {
+            opacity: 0.6;
+            background: repeating-linear-gradient(
+                45deg,
+                var(--bg-color),
+                var(--bg-color) 10px,
+                var(--secondary-bg) 10px,
+                var(--secondary-bg) 20px
+            );
+        }
+
+        
+
+        /* New Card Layout Elements */
+        .pc-brand {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--button-color);
+            margin-bottom: 4px;
+            align-self: flex-start;
+            z-index: 2;
+        }
+
+        .pc-name {
+            font-size: 14px;
+            font-weight: 700;
+            text-align: left;
+            margin-bottom: 4px;
+            line-height: 1.3;
+            width: 100%;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .pc-meta {
+            font-size: 11px;
+            color: var(--hint-color);
+            align-self: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .product-image {
+            width: 100%;
+            aspect-ratio: 1;
+            height: auto;
+            object-fit: contain;
+            border-radius: 8px;
+            background-color: var(--secondary-bg);
+            margin-bottom: 8px;
+        }
+
+        .pc-footer {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-color);
+            align-self: flex-start;
+            margin-top: auto;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: var(--bg-color);
+            width: 100%;
+            max-width: 500px;
+            border-radius: 12px;
+            padding: 20px;
+            max-height: 85vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 28px;
+            cursor: pointer;
+            color: var(--text-color);
+            z-index: 2;
+        }
+
+        .modal-img {
+            width: 100%;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .modal-title {
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            padding-right: 30px;
+        }
+
+        .modal-desc {
+            font-size: 15px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            color: var(--text-color);
+        }
+
+        /* Admin Controls */
+        .admin-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--secondary-bg);
+            padding: 15px;
+            border-top: 1px solid #ccc;
+            display: none; /* Hidden by default */
+            justify-content: center;
+            z-index: 900;
+        }
+
+        .admin-btn {
+            background-color: var(--button-color);
+            color: var(--button-text-color);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .admin-overlay {
+            position: absolute;
+            top: 10px;
+            right: 0;
+            display: none; /* Hidden by default */
+            gap: 5px;
+        }
+
+        .btn-hide {
+            background: var(--destructive);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .btn-edit-cat {
+            background: var(--button-color);
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        /* Admin Mode Active State */
+        body.admin-mode .admin-bar { display: flex; }
+        body.admin-mode .admin-overlay { display: flex; }
+
+        /* Category Tabs */
+        .category-nav-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 0;
+        }
+        .cat-scroll-btn {
+            flex-shrink: 0;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 1px solid var(--secondary-bg);
+            background: var(--bg-color);
+            color: var(--hint-color);
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.15s, color 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .cat-scroll-btn:active {
+            background: var(--button-color);
+            color: var(--button-text-color);
+        }
+        .category-nav {
+            display: flex;
+            overflow-x: auto;
+            gap: 8px;
+            flex: 1;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .category-nav::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .category-tab {
+            padding: 8px 16px;
+            background: var(--secondary-bg);
+            border-radius: 20px;
+            white-space: nowrap;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+            border: 1px solid transparent;
+        }
+        
+        .category-tab.active {
+            background: var(--button-color);
+            color: var(--button-text-color);
+        }
+
+        /* Active Filters */
+        .active-filters {
+            display: flex;
+            gap: 10px;
+            padding: 5px 0 10px 0;
+            flex-wrap: wrap;
+        }
+        .active-filters:empty {
+            display: none;
+            padding: 0;
+        }
+        .filter-tag {
+            background: var(--button-color);
+            color: var(--button-text-color);
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .filter-tag span {
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+
+        /* Modal Brand & Variants */
+        .brand-link {
+            color: var(--button-color);
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            display: inline-block;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .variant-section {
+            margin-top: 15px;
+            border-top: 1px solid var(--secondary-bg);
+            padding-top: 15px;
+        }
+        .variant-label {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--hint-color);
+        }
+        .variant-select {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid var(--secondary-bg);
+            background: var(--bg-color);
+            color: var(--text-color);
+            font-size: 16px;
+            outline: none;
+        }
+
+        /* Search Bar */
+        .search-wrapper {
+            padding: 10px 0;
+        }
+        
+        #search-input {
+            width: 100%;
+            padding: 10px 15px;
+            border-radius: 10px;
+            border: 1px solid var(--secondary-bg);
+            background: var(--secondary-bg);
+            color: var(--text-color);
+            font-size: 16px;
+            outline: none;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="sticky-header">
+        <div class="search-wrapper">
+            <input type="text" id="search-input" placeholder="🔍 Search products..." oninput="handleSearch()">
+        </div>
+        <div class="category-nav-wrapper">
+            <button class="cat-scroll-btn" onclick="scrollCats(-1)">&#8249;</button>
+            <div id="category-nav" class="category-nav"></div>
+            <button class="cat-scroll-btn" onclick="scrollCats(1)">&#8250;</button>
+        </div>
+        <div id="active-filters" class="active-filters"></div>
+    </div>
+
+    <div id="main-container">
+        <div style="text-align: center; padding: 40px; color: var(--hint-color);">Loading menu...</div>
+    </div>
+</div>
+
+<!-- Detail Modal -->
+<div id="detail-modal" class="modal-overlay" onclick="closeModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <span class="close-modal" onclick="closeModal()">&times;</span>
+        <div id="modal-body"></div>
+    </div>
+</div>
+
+<!-- Admin Save Bar -->
+<div class="admin-bar">
+    <button class="admin-btn" onclick="saveAdminSettings()">💾 Save Changes</button>
+</div>
+
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    // CONFIG
+    // Use absolute URL for Railway deployment
+    const API_URL = window.location.hostname === 'localhost' 
+        ? "/api/products" 
+        : `${window.location.protocol}//${window.location.hostname}/api/products`;
+    const PREFERRED_ORDER = ["Accessories", "In-House", "Carts", "Concentrates", "Disposables", "Edibles", "Flower", "Pre-rolls"];
+
+    // STATE
+    let rawData = [];
+    let CATEGORIES = [];
+    let settings = { h: [], r: {} };
+    let isAdmin = false;
+    let adminToken = '';
+    let currentImgPrefix = "";
+    let selectedCategory = null;
+
+    function buildImgUrl(raw, size) {
+        if (!raw) return '';
+
+        const apiBase = window.location.origin || '';
+
+        if (raw.startsWith('__cached__:')) {
+            return apiBase + '/api/img?u=' + encodeURIComponent(raw);
+        }
+
+        let img = raw.replace(/x_imgvariantsize/g, 'x' + String(size));
+
+        let remotePath;
+        if (img.startsWith('http://') || img.startsWith('https://')) {
+            remotePath = img;
+        } else if (img.startsWith('/uploads/') || img.startsWith('uploads/')) {
+            remotePath = '/' + img.replace(/^\//, '');
+        } else {
+            let prefix = currentImgPrefix || '/uploads/products/';
+            if (!prefix.startsWith('/')) prefix = '/' + prefix;
+            if (!prefix.endsWith('/')) prefix += '/';
+            remotePath = prefix + img;
+        }
+        remotePath = remotePath.replace(/([^:])\/\//g, '$1/');
+
+        return apiBase + '/api/img?u=' + encodeURIComponent(remotePath);
+    }
+    let selectedBrand = null;
+    let lastDataHash = "";
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        if (urlParams.get('admin') === '1') {
+            isAdmin = true;
+            document.body.classList.add('admin-mode');
+            adminToken = urlParams.get('token') || '';
+        }
+
+        await loadSettings();
+        await fetchData();
+
+        setInterval(() => fetchData(true), 300000);
+        
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                console.log('App visible - fetching fresh data');
+                fetchData(true);
+            }
+        });
+    });
+
+    async function loadSettings() {
+        try {
+            const resp = await fetch(
+                `${API_URL.replace('/api/products', '/api/settings')}?t=${Date.now()}`,
+                { cache: 'no-store' }
+            );
+            if (resp.ok) {
+                const s = await resp.json();
+                if (s && typeof s === 'object') {
+                    settings = s;
+                    if (!settings.h) settings.h = [];
+                    if (!settings.r) settings.r = {};
+                    console.log('Settings loaded:', settings.h.length, 'hidden items');
+                }
+            }
+        } catch (e) {
+            console.error('Failed to load settings:', e);
+        }
+    }
+
+    async function fetchData(isBackground = false) {
+        try {
+            // Add timestamp and random value to prevent all caching
+            const timestamp = new Date().getTime();
+            const random = Math.floor(Math.random() * 10000);
+            const cacheBreaker = `${timestamp}_${random}`;
+            
+            // Fetch with aggressive cache bypass headers
+            const response = await fetch(
+                `${API_URL}?t=${cacheBreaker}&nocache=${random}`,
+                {
+                    method: 'GET',
+                    cache: 'no-store',
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache'
+                    }
+                }
+            );
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const json = await response.json();
+            
+            // Get dynamic prefix from JSON, fallback if missing
+            currentImgPrefix = json.imagePathPrefix || "/uploads/products/";
+            
+            const newData = json.data || [];
+            const newHash = JSON.stringify(newData);
+            
+            // Check for updates - only compare data, not the hash to ensure we catch all changes
+            if (isBackground && newHash === lastDataHash) {
+                console.log('No menu changes detected');
+                return;
+            }
+            
+            console.log('Menu data updated:', new Date().toLocaleTimeString());
+            lastDataHash = newHash;
+            rawData = newData;
+            
+            preprocessData();
+            renderCategories();
+            
+            // Preserve scroll position on background updates
+            const scrollY = window.scrollY;
+            render();
+            if (isBackground) window.scrollTo(0, scrollY);
+        } catch (e) {
+            console.error('Failed to fetch data:', e);
+            console.error('API URL:', API_URL);
+            if (!isBackground) {
+                document.getElementById('main-container').innerHTML = `
+                    <div style="text-align:center; margin-top:50px;">
+                        Failed to load menu.<br>
+                        <span style="font-size:12px; color:#888;">Error: ${e.message}</span><br>
+                        <span style="font-size:12px; color:#888;">API: ${API_URL}</span><br>
+                        Please try again later.
+                    </div>`;
+            }
+        }
+    }
+
+    function getBrandName(brand) {
+        if (!brand) return '';
+        if (typeof brand === 'string') return brand;
+        if (typeof brand === 'object' && brand.name) return brand.name;
+        return String(brand);
+    }
+
+    function normalizeRawGroup(g) {
+        if (!g.imgs || typeof g.imgs !== 'object' || Array.isArray(g.imgs) || Object.keys(g.imgs).length === 0) {
+            const newImgs = {};
+            if (typeof g.imgs === 'string' && g.imgs) {
+                newImgs['main'] = g.imgs;
+            }
+            if (!Object.keys(newImgs).length) {
+                const prods = g.products || [];
+                for (const p of prods) {
+                    if (!p) continue;
+                    if (Array.isArray(p.images) && p.images.length > 0) {
+                        newImgs[String(p.id || 'img')] = p.images[0];
+                        break;
+                    }
+                }
+            }
+            g.imgs = newImgs;
+        }
+
+        if (!g.desc) {
+            g.desc = g.description || null;
+            if (!g.desc) {
+                const prods = g.products || [];
+                for (const p of prods) {
+                    const pd = p && (p.desc || p.description);
+                    if (pd) { g.desc = pd; break; }
+                }
+            }
+        }
+
+        if (!g.tags || !Array.isArray(g.tags)) g.tags = [];
+    }
+
+    function preprocessData() {
+        const banned = ["Merch", "Munchies"];
+        rawData = rawData.filter(g => {
+            if (!g.name || g.name.length < 3) return false;
+            if (g.cat && banned.includes(g.cat)) return false;
+            return true;
+        });
+
+        rawData.forEach(normalizeRawGroup);
+
+        const withImgs = rawData.filter(g => g.imgs && typeof g.imgs === 'object' && Object.keys(g.imgs).length > 0);
+        console.log(`[images] ${withImgs.length}/${rawData.length} groups have images after normalization`);
+        if (withImgs.length > 0) {
+            const sample = withImgs[0];
+            const firstKey = Object.keys(sample.imgs)[0];
+            console.log(`[images] Sample: "${sample.name}" key=${firstKey} val=${sample.imgs[firstKey]}`);
+            console.log(`[images] Built URL: ${buildImgUrl(sample.imgs[firstKey], 250)}`);
+        }
+
+        rawData.forEach(group => {
+            group.brand = getBrandName(group.brand);
+
+            if (!group.cat) {
+                group.cat = "Other";
+            }
+
+            if (group.brand && group.brand.toLowerCase() === "in-house") {
+                group.brand = "Value";
+                const catLower = (group.cat || "").toLowerCase();
+                const keepInOriginal = ["carts", "disposables"];
+                if (!keepInOriginal.includes(catLower)) {
+                    group.cat = "In-House";
+                }
+            }
+        });
+
+        const catSet = new Set();
+        rawData.forEach(g => { if (g.cat) catSet.add(g.cat); });
+
+        CATEGORIES = ["Explore"];
+        PREFERRED_ORDER.forEach(c => {
+            if (catSet.has(c)) {
+                CATEGORIES.push(c);
+                catSet.delete(c);
+            }
+        });
+
+        if (!selectedCategory || !CATEGORIES.includes(selectedCategory)) {
+            selectedCategory = CATEGORIES[0] || "Explore";
+        }
+    }
+
+    function handleSearch() {
+        render();
+    }
+
+    function selectCategory(cat) {
+        selectedCategory = cat;
+        renderCategories();
+        render();
+    }
+
+    function selectBrand(brand) {
+        selectedBrand = brand;
+        closeModal();
+        render();
+    }
+
+    function clearBrand() {
+        selectedBrand = null;
+        render();
+    }
+
+    function scrollCats(dir) {
+        const nav = document.getElementById('category-nav');
+        nav.scrollBy({ left: dir * 150, behavior: 'smooth' });
+    }
+
+    function renderCategories() {
+        const nav = document.getElementById('category-nav');
+        let html = '';
+        CATEGORIES.forEach(cat => {
+            html += `<div class="category-tab ${selectedCategory === cat ? 'active' : ''}" onclick="selectCategory('${cat}')">${cat}</div>`;
+        });
+        nav.innerHTML = html;
+    }
+
+    function getTagValue(tags, key) {
+        if (!tags || !tags.length) return null;
+        for (const t of tags) {
+            if (t.toLowerCase().startsWith(key.toLowerCase() + ' =') || t.toLowerCase().startsWith(key.toLowerCase() + '=')) {
+                return t.split('=').slice(1).join('=').trim();
+            }
+        }
+        return null;
+    }
+
+    function parseProductInfo(group) {
+        const name = group.name;
+        const desc = group.desc;
+        const tags = group.tags || [];
+
+        const variantNames = (group.products || []).map(p => p.name).join(" ");
+        const text = (name + " " + variantNames + " " + (desc || "")).toLowerCase();
+
+        let formulation = getTagValue(tags, 'Formulation');
+
+        if (!formulation) {
+            const forms = [
+                "liquid diamonds", "live resin", "live rosin", "cured resin", "cured rosin",
+                "distillate", "diamonds", "sauce", "badder", "budder", "batter",
+                "crumble", "shatter", "sugar", "kief", "hash", "moonrock", "wax",
+                "resin", "rosin", "isolate", "terp sauce", "thca", "delta-8", "delta-9", "hhc",
+                "flower", "pre-roll", "preroll", "infused pre-roll", "infused preroll", "blunt",
+                "edible", "gummy", "gummies", "chocolate", "brownie", "cookie", "capsule", "tincture", "syrup",
+                "vape", "cartridge", "cart", "pod", "disposable", "battery", "accessory", "syringe", "topical", "lotion", "balm"
+            ];
+            formulation = forms.find(f => text.includes(f)) || '';
+        }
+
+        if (!formulation || formulation.toLowerCase() === 'product') {
+            formulation = (group.cat && group.cat !== 'Product') ? group.cat : '';
+        }
+
+        if (formulation) {
+            const formMap = {
+                "cart": "Cartridge", "preroll": "Pre-roll", "infused preroll": "Infused Pre-roll",
+                "thca": "THCa", "hhc": "HHC", "d8": "Delta-8", "rso": "RSO",
+                "cbd": "CBD", "cbg": "CBG", "cbn": "CBN", "thc": "THC"
+            };
+            formulation = formMap[formulation.toLowerCase()] || formulation.charAt(0).toUpperCase() + formulation.slice(1);
+        }
+
+        let volume = getTagValue(tags, 'Volume') || '';
+
+        if (volume) {
+            volume = volume.replace(/\b(\d+)\s*gram\b/i, '$1g')
+                          .replace(/\b(\d+(\.\d+)?)\s*Gram\b/i, '$1g')
+                          .replace(/^(\d+(\.\d+)?)\s*g$/i, '$1g');
+        }
+
+        return {
+            formulation: formulation || "",
+            volume: volume
+        };
+    }
+
+    function safeQty(q) {
+        if (typeof q === 'number') return q;
+        if (typeof q === 'string') {
+            const n = parseInt(q.replace(/[^0-9]/g, ''), 10);
+            return isNaN(n) ? 0 : n;
+        }
+        return 0;
+    }
+
+    function render() {
+        const container = document.getElementById('main-container');
+        const filtersContainer = document.getElementById('active-filters');
+        const searchTerm = document.getElementById('search-input').value.toLowerCase().trim();
+        
+        container.innerHTML = '';
+        filtersContainer.innerHTML = '';
+
+        let filterHtml = '';
+        if (selectedBrand) {
+            filterHtml += `<div class="filter-tag">Brand: ${selectedBrand} <span onclick="clearBrand()">✕</span></div>`;
+        }
+        if (searchTerm) {
+            filterHtml += `<div class="filter-tag">Searching all categories</div>`;
+        } else if (selectedBrand) {
+            filterHtml += `<div class="filter-tag">Showing all categories</div>`;
+        }
+        filtersContainer.innerHTML = filterHtml;
+
+        const grid = document.createElement('div');
+        grid.className = 'products-grid';
+        let visibleCount = 0;
+
+        const sortedData = [...rawData].sort((a, b) => {
+            const aStock = (a.products || []).reduce((sum, p) => sum + safeQty(p.qty), 0);
+            const bStock = (b.products || []).reduce((sum, p) => sum + safeQty(p.qty), 0);
+            if (aStock > 0 && bStock <= 0) return -1;
+            if (aStock <= 0 && bStock > 0) return 1;
+            return 0;
+        });
+
+        sortedData.forEach(group => {
+            const hasBrandFilter = !!selectedBrand;
+            const hasSearch = !!searchTerm;
+
+            if (hasBrandFilter && group.brand !== selectedBrand) {
+                return;
+            }
+
+            if (!hasBrandFilter && !hasSearch && selectedCategory !== 'Explore' && group.cat !== selectedCategory) {
+                return;
+            }
+
+            const variants = group.products || [];
+            const inStockVariants = variants.filter(p => safeQty(p.qty) > 0);
+            
+            let totalStock = 0;
+            inStockVariants.forEach(p => totalStock += safeQty(p.qty));
+
+            const isOutOfStock = totalStock <= 0;
+            if (isOutOfStock && !isAdmin) return;
+
+            const groupId = variants.length > 0 ? variants[0].id : 0;
+            const isHidden = settings.h.includes(groupId);
+            if (isHidden && !isAdmin) return;
+
+            if (searchTerm) {
+                const brandName = (group.brand || "").toLowerCase();
+                const matchGroup = group.name.toLowerCase().includes(searchTerm);
+                const matchVariant = variants.some(v => v.name.toLowerCase().includes(searchTerm));
+                const matchBrand = brandName.includes(searchTerm);
+                if (!matchGroup && !matchVariant && !matchBrand) return;
+            }
+
+            const info = parseProductInfo(group);
+            const brandName = group.brand || "";
+            const optionsCount = isOutOfStock ? variants.length : inStockVariants.length;
+            
+            // Image Logic (Use first available)
+            let imgUrl = '';
+            let rawImg = '';
+            if (group.imgs) {
+                const firstKey = Object.keys(group.imgs)[0];
+                if (firstKey) rawImg = group.imgs[firstKey];
+            } else if (variants.length > 0 && variants[0].images && variants[0].images[0]) {
+                rawImg = variants[0].images[0];
+            }
+            
+            if (rawImg) {
+                imgUrl = buildImgUrl(rawImg, 250);
+            }
+
+            visibleCount++;
+
+            const card = document.createElement('div');
+            card.className = `product-card ${isHidden ? 'hidden-item' : ''}`;
+            card.onclick = (e) => {
+                if (e.target.closest('.admin-overlay') || e.target.closest('.pc-brand')) return;
+                openModal(group, variants);
+            };
+
+            const stockText = `${totalStock >= 500 ? '500+' : totalStock} left`;
+
+            card.innerHTML = `
+                <div class="pc-brand" onclick="event.stopPropagation(); selectBrand('${brandName.replace(/'/g, "\\'")}')">${brandName}</div>
+                <div class="pc-name">${group.name}</div>
+                <div class="pc-meta">${info.formulation}${optionsCount > 1 ? ' · ' + optionsCount + ' options' : ''}</div>
+                <img src="${imgUrl}" class="product-image" onerror="this.style.display='none'" loading="lazy">
+                <div class="pc-footer">${stockText}${info.volume ? ' · ' + info.volume : ''}</div>
+                ${isAdmin ? `
+                    <div class="admin-overlay">
+                        <button class="btn-hide" onclick="toggleHide(${groupId})">
+                            ${isHidden ? '👁️ Unhide' : '🚫 Hide'}
+                        </button>
+                    </div>
+                ` : ''}
+            `;
+            grid.appendChild(card);
+        });
+
+        if (visibleCount > 0) {
+            container.appendChild(grid);
+        }
+
+        if (container.innerHTML === '') {
+             container.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--hint-color)">No products found.</div>`;
+        }
+    }
+
+    // --- MODAL LOGIC ---
+    function openModal(group, variants) {
+        const modal = document.getElementById('detail-modal');
+        const body = document.getElementById('modal-body');
+        
+        // Use the first variant as the default display
+        const defaultVariant = variants.length > 0 ? variants[0] : {};
+        const info = parseProductInfo(group);
+
+        let imagesHtml = '';
+        let imageSources = [];
+
+        // Collect images from group first, then variants
+        if (group.imgs) {
+            imageSources = Object.values(group.imgs);
+        }
+        // Add variant images if not already present (simple check)
+        variants.forEach(v => {
+            if (v.images && v.images.length > 0) {
+                v.images.forEach(img => {
+                    if (!imageSources.includes(img)) imageSources.push(img);
+                });
+            }
+        });
+
+        if (imageSources.length > 0) {
+            imageSources.forEach(img => {
+                const src = buildImgUrl(img, 750);
+                if (src) {
+                    imagesHtml += `<img src="${src}" class="modal-img" onerror="this.style.display='none'">`;
+                }
+            });
+        }
+
+        const brandName = group.brand || "Geekd";
+        let brandHtml = `<div class="brand-link" onclick="selectBrand('${brandName.replace(/'/g, "\\'")}')">Brand: ${brandName}</div>`;
+
+        // Variants Dropdown
+        let variantsHtml = '';
+        if (variants.length > 0) {
+            let rows = '';
+            variants.forEach(p => {
+                let flavorName = p.name.replace(group.name, "").replace(/^[\s\-–]+/, "").trim();
+                if (!flavorName) flavorName = "Standard";
+
+                const qty = p.qty;
+                let qtyDisplay;
+                if (typeof qty === 'string') {
+                    qtyDisplay = qty;
+                } else {
+                    qtyDisplay = String(safeQty(qty));
+                }
+                const isOOS = safeQty(qty) <= 0;
+                rows += `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--secondary-bg); ${isOOS ? 'opacity:0.5;' : ''}">
+                    <div style="flex:1;">
+                        <div style="font-weight:600;">${flavorName}</div>
+                    </div>
+                    <div style="text-align:right; white-space:nowrap;">
+                        <div style="font-size:12px; color:var(--hint-color);">${qtyDisplay} left</div>
+                    </div>
+                </div>`;
+            });
+
+            variantsHtml = `
+                <div class="variant-section">
+                    <div class="variant-label" style="font-weight:700; margin-bottom:8px;">${variants.length} Option${variants.length > 1 ? 's' : ''}:</div>
+                    <div style="max-height:300px; overflow-y:auto;">${rows}</div>
+                </div>
+            `;
+        }
+
+        body.innerHTML = `
+            <div class="modal-title">${group.name}</div>
+            ${brandHtml}
+            <div style="margin-bottom:10px; font-weight:600; color:var(--hint-color)">${info.volume}</div>
+            ${imagesHtml}
+            <div class="modal-desc">${group.desc || 'No description available.'}</div>
+            ${variantsHtml}
+        `;
+        modal.style.display = 'flex';
+    }
+
+    function closeModal(e) {
+        if (!e || e.target.id === 'detail-modal' || e.target.classList.contains('close-modal')) {
+            document.getElementById('detail-modal').style.display = 'none';
+        }
+    }
+
+    function toggleHide(id) {
+        const idx = settings.h.indexOf(id);
+        if (idx > -1) {
+            settings.h.splice(idx, 1);
+        } else {
+            settings.h.push(id);
+        }
+        render();
+    }
+
+    function editCategory(originalName) {
+        const currentName = settings.r[originalName] || originalName;
+        const newName = prompt("Rename Category:", currentName);
+        
+        if (newName !== null) {
+            if (newName === originalName) {
+                delete settings.r[originalName];
+            } else {
+                settings.r[originalName] = newName;
+            }
+            render();
+        }
+    }
+
+    async function saveAdminSettings() {
+        const saveBtn = document.querySelector('.admin-btn');
+        const origText = saveBtn.textContent;
+        saveBtn.textContent = '⏳ Saving...';
+        saveBtn.disabled = true;
+
+        try {
+            const apiBase = API_URL.replace('/api/products', '');
+            const resp = await fetch(`${apiBase}/api/save_settings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    token: adminToken,
+                    settings: settings
+                })
+            });
+            const result = await resp.json();
+            if (result.success) {
+                saveBtn.textContent = '✅ Saved!';
+                setTimeout(() => {
+                    saveBtn.textContent = origText;
+                    saveBtn.disabled = false;
+                }, 2000);
+            } else {
+                saveBtn.textContent = '❌ Error: ' + (result.message || 'Unknown');
+                setTimeout(() => {
+                    saveBtn.textContent = origText;
+                    saveBtn.disabled = false;
+                }, 3000);
+            }
+        } catch (e) {
+            console.error('Save failed:', e);
+            saveBtn.textContent = '❌ Save failed';
+            setTimeout(() => {
+                saveBtn.textContent = origText;
+                saveBtn.disabled = false;
+            }, 3000);
+        }
+    }
+</script>
+
+</body>
+</html>

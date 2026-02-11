@@ -1,0 +1,132 @@
+📂 Database File Path: /app/data/bot_database.db
+🌍 Starting Web Server on port 8080...
+Bot is running...
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 22:37:22] "GET /api/products?t=1770676641460_1421&nocache=1421 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 22:37:22] "GET /api/products?t=1770676641463_6829&nocache=6829 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 22:37:26] "GET /api/products?t=1770676646460_8396&nocache=8396 HTTP/1.1" 200 -
+No error handlers are registered, logging exception.
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_application.py", line 1264, in process_update
+    await coroutine
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_handlers/basehandler.py", line 157, in handle_update
+    return await self.callback(update, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/bot.py", line 1183, in ticketinfo_command
+    await update.message.reply_text(info_text, parse_mode='HTML', reply_markup=reply_markup)
+  File "/usr/local/lib/python3.12/site-packages/telegram/_message.py", line 1809, in reply_text
+    return await self.get_bot().send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_extbot.py", line 2820, in send_message
+    return await super().send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 542, in decorator
+    result = await func(self, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 1018, in send_message
+    return await self._send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_extbot.py", line 581, in _send_message
+    result = await super()._send_message(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 736, in _send_message
+    result = await self._post(
+             ^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 630, in _post
+    return await self._do_post(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_extbot.py", line 347, in _do_post
+    return await super()._do_post(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 658, in _do_post
+    return await request.post(
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/request/_baserequest.py", line 200, in post
+    result = await self._request_wrapper(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/request/_baserequest.py", line 379, in _request_wrapper
+    raise BadRequest(message)
+telegram.error.BadRequest: Button_user_privacy_restricted
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 22:37:31] "GET /api/products?t=1770676651482_6437&nocache=6437 HTTP/1.1" 200 -
+No error handlers are registered, logging exception.
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_application.py", line 1264, in process_update
+    await coroutine
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_handlers/basehandler.py", line 157, in handle_update
+    return await self.callback(update, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/bot.py", line 1183, in ticketinfo_command
+    await update.message.reply_text(info_text, parse_mode='HTML', reply_markup=reply_markup)
+  File "/usr/local/lib/python3.12/site-packages/telegram/_message.py", line 1809, in reply_text
+    return await self.get_bot().send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_extbot.py", line 2820, in send_message
+    return await super().send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 542, in decorator
+    result = await func(self, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 1018, in send_message
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/request/_baserequest.py", line 379, in _request_wrapper
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 736, in _send_message
+    result = await self._post(
+             ^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 630, in _post
+    return await self._do_post(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_extbot.py", line 347, in _do_post
+    return await super()._do_post(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 658, in _do_post
+    return await request.post(
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/request/_baserequest.py", line 200, in post
+    result = await self._request_wrapper(
+    return await self._send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_extbot.py", line 581, in _send_message
+    result = await super()._send_message(
+    raise BadRequest(message)
+telegram.error.BadRequest: Button_user_privacy_restricted
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 22:37:36] "GET /api/products?t=1770676656492_3304&nocache=3304 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 22:37:41] "GET /api/products?t=1770676661502_3070&nocache=3070 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 22:37:46] "GET /api/products?t=1770676666513_748&nocache=748 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 22:37:51] "GET /api/products?t=1770676671523_9249&nocache=9249 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 22:37:56] "GET /api/products?t=1770676676532_1161&nocache=1161 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 22:38:01] "GET /api/products?t=1770676681543_37&nocache=37 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 22:38:06] "GET /api/products?t=1770676686552_3074&nocache=3074 HTTP/1.1" 200 -
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_extbot.py", line 2820, in send_message
+    return await super().send_message(
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 542, in decorator
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    result = await func(self, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/telegram/_bot.py", line 1018, in send_message
+    await coroutine
+  File "/usr/local/lib/python3.12/site-packages/telegram/ext/_handlers/basehandler.py", line 157, in handle_update
+No error handlers are registered, logging exception.
+Traceback (most recent call last):

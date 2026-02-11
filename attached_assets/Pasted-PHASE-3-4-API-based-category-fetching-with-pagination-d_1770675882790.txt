@@ -1,0 +1,99 @@
+PHASE 3+4: API-based category fetching with pagination discovery
+============================================================
+  Base search response keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    variations: 110
+    tags: list[0]
+    vendors: list[0]
+    categories: list[12] keys=['id', 'name'] is_group=False is_flat=False
+    brands: list[432] keys=['id', 'name'] is_group=False is_flat=False
+    oos: False
+    showFavorites: False
+    brandPage: False
+  Extracted 12 categories from API: ['Accessories', 'BYOB', 'Carts', 'Concentrates', 'Disposables', 'Edibles', 'Flower', 'Merch', 'Munchies', 'Pre-rolls', 'Topical', 'Rewards']
+  Base search: found 24 groups, +0 new (total: 34)
+  Using 12 categories from API response
+  Testing pagination on 'Accessories' (id=4)...
+  [resp] https://chadsflooring.bz/api/products/search?query=&limit=500 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["categories[12](dict:['id', 'name'])", "brands[432](dict:['id', 'name'])"]
+    Page 1: 24 groups, variations count: 61, last_id: 14471
+  [resp] https://chadsflooring.bz/api/products/search?query=&category=4 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+  [resp] https://chadsflooring.bz/api/products/search?query=&category=4&p=3 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+    &offset=24: 24 groups, 0 NEW
+  [interceptor] +19 groups from https://chadsflooring.bz/api/products/search?query=&category=4 (total: 53)
+    &page=2: 24 groups, 0 NEW
+  [resp] https://chadsflooring.bz/api/products/search?query=&category=4&page=2 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+    &page=3: 24 groups, 0 NEW
+  [resp] https://chadsflooring.bz/api/products/search?query=&category=4&page=3 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+    &p=2: 24 groups, 0 NEW
+  [resp] https://chadsflooring.bz/api/products/search?query=&category=4&p=2 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+    &p=3: 24 groups, 0 NEW
+  [resp] https://chadsflooring.bz/api/products/search?query=&category=4&offset=24 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+    &offset=48: 24 groups, 0 NEW
+  [resp] https://chadsflooring.bz/api/products/search?query=&category=4&offset=48 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+    &skip=24: 24 groups, 0 NEW
+  [resp] https://chadsflooring.bz/api/products/search?query=&category=4&skip=24 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+    &skip=48: 24 groups, 0 NEW
+  [resp] https://chadsflooring.bz/api/products/search?query=&category=4&skip=48 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+    &cursor=24: 24 groups, 0 NEW
+  [resp] https://chadsflooring.bz/api/products/search?query=&category=4&cursor=24 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+    &start=24: 24 groups, 0 NEW
+  [resp] https://chadsflooring.bz/api/products/search?query=&category=4&start=24 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+    &from=24: 24 groups, 0 NEW
+  [resp] https://chadsflooring.bz/api/products/search?query=&category=4&from=24 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+    &after=14471: 24 groups, 0 NEW
+  [resp] https://chadsflooring.bz/api/products/search?query=&category=4&after=14471 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+    &lastId=14471: 24 groups, 0 NEW
+  [resp] https://chadsflooring.bz/api/products/search?query=&category=4&lastId=14471 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+    &next=14471: 24 groups, 0 NEW
+  Trying limit-based approach (API reports 61 variations but returned 24 groups)...
+  [resp] https://chadsflooring.bz/api/products/search?query=&category=4&next=14471 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+    limit=50: 24 groups (variations=61)
+  [resp] https://chadsflooring.bz/api/products/search?query=&limit=50&category=4 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+    limit=100: 24 groups (variations=61)
+  [resp] https://chadsflooring.bz/api/products/search?query=&limit=100&category=4 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+    limit=200: 24 groups (variations=61)
+  [resp] https://chadsflooring.bz/api/products/search?query=&limit=200&category=4 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+    limit=500: 24 groups (variations=61)
+  [resp] https://chadsflooring.bz/api/products/search?query=&limit=500&category=4 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+    limit=1000: 24 groups (variations=61)
+  [resp] https://chadsflooring.bz/api/products/search?query=&limit=1000&category=4 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+    limit=9999: 24 groups (variations=61)
+  Trying Next.js data endpoint for categories...
+  [resp] https://chadsflooring.bz/api/products/search?query=&limit=9999&category=4 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+    Next.js [Accessories] pageProps keys: ['flags', 'homepageData', 'session', 'shop']
+    Next.js [Accessories]: 10 groups, +0 new
+    Next.js [BYOB] pageProps keys: ['flags', 'homepageData', 'session', 'shop']
+    Next.js [BYOB]: 10 groups, +0 new
+  No pagination discovered. Fetching each category via API and Next.js data...
+  [resp] https://chadsflooring.bz/api/products/search?query=&limit=9999&category=4 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[46](dict:['id', 'name'])"]
+    Accessories: no new groups
+  [resp] https://chadsflooring.bz/api/products/search?query=&limit=9999&category=11 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[1](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[2](dict:['id', 'name'])"]
+    BYOB: +7 new groups
+  [resp] https://chadsflooring.bz/api/products/search?query=&limit=9999&category=1 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[6](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[86](dict:['id', 'name'])"]
+    Carts: +22 new groups
+  [resp] https://chadsflooring.bz/api/products/search?query=&limit=9999&category=3 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[5](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[86](dict:['id', 'name'])"]
+    Concentrates: +20 new groups
+  [resp] https://chadsflooring.bz/api/products/search?query=&limit=9999&category=6 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[6](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[133](dict:['id', 'name'])"]
+    Disposables: +15 new groups
+  [resp] https://chadsflooring.bz/api/products/search?query=&limit=9999&category=7 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[5](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[93](dict:['id', 'name'])"]
+    Edibles: +24 new groups
+  [resp] https://chadsflooring.bz/api/products/search?query=&limit=9999&category=8 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["categories[12](dict:['id', 'name'])", "brands[4](dict:['id', 'name'])"]
+    Merch: no new groups
+  [resp] https://chadsflooring.bz/api/products/search?query=&limit=9999&category=2 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[4](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[117](dict:['id', 'name'])"]
+    Flower: +23 new groups
+    Munchies: no new groups
+  [resp] https://chadsflooring.bz/api/products/search?query=&limit=9999&category=9 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[4](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[117](dict:['id', 'name'])"]
+    Pre-rolls: +23 new groups
+  [resp] https://chadsflooring.bz/api/products/search?query=&limit=9999&category=13 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[2](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[34](dict:['id', 'name'])"]
+  [resp] https://chadsflooring.bz/api/products/search?query=&limit=9999&category=10 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[2](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[8](dict:['id', 'name'])"]
+    Topical: +4 new groups
+  [resp] https://chadsflooring.bz/api/products/search?query=&limit=9999&category=-1 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["tags[3](dict:['id', 'title', 'Tag'])", "categories[12](dict:['id', 'name'])", "brands[138](dict:['id', 'name'])"]
+    Rewards: +11 new groups
+  After Phase 4 API fetching: 202 total groups
+============================================================
+FINAL: 202 product groups, 834 variants
+============================================================
+  Unknown: 192 groups
+  None: 10 groups
+  Using 202 intercepted groups as product data
+Returning 202 product groups with 834 variants.
+⚠️ Scrape returned 202 groups (834 variants) but cache has 1740 groups (14072 variants). Keeping existing cache.

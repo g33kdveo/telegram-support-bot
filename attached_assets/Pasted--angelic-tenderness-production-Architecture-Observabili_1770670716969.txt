@@ -1,0 +1,229 @@
+
+
+angelic-tenderness
+
+production
+Architecture
+Observability
+Logs
+Settings
+
+13 days or $3.99 left
+
+
+
+
+
+
+
+
+
+
+worker
+Deployments
+Backups
+Variables
+Metrics
+Settings
+worker-production-ed30.up.railway.app
+3.13.11python@3.13.11
+us-east4-eqdc4a
+1 Replica
+
+
+
+
+History
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+worker
+/
+0d9b48bb
+Active
+
+Feb 9, 2026, 3:53 PM EST
+worker-production-ed30.up.railway.app
+Details
+Build Logs
+Deploy Logs
+HTTP Logs
+Network Flow Logs
+Filter and search logs
+
+    Not JSON response
+  Testing API pattern: https://chadsflooring.bz/api/products?category=4&page=1&limit=100
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+📋 explore.json pageProps structure: {}
+    Not JSON response
+  No working API pattern found. Trying _next/data category endpoints...
+  Trying: Accessories -> /category/4.json
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+📋 explore.json pageProps structure: {}
+    Not JSON
+  Trying: Accessories -> /explore.json?category=4
+📋 explore.json pageProps structure: {'flags': "dict[['rewards']]", 'homepageData': "dict[['topProducts', 'topCarts', 'newProducts', 'logoUrl', 'domain']]", 'session': "dict[['user', 'expires', 'sub', 'iat', 'exp']]", 'shop': "dict[['categories']]"}
+    pageProps keys: ['flags', 'homepageData', 'session', 'shop']
+    Found 118 products (total: 70)
+  Trying: BYOB -> /category/11.json
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/api/cart
+📋 explore.json pageProps structure: {}
+    Not JSON
+  Trying: BYOB -> /explore.json?category=11
+📋 explore.json pageProps structure: {'flags': "dict[['rewards']]", 'homepageData': "dict[['topProducts', 'topCarts', 'newProducts', 'logoUrl', 'domain']]", 'session': "dict[['user', 'expires', 'sub', 'iat', 'exp']]", 'shop': "dict[['categories']]"}
+[4:34:0209/205627.051212:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+    Found 118 products (total: 70)
+  Trying: Carts -> /category/1.json
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+  Trying: Carts -> /explore.json?category=1
+📋 explore.json pageProps structure: {'flags': "dict[['rewards']]", 'homepageData': "dict[['topProducts', 'topCarts', 'newProducts', 'logoUrl', 'domain']]", 'session': "dict[['user', 'expires', 'sub', 'iat', 'exp']]", 'shop': "dict[['categories']]"}
+    pageProps keys: ['flags', 'homepageData', 'session', 'shop']
+    Found 118 products (total: 70)
+  Trying: Concentrates -> /category/3.json
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+📋 explore.json pageProps structure: {}
+    Not JSON
+  Trying: Concentrates -> /explore.json?category=3
+📋 explore.json pageProps structure: {'flags': "dict[['rewards']]", 'homepageData': "dict[['topProducts', 'topCarts', 'newProducts', 'logoUrl', 'domain']]", 'session': "dict[['user', 'expires', 'sub', 'iat', 'exp']]", 'shop': "dict[['categories']]"}
+    pageProps keys: ['flags', 'homepageData', 'session', 'shop']
+    Found 118 products (total: 70)
+  Trying: Disposables -> /category/6.json
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+    Not JSON
+  Trying: Disposables -> /explore.json?category=6
+📋 explore.json pageProps structure: {'flags': "dict[['rewards']]", 'homepageData': "dict[['topProducts', 'topCarts', 'newProducts', 'logoUrl', 'domain']]", 'session': "dict[['user', 'expires', 'sub', 'iat', 'exp']]", 'shop': "dict[['categories']]"}
+    pageProps keys: ['flags', 'homepageData', 'session', 'shop']
+  Trying: Edibles -> /category/7.json
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/api/cart
+📋 explore.json pageProps structure: {}
+📋 explore.json pageProps structure: {'flags': "dict[['rewards']]", 'homepageData': "dict[['topProducts', 'topCarts', 'newProducts', 'logoUrl', 'domain']]", 'session': "dict[['user', 'expires', 'sub', 'iat', 'exp']]", 'shop': "dict[['categories']]"}
+    Not JSON
+  Trying: Edibles -> /explore.json?category=7
+    pageProps keys: ['flags', 'homepageData', 'session', 'shop']
+    Found 118 products (total: 70)
+  Trying: Flower -> /category/2.json
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+    Not JSON
+  Trying: Flower -> /explore.json?category=2
+📋 explore.json pageProps structure: {'flags': "dict[['rewards']]", 'homepageData': "dict[['topProducts', 'topCarts', 'newProducts', 'logoUrl', 'domain']]", 'session': "dict[['user', 'expires', 'sub', 'iat', 'exp']]", 'shop': "dict[['categories']]"}
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+📋 explore.json pageProps structure: {}
+    pageProps keys: ['flags', 'homepageData', 'session', 'shop']
+    Found 118 products (total: 70)
+  Trying: Merch -> /category/8.json
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+    Not JSON
+  Trying: Merch -> /explore.json?category=8
+📋 explore.json pageProps structure: {'flags': "dict[['rewards']]", 'homepageData': "dict[['topProducts', 'topCarts', 'newProducts', 'logoUrl', 'domain']]", 'session': "dict[['user', 'expires', 'sub', 'iat', 'exp']]", 'shop': "dict[['categories']]"}
+    pageProps keys: ['flags', 'homepageData', 'session', 'shop']
+    Found 118 products (total: 70)
+  Trying: Munchies -> /category/13.json
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+    Not JSON
+  Trying: Munchies -> /explore.json?category=13
+📋 explore.json pageProps structure: {'flags': "dict[['rewards']]", 'homepageData': "dict[['topProducts', 'topCarts', 'newProducts', 'logoUrl', 'domain']]", 'session': "dict[['user', 'expires', 'sub', 'iat', 'exp']]", 'shop': "dict[['categories']]"}
+    pageProps keys: ['flags', 'homepageData', 'session', 'shop']
+    Found 118 products (total: 70)
+  Trying: Pre-rolls -> /category/9.json
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/api/cart
+📋 explore.json pageProps structure: {}
+    Not JSON
+  Trying: Pre-rolls -> /explore.json?category=9
+📋 explore.json pageProps structure: {'flags': "dict[['rewards']]", 'homepageData': "dict[['topProducts', 'topCarts', 'newProducts', 'newFlavors', 'logoUrl']]", 'session': "dict[['user', 'expires', 'sub', 'iat', 'exp']]", 'shop': "dict[['categories']]"}
+    pageProps keys: ['flags', 'homepageData', 'session', 'shop']
+    Found 118 products (total: 70)
+  Trying: Topical -> /category/10.json
+Captured API response from: https://chadsflooring.bz/api/auth/session
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/api/cart
+    Not JSON
+  Trying: Topical -> /explore.json?category=10
+📋 explore.json pageProps structure: {'flags': "dict[['rewards']]", 'homepageData': "dict[['topProducts', 'topCarts', 'newProducts', 'logoUrl', 'domain']]", 'session': "dict[['user', 'expires', 'sub', 'iat', 'exp']]", 'shop': "dict[['categories']]"}
+Converted to 70 product groups.
+⚠️ Scrape returned 70 products but cache has 1740. Keeping existing cache to prevent data loss.
+    pageProps keys: ['flags', 'homepageData', 'session', 'shop']
+    Found 118 products (total: 70)
+  SUCCESS via _next/data categories: 70 flat products
+Converting 70 flat products to grouped format...
+
+
+worker
