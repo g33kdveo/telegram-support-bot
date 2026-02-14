@@ -244,9 +244,27 @@ def load_config():
     if row:
         loaded_conf = json.loads(row[0])
         global_config.update(loaded_conf)
+        
+        # Sync Texts
         for k, v in DEFAULT_CONFIG["texts"].items():
             if k not in global_config["texts"]:
                 global_config["texts"][k] = v
+
+        # Sync Menu Structure (Add new items from code to DB config)
+        def sync_menu(default_items, target_items):
+            target_ids = {x['id'] for x in target_items}
+            for item in default_items:
+                if item['id'] not in target_ids:
+                    target_items.append(item)
+                elif item.get('items'):
+                    # Recurse for sub-menus
+                    target_item = next((x for x in target_items if x['id'] == item['id']), None)
+                    if target_item:
+                        if 'items' not in target_item: target_item['items'] = []
+                        sync_menu(item['items'], target_item['items'])
+
+        if "menu" in global_config:
+            sync_menu(DEFAULT_CONFIG["menu"], global_config["menu"])
     else:
         save_config()
 
