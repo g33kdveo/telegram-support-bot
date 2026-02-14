@@ -48,6 +48,7 @@ WEBAPP_URL = os.getenv("WEBAPP_URL")
 CHADS_USERNAME = os.getenv("CHADS_USERNAME")
 CHADS_PASSWORD = os.getenv("CHADS_PASSWORD")
 CHADS_COOKIE = os.getenv("CHADS_COOKIE")
+CHADS_API_KEY = "10158.9.0d7ce251-dea2-5c52-af9d-437fddfcaf14"
 
 # Auto-configure WEBAPP_URL for Railway if not set manually
 if not WEBAPP_URL and os.getenv("RAILWAY_PUBLIC_DOMAIN"):
@@ -2036,7 +2037,7 @@ async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
     
     try:
         def run_scrape():
-            scraper = ChadsFlooringScraper(username=CHADS_USERNAME, password=CHADS_PASSWORD)
+            scraper = ChadsFlooringScraper(username=CHADS_USERNAME, password=CHADS_PASSWORD, api_key=CHADS_API_KEY)
             return scraper.get_products()
 
         loop = asyncio.get_running_loop()
@@ -2400,7 +2401,7 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
 
                 try:
                     print("📂 No cached data - running initial scrape...")
-                    scraper = ChadsFlooringScraper(username=CHADS_USERNAME, password=CHADS_PASSWORD)
+                    scraper = ChadsFlooringScraper(username=CHADS_USERNAME, password=CHADS_PASSWORD, api_key=CHADS_API_KEY)
                     fresh_result = scraper.get_products()
                 finally:
                     if http_started_scrape:

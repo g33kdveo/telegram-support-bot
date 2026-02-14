@@ -32,9 +32,10 @@ CATEGORIES = [
 
 class ChadsFlooringScraper:
 
-    def __init__(self, username=None, password=None, cookie_string=None):
+    def __init__(self, username=None, password=None, cookie_string=None, api_key=None):
         self.username = username
         self.password = password
+        self.api_key = api_key
         self.base_url = "https://chadsflooring.bz"
 
     def _find_chromium(self):
@@ -218,14 +219,21 @@ class ChadsFlooringScraper:
 
         for attempt in range(3):
             try:
-                json_text = await page.evaluate('''(url) => {
-                    return fetch(url, {credentials: 'include'})
+                json_text = await page.evaluate('''(url, apiKey) => {
+                    const headers = {};
+                    if (apiKey) {
+                        headers['X-Api-Key'] = apiKey;
+                    }
+                    return fetch(url, {
+                        credentials: 'include',
+                        headers: headers
+                    })
                         .then(r => {
                             if (!r.ok) return JSON.stringify({_error: 'HTTP ' + r.status});
                             return r.text();
                         })
                         .catch(e => JSON.stringify({_error: e.message}));
-                }''', url)
+                }''', url, self.api_key)
 
                 if not json_text:
                     print(f"  Attempt {attempt+1}: Empty response")
