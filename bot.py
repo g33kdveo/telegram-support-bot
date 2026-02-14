@@ -100,6 +100,7 @@ DEFAULT_CONFIG = {
             "message": "✅ You selected: 🛒 Create Order\n\n👇 Next, please choose from the options below:",
             "items": [
                 {"id": "order_singles", "name": "📦 Singles (1-5 pieces)", "type": "service", "status": True, "visible": True, "response_message": "✅ You have chosen {service_name}\nYour ticket has been created! 🎉\n\nPlease have your order ready!\n🎫 Ticket {ticket_id} has been sent to our staff.\n⏳ They will be with you shortly! 🚀"},
+                {"id": "order_value", "name": "🔽🛬Value Shipping ($75 Minimum)", "type": "service", "status": True, "visible": True, "response_message": "✅ You have chosen {service_name}\nYour ticket has been created! 🎉\n\nPlease have your order ready!\n🎫 Ticket {ticket_id} has been sent to our staff.\n⏳ They will be with you shortly! 🚀"},
                 {"id": "order_bulk", "name": "🚛 Bulk (10+ pieces SHIPPED)", "type": "service", "status": True, "visible": True, "response_message": "✅ You have chosen {service_name}\nYour ticket has been created! 🎉\n\nPlease have your order ready!\n🎫 Ticket {ticket_id} has been sent to our staff.\n⏳ They will be with you shortly! 🚀"}
             ]
         },
@@ -1266,7 +1267,7 @@ async def ticket_status_command(update: Update, context: ContextTypes.DEFAULT_TY
         return
     elif status_key == "delivered":
         # Bulk Only Check
-        if "bulk" not in ticket['section'].lower():
+        if "bulk" not in ticket['section'].lower() and "value" not in ticket['section'].lower():
             await update.message.reply_text("⚠️ Warning: This ticket does not seem to be Bulk. Proceeding anyway.")
         
         # Award Point if Referral
@@ -1316,7 +1317,7 @@ async def ticket_status_command(update: Update, context: ContextTypes.DEFAULT_TY
         return
     elif status_key == "shipdetails":
         # Bulk Only Check
-        if "bulk" not in ticket['section'].lower():
+        if "bulk" not in ticket['section'].lower() and "value" not in ticket['section'].lower():
             await update.message.reply_text("⚠️ Warning: This ticket does not seem to be Bulk. Proceeding anyway.")
         
         # Send options to user
