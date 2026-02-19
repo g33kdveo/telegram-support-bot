@@ -551,6 +551,8 @@ def get_webapp_url(user_id, admin_mode=False):
 
 # ===== COMMANDS =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if db_is_user_banned(update.effective_user.id):
+        return
     config = global_config
     keyboard = []
     
@@ -577,6 +579,11 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     # Don't answer yet, might be handled elsewhere if we didn't filter correctly, 
     # but here we assume it's a menu click.
     user = update.effective_user
+    
+    if db_is_user_banned(user.id):
+        await query.answer("⛔ You are blocked.", show_alert=True)
+        return
+
     choice = query.data
     
     # Try to find the item in the menu
@@ -722,6 +729,8 @@ async def create_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     
 async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    if db_is_user_banned(user.id):
+        return
     try:
         data = json.loads(update.effective_message.web_app_data.data)
     except json.JSONDecodeError:
@@ -862,6 +871,8 @@ async def handle_ticket_creation_step(update: Update, context: ContextTypes.DEFA
 # ===== MY REFERRALS COMMAND =====
 async def myreferrals_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    if db_is_user_banned(user.id):
+        return
     
     # Admin Mode: /myreferrals <userid> addpoint/removepoint <amount>
     if user.id in ADMIN_IDS and context.args:
@@ -912,6 +923,8 @@ async def myreferrals_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 # ===== MY TICKETS COMMAND =====
 async def mytickets_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    if db_is_user_banned(user.id):
+        return
     tickets = db_get_active_tickets(user.id)
     
     if not tickets:
@@ -957,7 +970,13 @@ async def block_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         uid = int(context.args[0])
         db_set_user_banned(uid, True)
-        await update.message.reply_text(f"⛔ User {uid} has been blocked.")
+        
+        # Close active tickets for this user
+        active_tickets = db_get_active_tickets(uid)
+        for t in active_tickets:
+            db_close_ticket(t['id'])
+            
+        await update.message.reply_text(f"⛔ User {uid} has been blocked and active tickets closed.")
     except ValueError:
         await update.message.reply_text("Invalid ID.")
 
@@ -1120,6 +1139,8 @@ async def stop_reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def close_ticket_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    if db_is_user_banned(user.id):
+        return
     
     # Check if Admin
     if user.id in ADMIN_IDS:
@@ -1360,6 +1381,8 @@ async def ticket_status_command(update: Update, context: ContextTypes.DEFAULT_TY
 
 # ===== REVIEW SYSTEM =====
 async def review_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if db_is_user_banned(update.effective_user.id):
+        return
     # Start review flow
     keyboard = [
         [InlineKeyboardButton("1 ⭐", callback_data="rev_star_1"), InlineKeyboardButton("2 ⭐", callback_data="rev_star_2"), InlineKeyboardButton("3 ⭐", callback_data="rev_star_3"), InlineKeyboardButton("4 ⭐", callback_data="rev_star_4"), InlineKeyboardButton("5 ⭐", callback_data="rev_star_5")],
@@ -1555,6 +1578,8 @@ async def handle_shipping_step(update: Update, context: ContextTypes.DEFAULT_TYP
 
 # ===== REFERRAL SYSTEM =====
 async def refer_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if db_is_user_banned(update.effective_user.id):
+        return
     msg = (
         "- GEEKDHOUSE REFERRALS -\n\n"
         "Generate a referral code unique to you that you can share with your friends.\n\n"
@@ -2014,6 +2039,8 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ===== MENU COMMAND =====
 async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    if db_is_user_banned(user.id):
+        return
     url = get_webapp_url(user.id)
     
     if not url:
