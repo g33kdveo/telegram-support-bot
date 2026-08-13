@@ -5,6 +5,7 @@ __pycache__/
 dist/
 build/
 .env
+.venv/
 bot_data.json
 bot_data.json.bak
 scraped_products.json
