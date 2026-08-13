@@ -23,6 +23,7 @@ def get_stored_cookies():
 IMAGE_PATH_PREFIX = "/uploads/products/"
 IMAGE_SIZE = 450
 IMAGE_SIZE_VARIANTS = [950, 750, 450, 400, 375, 325, 300, 250, 225, 178, 80]
+IMAGE_MIN_SIZE = 300  # Minimum acceptable image size to prevent tiny fallbacks
 
 CATEGORIES = [
     "Accessories", "BYOB", "Carts", "Concentrates",
@@ -274,15 +275,16 @@ class RogersRoofingScraper:
             return self.base_url + img_prefix + resolved
     
     def _get_image_url_variants(self, img_val, img_prefix):
-        """Generate a list of image URL variants from largest to smallest"""
+        """Generate a list of image URL variants from largest to smallest, respecting minimum size."""
         if not isinstance(img_val, str) or not img_val:
             return []
         
         variants = []
         for size in IMAGE_SIZE_VARIANTS:
-            url = self._resolve_image_url(img_val, img_prefix, size)
-            if url:
-                variants.append(url)
+            if size >= IMAGE_MIN_SIZE:  # Only include sizes >= minimum
+                url = self._resolve_image_url(img_val, img_prefix, size)
+                if url:
+                    variants.append(url)
         return variants
 
     async def _download_images(self, page, groups, img_prefix):
@@ -548,6 +550,25 @@ class RogersRoofingScraper:
             for b, count in sorted(brands_summary.items(), key=lambda x: -x[1])[:15]:
                 print(f"    {b}: {count}")
             print(f"{'='*60}")
+
+            # Normalize group images: convert hardcoded sizes (x250, x300, etc.) to x_imgvariantsize template
+            # so they get the same highest-quality variant treatment as product images
+            print(f"\n--- NORMALIZING GROUP IMAGES ---")
+            normalized_count = 0
+            for g in all_groups:
+                imgs = g.get('imgs')
+                if isinstance(imgs, dict):
+                    for ikey, ival in list(imgs.items()):
+                        if isinstance(ival, str):
+                            # Check if image has hardcoded size like x250, x300, etc.
+                            import re
+                            size_match = re.search(r'x(\d+)-', ival)
+                            if size_match:
+                                # Replace hardcoded size with template
+                                normalized = re.sub(r'x(\d+)-', 'x_imgvariantsize-', ival)
+                                imgs[ikey] = normalized
+                                normalized_count += 1
+            print(f"  Normalized {normalized_count} group images to use variant template")
 
             await self._download_images(page, all_groups, img_prefix)
 
