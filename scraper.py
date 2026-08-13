@@ -260,97 +260,136 @@ class RogersRoofingScraper:
 
         return None
 
-    def _resolve_image_url(self, img_val, img_prefix):
+    def _resolve_image_url(self, img_val, img_prefix, size=None):
+        """Resolve a single image URL, optionally with a specific size"""
         if not isinstance(img_val, str) or not img_val:
             return None
-        resolved = img_val.replace('x_imgvariantsize', f'x{IMAGE_SIZE}')
+        size_val = size if size is not None else IMAGE_SIZE
+        resolved = img_val.replace('x_imgvariantsize', f'x{size_val}')
         if resolved.startswith('http://') or resolved.startswith('https://'):
             return resolved
         elif resolved.startswith('/uploads/') or resolved.startswith('uploads/'):
             return self.base_url + '/' + resolved.lstrip('/')
         else:
             return self.base_url + img_prefix + resolved
+    
+    def _get_image_url_variants(self, img_val, img_prefix):
+        """Generate a list of image URL variants from largest to smallest"""
+        if not isinstance(img_val, str) or not img_val:
+            return []
+        
+        variants = []
+        for size in IMAGE_SIZE_VARIANTS:
+            url = self._resolve_image_url(img_val, img_prefix, size)
+            if url:
+                variants.append(url)
+        return variants
 
     async def _download_images(self, page, groups, img_prefix):
         img_cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cached_images")
         os.makedirs(img_cache_dir, exist_ok=True)
+        
+        # Clear cached images to ensure we get fresh, highest-quality versions
+        print(f"\n--- CLEARING IMAGE CACHE ---")
+        cleared_count = 0
+        if os.path.exists(img_cache_dir):
+            for f in os.listdir(img_cache_dir):
+                try:
+                    os.remove(os.path.join(img_cache_dir, f))
+                    cleared_count += 1
+                except Exception as e:
+                    pass
+        print(f"  Cleared {cleared_count} old cached images")
+        
         print(f"\n--- DOWNLOADING IMAGES ---")
 
-        url_map = {}
+        # Build URL variant mapping (template -> list of variants from largest to smallest)
+        url_variants_map = {}
+        
         for g in groups:
             imgs = g.get('imgs')
             if isinstance(imgs, dict):
                 for ikey, ival in imgs.items():
-                    if isinstance(ival, str) and ival:
-                        img_url = self._resolve_image_url(ival, img_prefix)
-                        if img_url:
-                            url_hash = hashlib.md5(img_url.encode()).hexdigest()[:16]
-                            ext = 'webp'
-                            if '.' in ival:
-                                raw_ext = ival.rsplit('.', 1)[-1].lower()
-                                if raw_ext in ('webp', 'png', 'jpg', 'jpeg', 'gif'):
-                                    ext = raw_ext
-                            cache_fname = f"{url_hash}.{ext}"
-                            url_map[ival] = (img_url, cache_fname)
+                    if isinstance(ival, str) and ival and ival not in url_variants_map:
+                        variants = self._get_image_url_variants(ival, img_prefix)
+                        if variants:
+                            url_variants_map[ival] = variants
 
             for p in g.get('products', []):
                 if not isinstance(p, dict):
                     continue
                 for img_val in p.get('images', []):
-                    if isinstance(img_val, str) and img_val and img_val not in url_map:
-                        img_url = self._resolve_image_url(img_val, img_prefix)
-                        if img_url:
-                            url_hash = hashlib.md5(img_url.encode()).hexdigest()[:16]
-                            ext = 'webp'
-                            if '.' in img_val:
-                                raw_ext = img_val.rsplit('.', 1)[-1].lower()
-                                if raw_ext in ('webp', 'png', 'jpg', 'jpeg', 'gif'):
-                                    ext = raw_ext
-                            cache_fname = f"{url_hash}.{ext}"
-                            url_map[img_val] = (img_url, cache_fname)
+                    if isinstance(img_val, str) and img_val and img_val not in url_variants_map:
+                        variants = self._get_image_url_variants(img_val, img_prefix)
+                        if variants:
+                            url_variants_map[img_val] = variants
 
-        already_cached = set(os.listdir(img_cache_dir))
-        to_download = {}
-        for ival, (img_url, cache_fname) in url_map.items():
-            if cache_fname not in already_cached:
-                to_download[cache_fname] = img_url
-        print(f"  Unique images: {len(url_map)}, already cached: {len(url_map) - len(to_download)}, to download: {len(to_download)}")
+        # Build cache mapping using template key
+        url_map = {}
+        for img_template, variants in url_variants_map.items():
+            if variants:
+                ext = 'webp'
+                if '.' in img_template:
+                    raw_ext = img_template.rsplit('.', 1)[-1].lower()
+                    if raw_ext in ('webp', 'png', 'jpg', 'jpeg', 'gif'):
+                        ext = raw_ext
+                # Use template as cache key so all sizes of same image use same cache file
+                url_hash = hashlib.md5(img_template.encode()).hexdigest()[:16]
+                cache_fname = f"{url_hash}.{ext}"
+                url_map[img_template] = (variants, cache_fname, ext)
 
-        if to_download and page:
+        print(f"  Unique images: {len(url_map)}")
+
+        if url_map and page:
             batch_size = 50
-            items = list(to_download.items())
+            items = list(url_map.items())
             downloaded = 0
             failed = 0
             total = len(items)
             start_time = time.time()
+            
             for i in range(0, total, batch_size):
                 batch = items[i:i + batch_size]
-                urls_for_js = [url for _, url in batch]
+                # Prepare variants list for JS (map of template -> variants list)
+                variants_for_js = {template: variants for template, (variants, _, _) in batch}
+                
                 results = {}
                 for attempt in range(2):
                     try:
-                        results = await page.evaluate('''async (urls) => {
+                        results = await page.evaluate('''async (variantsMap) => {
                             const out = {};
                             const CONCURRENCY = 10;
-                            for (let i = 0; i < urls.length; i += CONCURRENCY) {
-                                const chunk = urls.slice(i, i + CONCURRENCY);
-                                await Promise.allSettled(chunk.map(async (url) => {
-                                    try {
-                                        const r = await fetch(url, {credentials: 'include'});
-                                        if (!r.ok) { out[url] = {status: r.status}; return; }
-                                        const blob = await r.blob();
-                                        const reader = new FileReader();
-                                        const b64 = await new Promise((resolve, reject) => {
-                                            reader.onload = () => resolve(reader.result);
-                                            reader.onerror = reject;
-                                            reader.readAsDataURL(blob);
-                                        });
-                                        out[url] = {data: b64};
-                                    } catch(e) { out[url] = {error: e.message}; }
+                            const templates = Object.keys(variantsMap);
+                            
+                            for (let ti = 0; ti < templates.length; ti += CONCURRENCY) {
+                                const templateChunk = templates.slice(ti, ti + CONCURRENCY);
+                                await Promise.allSettled(templateChunk.map(async (template) => {
+                                    const variants = variantsMap[template];
+                                    // Try each variant from largest to smallest
+                                    for (const url of variants) {
+                                        try {
+                                            const r = await fetch(url, {credentials: 'include'});
+                                            if (r.ok) {
+                                                const blob = await r.blob();
+                                                const reader = new FileReader();
+                                                const b64 = await new Promise((resolve, reject) => {
+                                                    reader.onload = () => resolve(reader.result);
+                                                    reader.onerror = reject;
+                                                    reader.readAsDataURL(blob);
+                                                });
+                                                out[template] = {data: b64, url: url};
+                                                return; // Success, stop trying variants
+                                            }
+                                        } catch(e) {
+                                            // Try next variant
+                                        }
+                                    }
+                                    // All variants failed
+                                    out[template] = {error: 'All variants failed'};
                                 }));
                             }
                             return out;
-                        }''', urls_for_js)
+                        }''', variants_for_js)
                         break
                     except Exception as batch_err:
                         if attempt == 0:
@@ -360,8 +399,8 @@ class RogersRoofingScraper:
                             print(f"  Batch failed: {batch_err}")
                             results = {}
 
-                for cache_fname, url in batch:
-                    result = results.get(url, {})
+                for img_template, (variants, cache_fname, ext) in batch:
+                    result = results.get(img_template, {})
                     b64_data = result.get('data') if isinstance(result, dict) else None
                     if b64_data and ',' in b64_data:
                         raw_bytes = base64.b64decode(b64_data.split(',', 1)[1])
@@ -369,25 +408,36 @@ class RogersRoofingScraper:
                             with open(os.path.join(img_cache_dir, cache_fname), 'wb') as imgf:
                                 imgf.write(raw_bytes)
                             downloaded += 1
-                            already_cached.add(cache_fname)
+                            used_url = result.get('url', 'unknown')
+                            # Extract size from URL if possible and log to console
+                            size_match = used_url.split('x')
+                            size_str = size_match[1].split('/')[0] if len(size_match) > 1 else '?'
+                            if size_str != '?':
+                                print(f"    ✓ {cache_fname[:8]}... (x{size_str})")
                         else:
                             failed += 1
                     else:
                         failed += 1
+                
                 processed = min(i + batch_size, total)
                 elapsed = time.time() - start_time
                 rate = processed / elapsed if elapsed > 0 else 0
                 remaining = (total - processed) / rate if rate > 0 else 0
                 print(f"  Progress: {processed}/{total} ({downloaded} ok, {failed} fail) ~{remaining:.0f}s remaining")
                 await asyncio.sleep(0.05)
+            
             print(f"  Downloaded: {downloaded}, Failed: {failed}, Time: {time.time() - start_time:.1f}s")
         else:
-            print("  No new images to download")
+            print("  No images to download")
 
-        cached_count = len(already_cached)
+        cached_count = len(os.listdir(img_cache_dir)) if os.path.exists(img_cache_dir) else 0
         print(f"  Total cached images on disk: {cached_count}")
 
-        return url_map
+        # Return url_map with primary URL for UI (will use highest available from cache)
+        result_map = {}
+        for img_template, (variants, cache_fname, ext) in url_map.items():
+            result_map[img_template] = (variants[0], cache_fname)  # Use largest variant as reference
+        return result_map
 
     async def _scrape_async(self):
         print("=" * 60)
