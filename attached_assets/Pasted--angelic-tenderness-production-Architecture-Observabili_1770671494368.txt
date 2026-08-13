@@ -1,0 +1,226 @@
+
+
+angelic-tenderness
+
+production
+Architecture
+Observability
+Logs
+Settings
+
+13 days or $3.99 left
+
+
+
+
+
+
+
+
+
+
+worker
+Deployments
+Backups
+Variables
+Metrics
+Settings
+worker-production-ed30.up.railway.app
+3.13.11python@3.13.11
+us-east4-eqdc4a
+1 Replica
+
+
+
+
+History
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+worker
+/
+fc39f441
+Active
+
+Feb 9, 2026, 4:08 PM EST
+worker-production-ed30.up.railway.app
+Details
+Build Logs
+Deploy Logs
+HTTP Logs
+Network Flow Logs
+Filter and search logs
+
+🏷️ shop: 12 categories
+   categories[0] keys: ['id', 'name']
+Login navigation completed.
+   category names: ['Accessories', 'BYOB', 'Carts', 'Concentrates', 'Disposables']...
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18993.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18429.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18689.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18233.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/19983.json?slu
+Current URL after login: https://chadsflooring.bz/explore
+Login appears successful (redirected away from login page).
+Trying direct API endpoints for product data...
+  Trying: https://chadsflooring.bz/api/products
+✅ Serving products from cache
+Extracting __NEXT_DATA__ for build ID...
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.3 - - [09/Feb/2026 21:10:20] "GET /api/products?t=1770671419623_7107&nocache=7107 HTTP/1.1" 200 -
+  Post-login pageProps keys: ['captcha', 'captcha1', 'captcha2', 'showCaptcha']
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/api/cart
+📋 explore.json pageProps structure: {}
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.3 - - [09/Feb/2026 21:10:22] "GET /api/products?t=1770671421310_2785&nocache=2785 HTTP/1.1" 200 -
+  Not a JSON response
+  Trying: https://chadsflooring.bz/products
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/api/cart
+📋 explore.json pageProps structure: {}
+  Not a JSON response
+  Trying: https://chadsflooring.bz/api/catalog
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/cart
+[4:33:0209/211027.640955:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+  Not a JSON response
+  Trying: https://chadsflooring.bz/api/shop
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+📋 explore.json pageProps structure: {}
+  Not a JSON response
+  Trying: https://chadsflooring.bz/explore/api
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+📋 explore.json pageProps structure: {}
+  Not a JSON response
+  Trying: https://chadsflooring.bz/api/explore
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+  Not a JSON response
+Direct API endpoints didn't work. Trying Next.js data endpoints...
+  Trying Next.js data: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json (timeout: 30.0s)
+📋 explore.json pageProps structure: {'flags': "dict[['rewards']]", 'homepageData': "dict[['topProducts', 'topCarts', 'newProducts', 'logoUrl', 'domain']]", 'session': "dict[['user', 'expires', 'sub', 'iat', 'exp']]", 'shop': "dict[['categories']]"}
+  Got JSON but no grouped products (pageProps keys: ['flags', 'homepageData', 'session', 'shop'])
+  Trying Next.js data: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/products.json (timeout: 30.0s)
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+  Not a JSON response
+  Trying Next.js data: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/shop.json (timeout: 30.0s)
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+  Not a JSON response
+Checking homepageData for product data...
+  topProducts: 10 items
+    topProducts[0] keys: ['id', 'stock', 'thresholds', 'name', 'shopId', 'price', 'buyingOptionId', 'shop', 'BuyingOption', 'ProductTag', 'rating', 'reviewCount', 'bFormulation', 'bVolume', 'brand']
+  newProducts: 10 items
+    newProducts[0] keys: ['id', 'stock', 'thresholds', 'name', 'shopId', 'price', 'buyingOptionId', 'shop', 'BuyingOption', 'ProductTag', 'rating', 'reviewCount', 'bFormulation', 'bVolume', 'brand']
+  topCarts: 5 items
+    topCarts[0] keys: ['id', 'stock', 'thresholds', 'name', 'shopId', 'price', 'buyingOptionId', 'shop', 'BuyingOption', 'ProductTag', 'rating', 'reviewCount', 'bVolume', 'brand', 'bName']
+Trying /api/products/search endpoint...
+  Trying: /api/products/search?query=&limit=500
+Found grouped product response (24 groups) from: https://chadsflooring.bz/api/products/search?query=&limit=500
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    0 new unique items (total: 0)
+  Trying: /api/products/search?query=&limit=500&categoryId=4
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    0 new unique items (total: 0)
+  Trying: /api/products/search?query=&limit=500&category=4
+    Keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    0 new unique items (total: 0)
+Trying paginated _next/data explore endpoint...
+  Got 24 unique products from homepageData
+  Trying: explore.json?page=1&limit=100
+📋 explore.json pageProps structure: {'flags': "dict[['rewards']]", 'homepageData': "dict[['topProducts', 'topCarts', 'newProducts', 'newFlavors', 'logoUrl']]", 'session': "dict[['user', 'expires', 'sub', 'iat', 'exp']]", 'shop': "dict[['categories']]"}
+    Got 0 new products (total: 24)
+  Pagination pattern 'page={p}&limit=100' didn't yield new products
+  Trying: explore.json?p=1&perPage=100
+📋 explore.json pageProps structure: {'flags': "dict[['rewards']]", 'homepageData': "dict[['topProducts', 'topCarts', 'newProducts', 'logoUrl', 'domain']]", 'session': "dict[['user', 'expires', 'sub', 'iat', 'exp']]", 'shop': "dict[['categories']]"}
+    Got 0 new products (total: 24)
+  Pagination pattern 'p={p}&perPage=100' didn't yield new products
+  Trying: explore.json?offset=0&limit=100
+📋 explore.json pageProps structure: {'flags': "dict[['rewards']]", 'homepageData': "dict[['topProducts', 'topCarts', 'newProducts', 'logoUrl', 'domain']]", 'session': "dict[['user', 'expires', 'sub', 'iat', 'exp']]", 'shop': "dict[['categories']]"}
+    Got 0 new products (total: 24)
+  Pagination pattern 'offset={offset}&limit=100' didn't yield new products
+  Trying: explore.json?skip=0&take=100
+📋 explore.json pageProps structure: {'flags': "dict[['rewards']]", 'homepageData': "dict[['topProducts', 'topCarts', 'newProducts', 'logoUrl', 'domain']]", 'session': "dict[['user', 'expires', 'sub', 'iat', 'exp']]", 'shop': "dict[['categories']]"}
+    Got 0 new products (total: 24)
+  Pagination pattern 'skip={offset}&take=100' didn't yield new products
+  Got 24 flat products total
+Converting 24 flat products to grouped format...
+Converted to 24 product groups.
+⚠️ Scrape returned 24 products but cache has 1740. Keeping existing cache to prevent data loss.
+
+
+worker

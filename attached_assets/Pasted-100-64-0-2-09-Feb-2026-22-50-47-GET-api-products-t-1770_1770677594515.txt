@@ -1,0 +1,47 @@
+100.64.0.2 - - [09/Feb/2026 22:50:47] "GET /api/products?t=1770677447377_1660&nocache=1660 HTTP/1.1" 200 -
+✅ Serving products from cache
+100.64.0.2 - - [09/Feb/2026 22:50:52] "GET /api/products?t=1770677452378_834&nocache=834 HTTP/1.1" 200 -
+  [Concentrates] no new groups from scrolling
+  [Disposables] Navigating...
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 22:50:57] "GET /api/products?t=1770677457379_4975&nocache=4975 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 22:51:02] "GET /api/products?t=1770677462384_6800&nocache=6800 HTTP/1.1" 200 -
+  [Disposables] no new groups from scrolling
+  [Edibles] Navigating...
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 22:51:07] "GET /api/products?t=1770677467385_2900&nocache=2900 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 22:51:12] "GET /api/products?t=1770677472382_6990&nocache=6990 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 22:51:17] "GET /api/products?t=1770677477383_9580&nocache=9580 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 22:51:22] "GET /api/products?t=1770677482383_2228&nocache=2228 HTTP/1.1" 200 -
+  [Edibles] no new groups from scrolling
+  [Flower] Navigating...
+  [Flower] no new groups from scrolling
+  [Merch] Navigating...
+  [Merch] no new groups from scrolling
+  [Munchies] Navigating...
+  [Munchies] no new groups from scrolling
+  [Pre-rolls] Navigating...
+  [Pre-rolls] no new groups from scrolling
+  [Topical] Navigating...
+  [Topical] no new groups from scrolling
+  [Rewards] Navigating...
+  [Rewards] no new groups from scrolling
+  After browser scrolling: 528 total groups
+============================================================
+FINAL: 528 product groups, 3064 variants
+============================================================
+  Unknown: 518 groups
+  None: 10 groups
+  Using 528 intercepted groups as product data
+Returning 528 product groups with 3064 variants.
+⚠️ Scrape returned 528 groups (3064 variants) but cache has 1740 groups (14072 variants). Keeping existing cache.

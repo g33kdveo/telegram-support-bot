@@ -1,0 +1,42 @@
+~/workspace$ git pull --rebase
+remote: Enumerating objects: 114, done.
+remote: Counting objects: 100% (114/114), done.
+remote: Compressing objects: 100% (109/109), done.
+remote: Total 109 (delta 74), reused 0 (delta 0), pack-reused 0 (from 0)
+Receiving objects: 100% (109/109), 1.11 MiB | 4.31 MiB/s, done.
+Resolving deltas: 100% (74/74), completed with 5 local objects.
+From https://github.com/g33kdveo/telegram-support-bot
+   e255bbd..00edc09  main       -> origin/main
+warning: skipped previously applied commit c96e270
+warning: skipped previously applied commit e7fb5d5
+warning: skipped previously applied commit b061266
+warning: skipped previously applied commit 7225866
+warning: skipped previously applied commit 8a086e0
+warning: skipped previously applied commit ac8e857
+warning: skipped previously applied commit fb920c5
+warning: skipped previously applied commit 7cee342
+warning: skipped previously applied commit a2981ae
+warning: skipped previously applied commit da53019
+warning: skipped previously applied commit 56b0480
+warning: skipped previously applied commit 0e12a25
+warning: skipped previously applied commit 1b4d9a5
+warning: skipped previously applied commit 7baf616
+hint: use --reapply-cherry-picks to include skipped commits
+hint: Disable this message with "git config set advice.skippedCherryPicks false"
+Auto-merging bot.py
+CONFLICT (content): Merge conflict in bot.py
+error: could not apply 68c42fe... Fix broken DM links by properly escaping user names in HTML
+hint: Resolve all conflicts manually, mark them as resolved with
+hint: "git add/rm <conflicted_files>", then run "git rebase --continue".
+hint: You can instead skip this commit: run "git rebase --skip".
+hint: To abort and get back to the state before "git rebase", run "git rebase --abort".
+hint: Disable this message with "git config set advice.mergeConflict false"
+Could not apply 68c42fe... # Fix broken DM links by properly escaping user names in HTML
+~/workspace$ git push
+fatal: You are not currently on a branch.
+To push the history leading to the current (detached HEAD)
+state now, use
+
+    git push origin HEAD:<name-of-remote-branch>
+
+~/workspace$ 

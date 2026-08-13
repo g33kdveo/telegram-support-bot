@@ -1,0 +1,228 @@
+
+
+angelic-tenderness
+
+production
+Architecture
+Observability
+Logs
+Settings
+
+13 days or $4.00 left
+
+
+
+
+
+
+
+
+
+
+worker
+Deployments
+Backups
+Variables
+Metrics
+Settings
+worker-production-ed30.up.railway.app
+3.13.11python@3.13.11
+us-east4-eqdc4a
+1 Replica
+
+
+
+
+History
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+worker
+/
+724cb219
+Active
+
+Feb 9, 2026, 3:19 PM EST
+worker-production-ed30.up.railway.app
+Details
+Build Logs
+Deploy Logs
+HTTP Logs
+Network Flow Logs
+Filter and search logs
+
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 20:19:51] "GET /api/products?t=1770668390519_6221&nocache=6221 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 20:19:56] "GET /api/products?t=1770668395524_2932&nocache=2932 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 20:20:01] "GET /api/products?t=1770668400526_1735&nocache=1735 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 20:20:06] "GET /api/products?t=1770668405515_8232&nocache=8232 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 20:20:11] "GET /api/products?t=1770668410513_2310&nocache=2310 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 20:20:16] "GET /api/products?t=1770668415516_8254&nocache=8254 HTTP/1.1" 200 -
+100.64.0.2 - - [09/Feb/2026 20:20:18] "GET /webapp.html?settings=%7B%7D&admin=0 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.2 - - [09/Feb/2026 20:20:18] "GET /api/products?t=1770668418216_356&nocache=356 HTTP/1.1" 200 -
+100.64.0.2 - - [09/Feb/2026 20:20:18] "GET /favicon.ico HTTP/1.1" 204 -
+🔄 Auto-refreshing product cache...
+Using browser: /usr/bin/chromium
+[17:44:0209/202030.050019:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[17:44:0209/202030.398660:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+[17:17:0209/202030.384501:ERROR:dbus/object_proxy.cc:573] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+[17:44:0209/202030.436660:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[17:17:0209/202030.465452:ERROR:dbus/object_proxy.cc:573] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+Checking for age verification...
+Navigating to login page...
+   Skipping negative button: 'No, I Am Under 21'
+   Clicking age verification (positive): 'Yes, I Am 21+'
+Filling login credentials...
+   Filled username using: input[name='email']
+   Filled password.
+Submitting login...
+   Clicked submit: button[type='submit']
+Captured API response from: https://chadsflooring.bz/api/auth/providers
+Captured API response from: https://chadsflooring.bz/api/auth/csrf
+Captured API response from: https://chadsflooring.bz/api/auth/callback/credentials
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured Next.js build ID: OLWj_2DvoCcP4q9mNQtMi
+📋 explore.json pageProps structure: {'flags': "dict[['rewards']]", 'homepageData': "dict[['topProducts', 'topCarts', 'newProducts', 'logoUrl', 'domain']]", 'session': "dict[['user', 'expires', 'sub', 'iat', 'exp']]", 'shop': "dict[['categories']]"}
+Login navigation completed.
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18993.json?slu
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/19983.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18233.json?slu
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18689.json?slu
+Current URL after login: https://chadsflooring.bz/explore
+Login appears successful (redirected away from login page).
+Extracting __NEXT_DATA__ for build ID...
+  Post-login pageProps keys: ['captcha', 'captcha1', 'captcha2', 'showCaptcha']
+Trying direct API endpoints for product data...
+  Trying: https://chadsflooring.bz/api/products
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+  Not a JSON response
+  Trying: https://chadsflooring.bz/products
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/api/cart
+📋 explore.json pageProps structure: {}
+[17:47:0209/202057.433130:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+  Not a JSON response
+  Trying: https://chadsflooring.bz/api/catalog
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/api/cart
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+  Not a JSON response
+  Trying: https://chadsflooring.bz/api/shop
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+📋 explore.json pageProps structure: {}
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+  Not a JSON response
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+📋 explore.json pageProps structure: {}
+  Not a JSON response
+  Trying: https://chadsflooring.bz/api/explore
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+📋 explore.json pageProps structure: {}
+  Not a JSON response
+Direct API endpoints didn't work. Trying Next.js data endpoints...
+  Trying Next.js data: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/products/scrape.json (timeout: 120.0s)
+[17:47:0209/202154.142509:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+  Failed: Navigation Timeout Exceeded: 120000 ms exceeded.
+  Trying Next.js data: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json (timeout: 60.0s)
+connection unexpectedly closed
+Task exception was never retrieved
+future: <Task finished name='Task-1050' coro=<Connection._async_send() done, defined at /usr/local/lib/python3.12/site-packages/pyppeteer/connection.py:69> exception=InvalidStateError('invalid state')>
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/site-packages/pyppeteer/connection.py", line 73, in _async_send
+    await self.connection.send(msg)
+  File "/usr/local/lib/python3.12/site-packages/websockets/legacy/protocol.py", line 635, in send
+    await self.ensure_open()
+  File "/usr/local/lib/python3.12/site-packages/websockets/legacy/protocol.py", line 944, in ensure_open
+    raise self.connection_closed_exc()
+websockets.exceptions.ConnectionClosedOK: sent 1000 (OK); then received 1000 (OK)
+During handling of the above exception, another exception occurred:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/site-packages/pyppeteer/connection.py", line 79, in _async_send
+    await self.dispose()
+  File "/usr/local/lib/python3.12/site-packages/pyppeteer/connection.py", line 170, in dispose
+    await self._on_close()
+  File "/usr/local/lib/python3.12/site-packages/pyppeteer/connection.py", line 151, in _on_close
+    cb.set_exception(_rewriteError(
+asyncio.exceptions.InvalidStateError: invalid state
+Warning: vkCreateInstance: Found no drivers!
+Warning: vkCreateInstance failed with VK_ERROR_INCOMPATIBLE_DRIVER
+    at CheckVkSuccessImpl (../../third_party/dawn/src/dawn/native/vulkan/VulkanError.cpp:106)
+
+
+worker

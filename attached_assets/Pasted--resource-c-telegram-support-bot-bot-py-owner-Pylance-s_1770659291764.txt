@@ -1,0 +1,187 @@
+[{
+	"resource": "/c:/telegram-support-bot/bot.py",
+	"owner": "Pylance",
+	"severity": 8,
+	"message": "Expected expression",
+	"source": "Pylance",
+	"startLineNumber": 1577,
+	"startColumn": 19,
+	"endLineNumber": 1577,
+	"endColumn": 22,
+	"modelVersionId": 1,
+	"origin": "extHost1"
+},{
+	"resource": "/c:/telegram-support-bot/bot.py",
+	"owner": "Pylance",
+	"severity": 8,
+	"message": "Expected \":\"",
+	"source": "Pylance",
+	"startLineNumber": 1779,
+	"startColumn": 14,
+	"endLineNumber": 1779,
+	"endColumn": 21,
+	"modelVersionId": 1,
+	"origin": "extHost1"
+},{
+	"resource": "/c:/telegram-support-bot/bot.py",
+	"owner": "Pylance",
+	"severity": 8,
+	"message": "Statements must be separated by newlines or semicolons",
+	"source": "Pylance",
+	"startLineNumber": 2171,
+	"startColumn": 22,
+	"endLineNumber": 2171,
+	"endColumn": 24,
+	"modelVersionId": 1,
+	"origin": "extHost1"
+},{
+	"resource": "/c:/telegram-support-bot/bot.py",
+	"owner": "Pylance",
+	"severity": 8,
+	"message": "Invalid character \"\\ufffd\" in token",
+	"source": "Pylance",
+	"startLineNumber": 2171,
+	"startColumn": 22,
+	"endLineNumber": 2171,
+	"endColumn": 24,
+	"modelVersionId": 1,
+	"origin": "extHost1"
+},{
+	"resource": "/c:/telegram-support-bot/bot.py",
+	"owner": "Pylance",
+	"severity": 8,
+	"message": "Unexpected indentation",
+	"source": "Pylance",
+	"startLineNumber": 2172,
+	"startColumn": 1,
+	"endLineNumber": 2172,
+	"endColumn": 25,
+	"modelVersionId": 1,
+	"origin": "extHost1"
+},{
+	"resource": "/c:/telegram-support-bot/bot.py",
+	"owner": "Pylance",
+	"code": {
+		"value": "reportUndefinedVariable",
+		"target": {
+			"$mid": 1,
+			"path": "/microsoft/pylance-release/blob/main/docs/diagnostics/reportUndefinedVariable.md",
+			"scheme": "https",
+			"authority": "github.com"
+		}
+	},
+	"severity": 4,
+	"message": "\"item\" is not defined",
+	"source": "Pylance",
+	"startLineNumber": 1578,
+	"startColumn": 16,
+	"endLineNumber": 1578,
+	"endColumn": 20,
+	"modelVersionId": 1,
+	"origin": "extHost1"
+},{
+	"resource": "/c:/telegram-support-bot/bot.py",
+	"owner": "Pylance",
+	"code": {
+		"value": "reportUndefinedVariable",
+		"target": {
+			"$mid": 1,
+			"path": "/microsoft/pylance-release/blob/main/docs/diagnostics/reportUndefinedVariable.md",
+			"scheme": "https",
+			"authority": "github.com"
+		}
+	},
+	"severity": 4,
+	"message": "\"item\" is not defined",
+	"source": "Pylance",
+	"startLineNumber": 1579,
+	"startColumn": 54,
+	"endLineNumber": 1579,
+	"endColumn": 58,
+	"modelVersionId": 1,
+	"origin": "extHost1"
+},{
+	"resource": "/c:/telegram-support-bot/bot.py",
+	"owner": "Pylance",
+	"code": {
+		"value": "reportUndefinedVariable",
+		"target": {
+			"$mid": 1,
+			"path": "/microsoft/pylance-release/blob/main/docs/diagnostics/reportUndefinedVariable.md",
+			"scheme": "https",
+			"authority": "github.com"
+		}
+	},
+	"severity": 4,
+	"message": "\"item\" is not defined",
+	"source": "Pylance",
+	"startLineNumber": 1580,
+	"startColumn": 17,
+	"endLineNumber": 1580,
+	"endColumn": 21,
+	"modelVersionId": 1,
+	"origin": "extHost1"
+},{
+	"resource": "/c:/telegram-support-bot/bot.py",
+	"owner": "Pylance",
+	"code": {
+		"value": "reportUndefinedVariable",
+		"target": {
+			"$mid": 1,
+			"path": "/microsoft/pylance-release/blob/main/docs/diagnostics/reportUndefinedVariable.md",
+			"scheme": "https",
+			"authority": "github.com"
+		}
+	},
+	"severity": 4,
+	"message": "\"item\" is not defined",
+	"source": "Pylance",
+	"startLineNumber": 1582,
+	"startColumn": 67,
+	"endLineNumber": 1582,
+	"endColumn": 71,
+	"modelVersionId": 1,
+	"origin": "extHost1"
+},{
+	"resource": "/c:/telegram-support-bot/bot.py",
+	"owner": "Pylance",
+	"code": {
+		"value": "reportUndefinedVariable",
+		"target": {
+			"$mid": 1,
+			"path": "/microsoft/pylance-release/blob/main/docs/diagnostics/reportUndefinedVariable.md",
+			"scheme": "https",
+			"authority": "github.com"
+		}
+	},
+	"severity": 4,
+	"message": "\"ne\" is not defined",
+	"source": "Pylance",
+	"startLineNumber": 1779,
+	"startColumn": 12,
+	"endLineNumber": 1779,
+	"endColumn": 14,
+	"modelVersionId": 1,
+	"origin": "extHost1"
+},{
+	"resource": "/c:/telegram-support-bot/bot.py",
+	"owner": "Pylance",
+	"code": {
+		"value": "reportUndefinedVariable",
+		"target": {
+			"$mid": 1,
+			"path": "/microsoft/pylance-release/blob/main/docs/diagnostics/reportUndefinedVariable.md",
+			"scheme": "https",
+			"authority": "github.com"
+		}
+	},
+	"severity": 4,
+	"message": "\"i\" is not defined",
+	"source": "Pylance",
+	"startLineNumber": 2171,
+	"startColumn": 21,
+	"endLineNumber": 2171,
+	"endColumn": 22,
+	"modelVersionId": 1,
+	"origin": "extHost1"
+}]

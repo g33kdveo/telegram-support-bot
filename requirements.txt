@@ -1,0 +1,7 @@
+python-telegram-bot[job-queue]==20.*
+python-dotenv
+pyppeteer
+pyppeteer
+python-dotenv
+python-telegram-bot[job-queue]
+telegram

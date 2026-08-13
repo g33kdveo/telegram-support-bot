@@ -1,0 +1,130 @@
+    variant[0] images: []
+    variant[0] imgs: 'MISSING'
+    variant[0] img: 'MISSING'
+  DEBUG 'Puffin 2g':
+    imgs keys: NONE
+    imgs values: NONE
+    variant count: 1
+    variant qtys: [500]
+    variant keys: ['name', 'tiers', 'qty', 'desc', 'tags', 'id', 'price', 'images']
+    variant[0] images: []
+    variant[0] imgs: 'MISSING'
+    variant[0] img: 'MISSING'
+============================================================
+  None: 68 groups
+  Edibles: 42 groups
+  Flower: 39 groups
+  Accessories: 34 groups
+  Concentrates: 33 groups
+  Disposables: 30 groups
+  Carts: 28 groups
+  Pre-rolls: 27 groups
+  BYOB: 7 groups
+  Topical: 4 groups
+📊 Scrape found: 312 products.
+100.64.0.2 - - [10/Feb/2026 20:56:18] "GET /api/products?t=1770756883510_2613&nocache=2613 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:56:18] "GET /api/products?t=1770756888512_4190&nocache=4190 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:56:18] "GET /api/products?t=1770756893521_9732&nocache=9732 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:56:18] "GET /api/products?t=1770756898515_5436&nocache=5436 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:56:18] "GET /api/products?t=1770756903507_174&nocache=174 HTTP/1.1" 200 -
+  Rewards: +11 new (total: 303)
+--- PHASE 4: Brand-by-brand API fetching ---
+✅ Serving 312 products from cache
+100.64.0.2 - - [10/Feb/2026 20:56:19] "GET /api/products?t=1770756978514_9470&nocache=9470 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:56:19] "GET /api/products?t=1770756968510_9545&nocache=9545 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:56:18] "GET /api/products?t=1770756938513_8856&nocache=8856 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:56:18] "GET /api/products?t=1770756918513_3854&nocache=3854 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:56:18] "GET /api/products?t=1770756943520_2135&nocache=2135 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:56:18] "GET /api/products?t=1770756948513_9914&nocache=9914 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:56:18] "GET /api/products?t=1770756953520_3799&nocache=3799 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:56:18] "GET /api/products?t=1770756958512_1722&nocache=1722 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:56:18] "GET /api/products?t=1770756908511_9584&nocache=9584 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:56:18] "GET /api/products?t=1770756913522_5685&nocache=5685 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:56:19] "GET /api/products?t=1770756963523_2270&nocache=2270 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:56:18] "GET /api/products?t=1770756923521_2233&nocache=2233 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:56:18] "GET /api/products?t=1770756928513_4499&nocache=4499 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:56:18] "GET /api/products?t=1770756933522_8779&nocache=8779 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:56:19] "GET /api/products?t=1770756973520_2406&nocache=2406 HTTP/1.1" 200 -
+✅ Serving 312 products from cache
+100.64.0.2 - - [10/Feb/2026 20:56:24] "GET /api/products?t=1770756983520_316&nocache=316 HTTP/1.1" 200 -
+  Processed 100/434 brands, +9 new
+✅ Serving 312 products from cache
+100.64.0.2 - - [10/Feb/2026 20:56:29] "GET /api/products?t=1770756988515_2574&nocache=2574 HTTP/1.1" 200 -
+  Processed 200/434 brands, +9 new
+✅ Serving 312 products from cache
+100.64.0.2 - - [10/Feb/2026 20:56:34] "GET /api/products?t=1770756993522_3975&nocache=3975 HTTP/1.1" 200 -
+  Processed 300/434 brands, +9 new
+✅ Serving 312 products from cache
+100.64.0.2 - - [10/Feb/2026 20:56:39] "GET /api/products?t=1770756998513_9228&nocache=9228 HTTP/1.1" 200 -
+  Processed 400/434 brands, +9 new
+✅ Serving 312 products from cache
+100.64.0.2 - - [10/Feb/2026 20:56:44] "GET /api/products?t=1770757003523_5684&nocache=5684 HTTP/1.1" 200 -
+  Brand fetching: +9 new (total: 312)
+--- PHASE 5: Targeted query searches ---
+  DEBUG 'Disposable 2g':
+    imgs keys: NONE
+    imgs values: NONE
+    variant count: 1
+    variant qtys: [500]
+    variant keys: ['name', 'tiers', 'qty', 'desc', 'tags', 'id', 'price', 'images']
+    variant[0] images: []
+    variant[0] imgs: 'MISSING'
+    variant[0] img: 'MISSING'
+  DEBUG 'HITZ Infinity':
+    imgs keys: NONE
+  Query searches: +0 new (total: 312)
+============================================================
+FINAL: 312 product groups, 1305 variants
+IMAGES: 0/312 groups have images
+STOCK: total qty across all variants = 28537
+  DEBUG 'MM Gen3 AIO':
+    imgs keys: NONE
+    imgs values: NONE
+    variant count: 1
+    variant qtys: [500]
+    variant keys: ['name', 'tiers', 'qty', 'desc', 'tags', 'id', 'price', 'images']
+    variant[0] images: []
+    variant[0] imgs: 'MISSING'
+    variant[0] img: 'MISSING'
+    imgs values: NONE
+    variant count: 1
+    variant qtys: [500]
+    variant keys: ['name', 'tiers', 'qty', 'desc', 'tags', 'id', 'price', 'images']
+    variant[0] images: []
+    variant[0] imgs: 'MISSING'
+    variant[0] img: 'MISSING'
+  DEBUG 'Ice Cream Cake ':
+    imgs keys: NONE
+    imgs values: NONE
+    variant count: 1
+    variant qtys: [166]
+    variant keys: ['name', 'tiers', 'qty', 'desc', 'tags', 'id', 'price', 'images']
+    variant[0] images: []
+    variant[0] imgs: 'MISSING'
+    variant[0] img: 'MISSING'
+  DEBUG 'Puffin 2g':
+    imgs keys: NONE
+    imgs values: NONE
+    variant count: 1
+    variant qtys: [500]
+    variant keys: ['name', 'tiers', 'qty', 'desc', 'tags', 'id', 'price', 'images']
+    variant[0] images: []
+    variant[0] imgs: 'MISSING'
+    variant[0] img: 'MISSING'
+============================================================
+  None: 68 groups
+  Edibles: 42 groups
+  Flower: 39 groups
+  Accessories: 34 groups
+  Concentrates: 33 groups
+  Disposables: 30 groups
+  Carts: 28 groups
+  Pre-rolls: 27 groups
+  BYOB: 7 groups
+  Topical: 4 groups
+📊 Scrape found: 312 groups
+✅ Serving 312 products from cache
+100.64.0.2 - - [10/Feb/2026 20:56:49] "GET /api/products?t=1770757008517_4863&nocache=4863 HTTP/1.1" 200 -
+✅ Cache Refreshed! 312 groups.
+✅ Serving 312 products from cache
+100.64.0.2 - - [10/Feb/2026 20:56:54] "GET /api/products?t=1770757013508_7357&nocache=7357 HTTP/1.1" 200 -

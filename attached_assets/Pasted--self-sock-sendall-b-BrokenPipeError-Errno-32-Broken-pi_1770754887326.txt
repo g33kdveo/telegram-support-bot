@@ -1,0 +1,106 @@
+    self._sock.sendall(b)
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+  File "/usr/local/lib/python3.12/socketserver.py", line 766, in __init__
+    self.handle()
+  File "/usr/local/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/local/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/app/bot.py", line 2282, in do_GET
+    self.send_json(PRODUCT_CACHE["data"])
+  File "/app/bot.py", line 2337, in send_json
+    self.end_headers()
+  File "/usr/local/lib/python3.12/http/server.py", line 538, in end_headers
+    self.flush_headers()
+  File "/usr/local/lib/python3.12/http/server.py", line 542, in flush_headers
+    self.wfile.write(b"".join(self._headers_buffer))
+  File "/usr/local/lib/python3.12/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+  File "/usr/local/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/app/bot.py", line 2282, in do_GET
+    self.send_json(PRODUCT_CACHE["data"])
+  File "/app/bot.py", line 2337, in send_json
+    self.end_headers()
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+  File "/usr/local/lib/python3.12/http/server.py", line 538, in end_headers
+    self.flush_headers()
+  File "/usr/local/lib/python3.12/http/server.py", line 542, in flush_headers
+    self.wfile.write(b"".join(self._headers_buffer))
+  File "/usr/local/lib/python3.12/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+100.64.0.2 - - [10/Feb/2026 20:20:25] "GET /api/products?t=1770754702882_2699&nocache=2699 HTTP/1.1" 200 -
+----------------------------------------
+Exception occurred during processing of request from ('100.64.0.2', 14382)
+Traceback (most recent call last):
+  File "/app/bot.py", line 2239, in do_GET
+    self.send_json(PRODUCT_CACHE["data"])
+  File "/app/bot.py", line 2338, in send_json
+    self.wfile.write(response)
+  File "/usr/local/lib/python3.12/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+BrokenPipeError: [Errno 32] Broken pipe
+During handling of the above exception, another exception occurred:
+Traceback (most recent call last):
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+  File "/usr/local/lib/python3.12/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/local/lib/python3.12/http/server.py", line 672, in __init__
+    super().__init__(*args, **kwargs)
+  File "/usr/local/lib/python3.12/socketserver.py", line 766, in __init__
+    self.handle()
+  File "/usr/local/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/local/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/app/bot.py", line 2282, in do_GET
+    self.send_json(PRODUCT_CACHE["data"])
+  File "/app/bot.py", line 2337, in send_json
+    self.end_headers()
+  File "/usr/local/lib/python3.12/http/server.py", line 538, in end_headers
+    self.flush_headers()
+  File "/usr/local/lib/python3.12/http/server.py", line 542, in flush_headers
+✅ Cache Refreshed! 774 groups.
+✅ Serving 774 products from cache
+100.64.0.2 - - [10/Feb/2026 20:20:34] "GET /api/products?t=1770754834242_8544&nocache=8544 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:20:29] "GET /favicon.ico HTTP/1.1" 204 -
+✅ Serving 774 products from cache
+100.64.0.2 - - [10/Feb/2026 20:20:29] "GET /api/products?t=1770754829163_9816&nocache=9816 HTTP/1.1" 200 -
+  Query searches: +2 new (total: 774)
+============================================================
+FINAL: 774 product groups, 5388 variants
+    self.wfile.write(b"".join(self._headers_buffer))
+  File "/usr/local/lib/python3.12/socketserver.py", line 845, in write
+============================================================
+    self._sock.sendall(b)
+  Unknown: 764 groups
+BrokenPipeError: [Errno 32] Broken pipe
+  None: 10 groups
+----------------------------------------
+📊 Scrape found: 774 groups
+100.64.0.2 - - [10/Feb/2026 20:20:29] "GET /webapp.html?admin=0 HTTP/1.1" 304 -
+100.64.0.2 - - [10/Feb/2026 20:20:29] "GET /api/settings?t=1770754829146 HTTP/1.1" 200 -
+✅ Serving 774 products from cache
+100.64.0.2 - - [10/Feb/2026 20:20:39] "GET /api/products?t=1770754839252_4736&nocache=4736 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:20:44] "GET /webapp.html?admin=0 HTTP/1.1" 304 -
+100.64.0.2 - - [10/Feb/2026 20:20:44] "GET /api/settings?t=1770754844252 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:20:44] "GET /favicon.ico HTTP/1.1" 204 -
+✅ Serving 774 products from cache
+100.64.0.2 - - [10/Feb/2026 20:20:44] "GET /api/products?t=1770754844269_6458&nocache=6458 HTTP/1.1" 200 -
+✅ Serving 774 products from cache
+100.64.0.2 - - [10/Feb/2026 20:20:49] "GET /api/products?t=1770754849364_7711&nocache=7711 HTTP/1.1" 200 -
+✅ Serving 774 products from cache
+100.64.0.2 - - [10/Feb/2026 20:20:54] "GET /api/products?t=1770754854353_194&nocache=194 HTTP/1.1" 200 -
+✅ Serving 774 products from cache
+100.64.0.2 - - [10/Feb/2026 20:20:59] "GET /api/products?t=1770754859357_5490&nocache=5490 HTTP/1.1" 200 -
+✅ Serving 774 products from cache
+100.64.0.2 - - [10/Feb/2026 20:21:04] "GET /api/products?t=1770754864361_4469&nocache=4469 HTTP/1.1" 200 -
+✅ Serving 774 products from cache
+100.64.0.2 - - [10/Feb/2026 20:21:09] "GET /api/products?t=1770754869353_9178&nocache=9178 HTTP/1.1" 200 -
+✅ Serving 774 products from cache
+100.64.0.2 - - [10/Feb/2026 20:21:14] "GET /api/products?t=1770754874357_519&nocache=519 HTTP/1.1" 200 -

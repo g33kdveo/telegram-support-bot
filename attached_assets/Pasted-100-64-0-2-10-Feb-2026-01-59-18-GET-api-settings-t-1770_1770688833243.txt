@@ -1,0 +1,68 @@
+100.64.0.2 - - [10/Feb/2026 01:59:18] "GET /api/settings?t=1770688757691 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 01:59:18] "GET /favicon.ico HTTP/1.1" 204 -
+✅ Serving 8875 products from cache
+100.64.0.2 - - [10/Feb/2026 01:59:18] "GET /api/products?t=1770688757767_8588&nocache=8588 HTTP/1.1" 200 -
+✅ Serving 8875 products from cache
+100.64.0.3 - - [10/Feb/2026 01:59:24] "GET /api/products?t=1770688763154_7590&nocache=7590 HTTP/1.1" 200 -
+✅ Serving 8875 products from cache
+100.64.0.3 - - [10/Feb/2026 01:59:29] "GET /api/products?t=1770688768156_2435&nocache=2435 HTTP/1.1" 200 -
+----------------------------------------
+Exception occurred during processing of request from 100.64.0.3 - - [10/Feb/2026 01:59:34] "GET /api/settings?t=1770688773351 HTTP/1.1" 200 -
+('100.64.0.3', 13990)
+100.64.0.3 - - [10/Feb/2026 01:59:34] "GET /favicon.ico HTTP/1.1" 204 -
+Traceback (most recent call last):
+  File "/app/bot.py", line 2417, in do_GET
+✅ Serving 8875 products from cache
+100.64.0.3 - - [10/Feb/2026 01:59:34] "GET /api/products?t=1770688773151_8406&nocache=8406 HTTP/1.1" 200 -
+100.64.0.3 - - [10/Feb/2026 01:59:34] "GET /webapp.html?admin=0 HTTP/1.1" 200 -
+❌ Critical error in API proxy: [Errno 104] Connection reset by peer
+Traceback (most recent call last):
+  File "/app/bot.py", line 2417, in do_GET
+    self.send_json(PRODUCT_CACHE["data"])
+  File "/app/bot.py", line 2535, in send_json
+    self.wfile.write(response)
+  File "/usr/local/lib/python3.12/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+⚠️ Serving stale cache due to critical error.
+100.64.0.3 - - [10/Feb/2026 01:59:34] "GET /api/products?t=1770688773151_8406&nocache=8406 HTTP/1.1" 200 -
+    self.send_json(PRODUCT_CACHE["data"])
+  File "/app/bot.py", line 2535, in send_json
+    self.wfile.write(response)
+  File "/usr/local/lib/python3.12/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+During handling of the above exception, another exception occurred:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/local/lib/python3.12/http/server.py", line 672, in __init__
+    super().__init__(*args, **kwargs)
+  File "/usr/local/lib/python3.12/socketserver.py", line 766, in __init__
+    self.handle()
+  File "/usr/local/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/local/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/app/bot.py", line 2479, in do_GET
+    self.send_json(PRODUCT_CACHE["data"])
+  File "/app/bot.py", line 2534, in send_json
+    self.end_headers()
+  File "/usr/local/lib/python3.12/http/server.py", line 538, in end_headers
+    self.flush_headers()
+  File "/usr/local/lib/python3.12/http/server.py", line 542, in flush_headers
+    self.wfile.write(b"".join(self._headers_buffer))
+  File "/usr/local/lib/python3.12/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+✅ Serving 8875 products from cache
+100.64.0.3 - - [10/Feb/2026 01:59:34] "GET /api/products?t=1770688773497_156&nocache=156 HTTP/1.1" 200 -
+✅ Serving 8875 products from cache
+100.64.0.3 - - [10/Feb/2026 01:59:40] "GET /api/products?t=1770688778810_45&nocache=45 HTTP/1.1" 200 -
+✅ Serving 8875 products from cache
+100.64.0.3 - - [10/Feb/2026 01:59:45] "GET /api/products?t=1770688783811_3347&nocache=3347 HTTP/1.1" 200 -
+✅ Serving 8875 products from cache
+100.64.0.3 - - [10/Feb/2026 01:59:50] "GET /api/products?t=1770688788812_7290&nocache=7290 HTTP/1.1" 200 

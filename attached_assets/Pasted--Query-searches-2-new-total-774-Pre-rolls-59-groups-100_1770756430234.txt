@@ -1,0 +1,42 @@
+  Query searches: +2 new (total: 774)
+  Pre-rolls: 59 groups
+100.64.0.2 - - [10/Feb/2026 20:46:48] "GET /api/products?t=1770756239944_167&nocache=167 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:48] "GET /api/products?t=1770756244938_1625&nocache=1625 HTTP/1.1" 200 -
+📊 Scrape found: 774 products.
+100.64.0.2 - - [10/Feb/2026 20:46:49] "GET /api/products?t=1770756249943_5315&nocache=5315 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:48] "GET /api/products?t=1770756234943_4486&nocache=4486 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:49] "GET /api/products?t=1770756254947_638&nocache=638 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:49] "GET /api/products?t=1770756259940_3837&nocache=3837 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:49] "GET /api/products?t=1770756269946_8699&nocache=8699 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:49] "GET /api/products?t=1770756264949_800&nocache=800 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:49] "GET /api/products?t=1770756274948_7112&nocache=7112 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:49] "GET /api/products?t=1770756284942_3690&nocache=3690 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:49] "GET /api/products?t=1770756289943_608&nocache=608 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:49] "GET /api/products?t=1770756279950_1971&nocache=1971 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:49] "GET /api/products?t=1770756294938_426&nocache=426 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:49] "GET /api/products?t=1770756329939_5413&nocache=5413 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:49] "GET /api/products?t=1770756299947_975&nocache=975 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:50] "GET /api/products?t=1770756334939_7301&nocache=7301 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:49] "GET /api/products?t=1770756304940_3249&nocache=3249 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:50] "GET /api/products?t=1770756339946_6038&nocache=6038 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:49] "GET /api/products?t=1770756309943_6135&nocache=6135 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:50] "GET /api/products?t=1770756344951_315&nocache=315 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:49] "GET /api/products?t=1770756314950_3403&nocache=3403 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:50] "GET /api/products?t=1770756349939_6824&nocache=6824 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:49] "GET /api/products?t=1770756319941_519&nocache=519 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:49] "GET /api/products?t=1770756324950_1194&nocache=1194 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:50] "GET /api/products?t=1770756354945_9562&nocache=9562 HTTP/1.1" 200 -
+✅ Serving 774 products from cache
+100.64.0.2 - - [10/Feb/2026 20:46:50] "GET /api/products?t=1770756409945_2908&nocache=2908 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:50] "GET /api/products?t=1770756359939_3855&nocache=3855 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:50] "GET /api/products?t=1770756364952_8844&nocache=8844 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:50] "GET /api/products?t=1770756369951_416&nocache=416 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:50] "GET /api/products?t=1770756374946_6053&nocache=6053 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:50] "GET /api/products?t=1770756379939_5411&nocache=5411 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:50] "GET /api/products?t=1770756384945_1806&nocache=1806 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:51] "GET /api/products?t=1770756389939_9333&nocache=9333 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:51] "GET /api/products?t=1770756394939_4383&nocache=4383 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:51] "GET /api/products?t=1770756399949_4095&nocache=4095 HTTP/1.1" 200 -
+100.64.0.2 - - [10/Feb/2026 20:46:51] "GET /api/products?t=1770756404939_8249&nocache=8249 HTTP/1.1" 200 -
+✅ Serving 774 products from cache
+100.64.0.2 - - [10/Feb/2026 20:46:55] "GET /api/products?t=1770756414941_6494&nocache=6494 HTTP/1.1" 200 -

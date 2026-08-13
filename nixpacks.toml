@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["python3", "chromium", "glib", "nss", "nspr", "expat", "libdrm", "mesa", "alsa-lib", "dbus", "libxkbcommon", "pango", "cairo", "gdk-pixbuf", "gtk3", "at-spi2-core", "libxcomposite", "libxdamage", "libxrandr", "libgbm"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[start]
+cmd = "python bot.py"

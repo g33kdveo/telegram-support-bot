@@ -1,0 +1,28 @@
+✅ Serving 312 products from cache
+100.64.0.2 - - [10/Feb/2026 21:44:49] "GET /api/products?t=1770759888560_4689&nocache=4689 HTTP/1.1" 200 -
+✅ Serving 312 products from cache
+100.64.0.3 - - [10/Feb/2026 21:49:49] "GET /api/products?t=1770760188563_4743&nocache=4743 HTTP/1.1" 200 -
+100.64.0.3 - - [10/Feb/2026 21:50:19] "GET /webapp.html?admin=0 HTTP/1.1" 200 -
+100.64.0.3 - - [10/Feb/2026 21:50:19] "GET /favicon.ico HTTP/1.1" 204 -
+✅ Serving 312 products from cache
+100.64.0.3 - - [10/Feb/2026 21:50:20] "GET /api/img?u=%2Fuploads%2Fproducts%2Fx-img-16-1725902937664.png.webp HTTP/1.1" 404 -
+100.64.0.3 - - [10/Feb/2026 21:50:20] "GET /api/img?u=%2Fuploads%2Fproducts%2Fx-1-1727298977885.png.webp HTTP/1.1" 404 -
+100.64.0.3 - - [10/Feb/2026 21:50:20] "GET /api/img?u=%2Fuploads%2Fproducts%2Fx-img-19-1719957225617.png.webp HTTP/1.1" 404 -
+100.64.0.3 - - [10/Feb/2026 21:50:20] "GET /api/img?u=%2Fuploads%2Fproducts%2Fx-img-8-1742580280554.png.webp HTTP/1.1" 404 -
+100.64.0.3 - - [10/Feb/2026 21:50:21] "GET /api/img?u=%2Fuploads%2Fproducts%2Fx-img-22-1735674839870.png.webp HTTP/1.1" 404 -
+100.64.0.3 - - [10/Feb/2026 21:50:21] "GET /api/img?u=%2Fuploads%2Fproducts%2Fx-img-53-1768264153220.png.webp HTTP/1.1" 404 -
+100.64.0.3 - - [10/Feb/2026 21:50:21] "GET /api/img?u=%2Fuploads%2Fproducts%2Fx-img-15-1724701202172.png.webp HTTP/1.1" 404 -
+100.64.0.3 - - [10/Feb/2026 21:50:23] "GET /api/img?u=%2Fuploads%2Fproducts%2Fx-19-1730323429484.png.webp HTTP/1.1" 404 -
+100.64.0.3 - - [10/Feb/2026 21:50:23] "GET /api/img?u=%2Fuploads%2Fproducts%2Fx-mys3-1-1711664372610.png.webp HTTP/1.1" 404 -
+100.64.0.3 - - [10/Feb/2026 21:50:23] "GET /api/img?u=%2Fuploads%2Fproducts%2Fx-bulk_exotic-1756321270882.png.webp HTTP/1.1" 404 -
+100.64.0.3 - - [10/Feb/2026 21:50:23] "GET /api/img?u=%2Fuploads%2Fproducts%2Fx-main_bulk_smalls-1748303882850.png.webp HTTP/1.1" 404 -
+100.64.0.3 - - [10/Feb/2026 21:50:23] "GET /api/img?u=%2Fuploads%2Fproducts%2Fx-img-50-1734574096833.png.webp HTTP/1.1" 404 -
+100.64.0.3 - - [10/Feb/2026 21:50:23] "GET /api/img?u=%2Fuploads%2Fproducts%2Fx-rosin-1-1710531329523.png.webp HTTP/1.1" 404 -
+100.64.0.3 - - [10/Feb/2026 21:50:23] "GET /api/img?u=%2Fuploads%2Fproducts%2Fx-bulk-premium-smalls-1756331835239.png.webp HTTP/1.1" 404 -
+100.64.0.3 - - [10/Feb/2026 21:50:23] "GET /api/img?u=%2Fuploads%2Fproducts%2Fx-bag_1-1747449625037.png.webp HTTP/1.1" 404 -
+100.64.0.3 - - [10/Feb/2026 21:50:23] "GET /api/img?u=%2Fuploads%2Fproducts%2Fx-bulk-untrimmed-smalls_n-1768503860314.png.webp HTTP/1.1" 404 -
+100.64.0.3 - - [10/Feb/2026 21:50:23] "GET /api/img?u=%2Fuploads%2Fproducts%2Fx-small-bag-1714592248964.png.webp HTTP/1.1" 404 -
+100.64.0.3 - - [10/Feb/2026 21:50:23] "GET /api/img?u=%2Fuploads%2Fproducts%2Fx-img-exotic-1732038195414-copy-1732318295361.png.webp HTTP/1.1" 404 -
+100.64.0.3 - - [10/Feb/2026 21:50:24] "GET /api/img?u=%2Fuploads%2Fproducts%2Fx-bulk-exotic-smalls-1756330001401.png.webp HTTP/1.1" 404 -
+100.64.0.3 - - [10/Feb/2026 21:50:24] "GET /api/img?u=%2Fuploads%2Fproducts%2Fx-img-premium_smalls-1732229011393-copy-1732318636982.png.webp HTTP/1.1" 404 -
+100.64.0.3 - - [10/Feb/2026 21:50:25] "GET /api/img?u=%2Fuploads%2Fproducts%2Fx-img-premium_-1732039023508-copy-1732318463859.png.webp HTTP/1.1" 404 -

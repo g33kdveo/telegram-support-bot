@@ -1,0 +1,97 @@
+❌ Critical error in API proxy: [Errno 32] Broken pipe
+  File "/usr/local/lib/python3.12/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/lib/python3.12/socketserver.py", line 362, in finish_request
+  File "/app/bot.py", line 2337, in send_json
+    self.end_headers()
+  File "/usr/local/lib/python3.12/http/server.py", line 538, in end_headers
+  File "/usr/local/lib/python3.12/socketserver.py", line 766, in __init__
+100.64.0.2 - - [10/Feb/2026 20:20:25] "GET /api/products?t=1770754672888_7748&nocache=7748 HTTP/1.1" 200 -
+    self.RequestHandlerClass(request, client_address, self)
+    self.handle()
+----------------------------------------
+  File "/usr/local/lib/python3.12/http/server.py", line 672, in __init__
+    super().__init__(*args, **kwargs)
+    self.flush_headers()
+  File "/usr/local/lib/python3.12/http/server.py", line 436, in handle
+  File "/usr/local/lib/python3.12/http/server.py", line 542, in flush_headers
+    self.handle_one_request()
+    self.send_json(PRODUCT_CACHE["data"])
+  File "/usr/local/lib/python3.12/http/server.py", line 424, in handle_one_request
+    self.wfile.write(b"".join(self._headers_buffer))
+100.64.0.2 - - [10/Feb/2026 20:20:25] "GET /api/products?t=1770754702882_2699&nocache=2699 HTTP/1.1" 200 -
+    method()
+  File "/usr/local/lib/python3.12/socketserver.py", line 845, in write
+  File "/app/bot.py", line 2282, in do_GET
+    self._sock.sendall(b)
+Traceback (most recent call last):
+  File "/app/bot.py", line 2239, in do_GET
+    self.send_json(PRODUCT_CACHE["data"])
+  File "/app/bot.py", line 2338, in send_json
+    self.wfile.write(response)
+BrokenPipeError: [Errno 32] Broken pipe
+  File "/usr/local/lib/python3.12/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+⚠️ Serving stale cache due to critical error.
+❌ Critical error in API proxy: [Errno 32] Broken pipe
+Exception occurred during processing of request from ('100.64.0.2', 53432)
+Traceback (most recent call last):
+  File "/app/bot.py", line 2239, in do_GET
+    self.send_json(PRODUCT_CACHE["data"])
+  File "/app/bot.py", line 2338, in send_json
+    self.wfile.write(response)
+('100.64.0.2', 13034)
+  File "/usr/local/lib/python3.12/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+BrokenPipeError: [Errno 32] Broken pipe
+Traceback (most recent call last):
+100.64.0.2 - - [10/Feb/2026 20:20:25] "GET /api/products?t=1770754697882_5693&nocache=5693 HTTP/1.1" 200 -
+----------------------------------------
+Exception occurred during processing of request from ('100.64.0.2', 13050)
+  File "/app/bot.py", line 2239, in do_GET
+    self.send_json(PRODUCT_CACHE["data"])
+  File "/app/bot.py", line 2338, in send_json
+    self.wfile.write(response)
+  File "/usr/local/lib/python3.12/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+BrokenPipeError: [Errno 32] Broken pipe
+During handling of the above exception, another exception occurred:
+Traceback (most recent call last):
+  File "/app/bot.py", line 2239, in do_GET
+    self.send_json(PRODUCT_CACHE["data"])
+  File "/app/bot.py", line 2338, in send_json
+    self.wfile.write(response)
+  File "/usr/local/lib/python3.12/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+⚠️ Serving stale cache due to critical error.100.64.0.2 - - [10/Feb/2026 20:20:25] "GET /api/products?t=1770754703408_9498&nocache=9498 HTTP/1.1" 200 -
+Traceback (most recent call last):
+  File "/app/bot.py", line 2239, in do_GET
+During handling of the above exception, another exception occurred:
+    self.send_json(PRODUCT_CACHE["data"])
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/socketserver.py", line 697, in process_request_thread
+  File "/app/bot.py", line 2338, in send_json
+    self.wfile.write(response)
+  File "/usr/local/lib/python3.12/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+BrokenPipeError: [Errno 32] Broken pipe
+Traceback (most recent call last):
+  File "/app/bot.py", line 2239, in do_GET
+    self.send_json(PRODUCT_CACHE["data"])
+  File "/app/bot.py", line 2338, in send_json
+    self.wfile.write(response)
+  File "/usr/local/lib/python3.12/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+BrokenPipeError: [Errno 32] Broken pipe
+During handling of the above exception, another exception occurred:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/usr/local/lib/python3.12/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/local/lib/python3.12/http/server.py", line 672, in __init__

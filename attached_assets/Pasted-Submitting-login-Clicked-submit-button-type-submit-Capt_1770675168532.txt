@@ -1,0 +1,42 @@
+Submitting login...
+   Clicked submit: button[type='submit']
+Captured Next.js build ID: OLWj_2DvoCcP4q9mNQtMi
+  [interceptor] +10 groups from https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json (total: 10)
+Login navigation completed.
+  [resp] https://chadsflooring.bz/api/cart keys=['carts', 'cartsByVendor', 'subTotal', 'shippingMethod', 'shippingMethods', 'shippingTotal', 'shippingPoints', 'totalPoints', 'isRewardsProduct', 'totalPrice'] arrays=["carts[5](dict:['id', 'price', 'priceInPoints', 'slug', 'name', 'pName'])", "shippingMethods[1](dict:['id', 'name', 'weight', 'price', 'archived', 'minOrderPrice'])"]
+  [interceptor] +5 groups from https://chadsflooring.bz/api/cart (total: 15)
+  [resp] https://chadsflooring.bz/api/ticket/create-form keys=['issueTypes', 'orderId', 'statusMapping', 'vendors', 'deposits', 'orders'] arrays=["issueTypes[10](dict:['id', 'name', 'description', 'archived', 'createdAt', 'updatedAt'])", "deposits[2](dict:['id', 'status', 'createdAt', 'creditAmount', 'totalReceived', 'type'])", "orders[2](dict:['id', 'createdAt', 'updatedAt', 'orderId', 'orderItemId', 'price'])"]
+Current URL after login: https://chadsflooring.bz/explore
+Login appears successful (redirected away from login page).
+Extracting __NEXT_DATA__ for build ID...
+  Post-login pageProps keys: ['captcha', 'captcha1', 'captcha2', 'showCaptcha']
+============================================================
+API PROBE: Testing /api/products/search directly...
+============================================================
+    brandPage: bool = False
+    vendors: list[0]
+============================================================
+    categories: list[12]
+PHASE 1: Navigate to explore page and discover API patterns
+============================================================
+      [0] keys: ['id', 'name']
+      [0] sample: {"id": 4, "name": "Accessories"}
+      is_group: False, is_flat: False
+    brands: list[432]
+      [0] keys: ['id', 'name']
+      [0] sample: {"id": 205, "name": "12 Alarm Fire"}
+      is_group: False, is_flat: False
+    oos: bool = False
+    showFavorites: bool = False
+  API response type: dict, keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    variations: int = 110
+    tags: list[0]
+  Navigating to explore page...
+  [resp] https://chadsflooring.bz/api/products/search?query=&limit=5 keys=['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage'] arrays=["categories[12](dict:['id', 'name'])", "brands[432](dict:['id', 'name'])"]
+  [interceptor] +24 groups from https://chadsflooring.bz/api/products/search?query=&limit=5 (total: 39)
+  [resp] https://chadsflooring.bz/api/cart keys=['carts', 'cartsByVendor', 'subTotal', 'shippingMethod', 'shippingMethods', 'shippingTotal', 'shippingPoints', 'totalPoints', 'isRewardsProduct', 'totalPrice'] arrays=["carts[5](dict:['id', 'price', 'priceInPoints', 'slug', 'name', 'pName'])", "shippingMethods[1](dict:['id', 'name', 'weight', 'price', 'archived', 'minOrderPrice'])"]
+  [resp] https://chadsflooring.bz/api/ticket/create-form keys=['issueTypes', 'orderId', 'statusMapping', 'vendors', 'deposits', 'orders'] arrays=["issueTypes[10](dict:['id', 'name', 'description', 'archived', 'createdAt', 'updatedAt'])", "deposits[2](dict:['id', 'status', 'createdAt', 'creditAmount', 'totalReceived', 'type'])", "orders[2](dict:['id', 'createdAt', 'updatedAt', 'orderId', 'orderItemId', 'price'])"]
+  Found 10 product groups in __NEXT_DATA__
+  Found 10 groups in __NEXT_DATA__
+  No categories from shop data, trying to discover from page...
+  Intercepted so far: 39 groups

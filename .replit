@@ -1,0 +1,45 @@
+modules = ["python-3.12", "web"]
+[agent]
+expertMode = true
+
+[nix]
+channel = "stable-25_05"
+packages = ["alsa-lib", "at-spi2-core", "cairo", "chromium", "dbus", "expat", "gdk-pixbuf", "glib", "gtk3", "libdrm", "libxkbcommon", "mesa", "nspr", "nss", "pango", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXrandr"]
+
+[userenv]
+
+[userenv.shared]
+PORT = "5000"
+PUPPETEER_EXECUTABLE_PATH = "/nix/store/qa9cnw4v5xkxyip6mb9kxqfq1z4x2dx1-chromium-138.0.7204.100/bin/chromium"
+WEBAPP_URL = "https://091c55c8-c17d-4479-909e-fd063d64d85f-00-9ut24ypcc8f6.janeway.replit.dev/webapp.html"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Bot"
+
+[[workflows.workflow]]
+name = "Bot"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "echo \"Bot stopped - running on Railway instead\""
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[deployment]
+deploymentTarget = "vm"
+run = ["python", "bot.py"]

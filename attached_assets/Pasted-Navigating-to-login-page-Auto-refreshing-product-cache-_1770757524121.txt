@@ -1,0 +1,116 @@
+Navigating to login page...
+🔄 Auto-refreshing product cache...
+============================================================
+Starting Chads Flooring scraper...
+============================================================
+Using browser: /usr/bin/chromium
+Navigating to site...
+  Filled username using: input[name='email']
+Checking age verification...
+    [flat_product] wrapping: name='MM Gen3 AIO', id=19324
+    [flat_product] wrapping: name='HITZ Infinity', id=19784
+    [flat_product] wrapping: name='Ice Cream Cake ', id=18789
+    [flat_product] wrapping: name='Fun Dip', id=18546
+    [flat_product] wrapping: name='Ultra Fruit Loops', id=18478
+    [flat_product] wrapping: name='Banana Jealousy', id=18254
+  [interceptor] +10 from https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json (total: 10)
+Age verification completed.
+Navigating to login page...
+Login successful.
+--- PHASE 1: Navigate to explore page ---
+    [flat_product] wrapping: name='MM Gen3 AIO', id=19324
+    [flat_product] wrapping: name='Disposable 2g', id=18388
+    [flat_product] wrapping: name='HITZ Infinity', id=19784
+    [flat_product] wrapping: name='Ice Cream Cake ', id=18789
+    [flat_product] wrapping: name='Puffin 2g', id=19325
+    [flat_product] wrapping: name='Fun Dip', id=18546
+    [flat_product] wrapping: name='Ultra Fruit Loops', id=18478
+    [flat_product] wrapping: name='Cereal Milk', id=18664
+    [flat_product] wrapping: name='HBIC', id=18993
+    [flat_product] wrapping: name='Banana Jealousy', id=18254
+  __NEXT_DATA__: 10 groups found, +0 new
+  After Phase 1: 10 groups
+--- PHASE 2: API base call - discover categories & brands ---
+  API response top-level keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    [variations]: int, len=?
+    [posts]: dict, len=1
+    [tags]: list, len=0
+    [vendors]: list = []
+    [currentCategory]: NoneType = None
+    [categories]: list, len=12
+    [brands]: list, len=434
+    [oos]: bool, len=?
+    [showFavorites]: bool = False
+    [brandPage]: bool = False
+    [images]: dict = {'b3201': 'x-img-45-copy-1696292345867.png.webp', 'b4600': 'x-img-54-1759509471012.png.webp', 'b4686': 'x-img-21-1765567301329.png.webp', 'b4495': 'x-...
+  Categories (12): ['Accessories', 'BYOB', 'Carts', 'Concentrates', 'Disposables', 'Edibles', 'Flower', 'Merch', 'Munchies', 'Pre-rolls', 'Topical', 'Rewards']
+  Brands: 434
+  Filled username using: input[name='email']
+  Accessories: +35 new (total: 69)
+    [flat_product] wrapping: name='MM Gen3 AIO', id=19324
+    [flat_product] wrapping: name='Disposable 2g', id=18388
+    [flat_product] wrapping: name='HITZ Infinity', id=19784
+    [flat_product] wrapping: name='Ice Cream Cake ', id=18789
+    [flat_product] wrapping: name='Puffin 2g', id=19325
+    [flat_product] wrapping: name='Fun Dip', id=18546
+    [flat_product] wrapping: name='Ultra Fruit Loops', id=18478
+    [flat_product] wrapping: name='Cereal Milk', id=18664
+    [flat_product] wrapping: name='HBIC', id=18993
+    [flat_product] wrapping: name='Banana Jealousy', id=18254
+  [interceptor] +10 from https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json (total: 10)
+Login successful.
+--- PHASE 1: Navigate to explore page ---
+  Carts: +31 new (total: 107)
+    [tags]: list, len=0
+    [vendors]: list = []
+    [currentCategory]: NoneType = None
+    [categories]: list, len=12
+    [brands]: list, len=434
+    [flat_product] wrapping: name='MM Gen3 AIO', id=19324
+    [flat_product] wrapping: name='Disposable 2g', id=18388
+    [flat_product] wrapping: name='HITZ Infinity', id=19784
+    [flat_product] wrapping: name='Ice Cream Cake ', id=18789
+    [flat_product] wrapping: name='Puffin 2g', id=19325
+    [flat_product] wrapping: name='Fun Dip', id=18546
+    [flat_product] wrapping: name='Ultra Fruit Loops', id=18478
+    [flat_product] wrapping: name='Cereal Milk', id=18664
+    [flat_product] wrapping: name='HBIC', id=18993
+    [flat_product] wrapping: name='Banana Jealousy', id=18254
+  __NEXT_DATA__: 10 groups found, +0 new
+  After Phase 1: 10 groups
+--- PHASE 2: API base call - discover categories & brands ---
+  API response top-level keys: ['variations', 'posts', 'tags', 'vendors', 'currentCategory', 'categories', 'brands', 'oos', 'showFavorites', 'brandPage', 'images', 'logoUrl']
+    [variations]: int, len=?
+    [posts]: dict, len=1
+    [oos]: bool, len=?
+    [showFavorites]: bool = False
+    [images]: dict = {'b3201': 'x-img-45-copy-1696292345867.png.webp', 'b4600': 'x-img-54-1759509471012.png.webp', 'b4686': 'x-img-21-1765567301329.png.webp', 'b4495': 'x-...
+    [logoUrl]: NoneType = None
+  Brands: 434
+  Base search: 24 groups, +24 new (total: 34)
+--- PHASE 3: Category-by-category API fetching ---
+  Concentrates: +36 new (total: 143)
+  Accessories: +35 new (total: 69)
+  BYOB: +7 new (total: 76)
+  Disposables: +30 new (total: 173)
+  Carts: +31 new (total: 107)
+  Edibles: +42 new (total: 215)
+  Concentrates: +36 new (total: 143)
+  Flower: +41 new (total: 256)
+  Merch: +0 new (total: 256)
+  Disposables: +30 new (total: 173)
+  Munchies: +0 new (total: 256)
+  Edibles: +42 new (total: 215)
+  Pre-rolls: +32 new (total: 288)
+  Topical: +4 new (total: 292)
+  Flower: +41 new (total: 256)
+  Merch: +0 new (total: 256)
+  Rewards: +11 new (total: 303)
+--- PHASE 4: Brand-by-brand API fetching ---
+  Munchies: +0 new (total: 256)
+  Pre-rolls: +32 new (total: 288)
+  Processed 100/434 brands, +9 new
+  Topical: +4 new (total: 292)
+  Rewards: +11 new (total: 303)
+--- PHASE 4: Brand-by-brand API fetching ---
+  Processed 100/434 brands, +9 new

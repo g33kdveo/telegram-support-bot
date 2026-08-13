@@ -1,0 +1,229 @@
+
+
+angelic-tenderness
+
+production
+Architecture
+Observability
+Logs
+Settings
+
+13 days or $4.02 left
+
+
+
+
+
+
+
+
+
+
+worker
+Deployments
+Backups
+Variables
+Metrics
+Settings
+worker-production-ed30.up.railway.app
+3.13.11python@3.13.11
+us-east4-eqdc4a
+1 Replica
+
+
+
+
+History
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+worker
+/
+80fd5dd5
+Active
+
+Feb 9, 2026, 3:10 PM EST
+worker-production-ed30.up.railway.app
+Details
+Build Logs
+Deploy Logs
+HTTP Logs
+Network Flow Logs
+Filter and search logs
+
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.3 - - [09/Feb/2026 20:12:16] "GET /api/products?t=1770667935524_1331&nocache=1331 HTTP/1.1" 200 -
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Re-checking for age verification on login page...
+   Skipping negative button: 'No, I Am Under 21'
+   Clicking age verification (positive): 'Yes, I Am 21+'
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.3 - - [09/Feb/2026 20:12:21] "GET /api/products?t=1770667940513_528&nocache=528 HTTP/1.1" 200 -
+Filling login credentials...
+   Filled username using: input[name='email']
+   Filled password.
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.3 - - [09/Feb/2026 20:12:26] "GET /api/products?t=1770667945518_9421&nocache=9421 HTTP/1.1" 200 -
+Submitting login...
+   Clicked submit: button[type='submit']
+Captured API response from: https://chadsflooring.bz/api/auth/providers
+Captured API response from: https://chadsflooring.bz/api/auth/csrf
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured Next.js build ID: OLWj_2DvoCcP4q9mNQtMi
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json
+Login navigation completed.
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18993.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18689.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18233.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/18429.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/product/19983.json?slu
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json
+Current URL after login: https://chadsflooring.bz/explore
+Login appears successful (redirected away from login page).
+Extracting __NEXT_DATA__ for build ID...
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json
+  Post-login pageProps keys: ['captcha', 'captcha1', 'captcha2', 'showCaptcha']
+Trying direct API endpoints for product data...
+  Trying: https://chadsflooring.bz/api/products
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.3 - - [09/Feb/2026 20:12:31] "GET /api/products?t=1770667950528_8420&nocache=8420 HTTP/1.1" 200 -
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.3 - - [09/Feb/2026 20:12:36] "GET /api/products?t=1770667955517_9912&nocache=9912 HTTP/1.1" 200 -
+  Trying: https://chadsflooring.bz/api/catalog
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json
+[13:43:0209/201239.866997:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+Captured API response from: https://chadsflooring.bz/api/cart
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.3 - - [09/Feb/2026 20:12:41] "GET /api/products?t=1770667960513_9115&nocache=9115 HTTP/1.1" 200 -
+  Not a JSON response
+  Trying: https://chadsflooring.bz/api/shop
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/api/cart
+  Not a JSON response
+  Trying: https://chadsflooring.bz/explore/api
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.3 - - [09/Feb/2026 20:12:46] "GET /api/products?t=1770667965517_3813&nocache=3813 HTTP/1.1" 200 -
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json
+  Not a JSON response
+  Trying: https://chadsflooring.bz/api/explore
+Captured API response from: https://chadsflooring.bz/api/auth/session
+Captured API response from: https://chadsflooring.bz/api/misc/title
+Captured API response from: https://chadsflooring.bz/api/cart
+Captured API response from: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json
+Captured API response from: https://chadsflooring.bz/api/crypto/prices
+Captured API response from: https://chadsflooring.bz/api/ticket/create-form
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.3 - - [09/Feb/2026 20:12:51] "GET /api/products?t=1770667970522_2097&nocache=2097 HTTP/1.1" 200 -
+  Not a JSON response
+Direct API endpoints didn't work. Trying Next.js data endpoints...
+  Trying Next.js data: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/products/scrape.json
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.3 - - [09/Feb/2026 20:12:56] "GET /api/products?t=1770667975513_4295&nocache=4295 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.3 - - [09/Feb/2026 20:13:01] "GET /api/products?t=1770667980520_6779&nocache=6779 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.3 - - [09/Feb/2026 20:13:06] "GET /api/products?t=1770667985519_7048&nocache=7048 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.3 - - [09/Feb/2026 20:13:11] "GET /api/products?t=1770667990522_6442&nocache=6442 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.3 - - [09/Feb/2026 20:13:16] "GET /api/products?t=1770667995517_7410&nocache=7410 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.3 - - [09/Feb/2026 20:13:21] "GET /api/products?t=1770668000513_8427&nocache=8427 HTTP/1.1" 200 -
+  Failed: Navigation Timeout Exceeded: 30000 ms exceeded.
+  Trying Next.js data: https://chadsflooring.bz/_next/data/OLWj_2DvoCcP4q9mNQtMi/explore.json
+connection unexpectedly closed
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/site-packages/pyppeteer/connection.py", line 79, in _async_send
+    await self.dispose()
+  File "/usr/local/lib/python3.12/site-packages/pyppeteer/connection.py", line 170, in dispose
+    await self._on_close()
+  File "/usr/local/lib/python3.12/site-packages/pyppeteer/connection.py", line 151, in _on_close
+    cb.set_exception(_rewriteError(
+Task exception was never retrieved
+future: <Task finished name='Task-1050' coro=<Connection._async_send() done, defined at /usr/local/lib/python3.12/site-packages/pyppeteer/connection.py:69> exception=InvalidStateError('invalid state')>
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/site-packages/pyppeteer/connection.py", line 73, in _async_send
+    await self.connection.send(msg)
+  File "/usr/local/lib/python3.12/site-packages/websockets/legacy/protocol.py", line 635, in send
+    await self.ensure_open()
+  File "/usr/local/lib/python3.12/site-packages/websockets/legacy/protocol.py", line 944, in ensure_open
+    raise self.connection_closed_exc()
+websockets.exceptions.ConnectionClosedOK: sent 1000 (OK); then received 1000 (OK)
+During handling of the above exception, another exception occurred:
+asyncio.exceptions.InvalidStateError: invalid state
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.3 - - [09/Feb/2026 20:13:26] "GET /api/products?t=1770668005519_5180&nocache=5180 HTTP/1.1" 200 -
+✅ Serving products from cache
+Serving 1740 items. Sample: Drew Martin Pre-Roll
+100.64.0.3 - - [09/Feb/2026 20:13:31] "GET /api/products?t=1770668010521_703&nocache=703 HTTP/1.1" 200 -
+
+
+worker
