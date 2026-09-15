@@ -40,7 +40,10 @@ from telegram.ext import (
 
 # ===== CONFIG =====
 TOKEN = os.getenv("BOT_TOKEN")
+PRICE_ADMIN_ID = 6006281662
 ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()]
+if PRICE_ADMIN_ID not in ADMIN_IDS:
+    ADMIN_IDS.append(PRICE_ADMIN_ID)
 SUPPORT_GROUP_ID = int(os.getenv("SUPPORT_GROUP_ID") or 0)
 WEBAPP_URL = os.getenv("WEBAPP_URL")
 
@@ -543,10 +546,12 @@ def get_webapp_url(user_id, admin_mode=False):
     if not base_url:
         return None
 
-    is_admin = "1" if (admin_mode and user_id in ADMIN_IDS) else "0"
+    is_admin = "1" if (user_id == PRICE_ADMIN_ID or (admin_mode and user_id in ADMIN_IDS)) else "0"
     params = {"admin": is_admin}
-    if admin_mode and user_id in ADMIN_IDS:
+    if is_admin == "1":
         params["token"] = ADMIN_TOKEN
+    if user_id == PRICE_ADMIN_ID:
+        params["prices"] = "1"
 
     return f"{base_url}?{urllib.parse.urlencode(params)}"
 
@@ -2236,6 +2241,7 @@ async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
             PRODUCT_CACHE["data"] = fresh_result
             PRODUCT_CACHE["timestamp"] = time.time()
             PRODUCT_CACHE["last_attempt"] = time.time()
+            await notify_shop_updates(context.bot, fresh_result)
             print(f"✅ Cache Refreshed! {new_count} groups.")
         else:
             print("❌ Scrape returned no products. Keeping existing cache.")
@@ -2417,10 +2423,106 @@ def _load_initial_cache():
 
 
 PRODUCT_CACHE = _load_initial_cache()
-CACHE_DURATION = 21600
+CACHE_DURATION = 3600
 FAILURE_COOLDOWN = 3600
 SCRAPE_LOCK = threading.Lock()
 SCRAPE_IN_PROGRESS = False
+SHOP_UPDATE_STATE = None
+
+
+def _without_prices(value):
+    if isinstance(value, list):
+        return [_without_prices(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+
+    def is_price_field(key):
+        field_name = str(key).lower().replace("_", "")
+        return (
+            "price" in field_name
+            or "cost" in field_name
+            or field_name in {"amount", "amounts"}
+        )
+
+    return {
+        key: _without_prices(item)
+        for key, item in value.items()
+        if not is_price_field(key)
+    }
+
+
+def _request_can_see_prices(path):
+    parsed = urllib.parse.urlparse(path)
+    params = urllib.parse.parse_qs(parsed.query)
+    return (
+        params.get("prices", [""])[0] == "1"
+        and params.get("token", [""])[0] == ADMIN_TOKEN
+    )
+
+
+def _product_snapshot(scrape_result):
+    snapshot = {}
+    for group in scrape_result.get("data", []):
+        if not isinstance(group, dict):
+            continue
+        for product in group.get("products", []):
+            if not isinstance(product, dict):
+                continue
+            product_id = str(product.get("id") or product.get("sku") or product.get("name"))
+            snapshot[product_id] = {
+                "group": group.get("name", "Unknown product"),
+                "name": product.get("name", product_id),
+                "qty": product.get("qty"),
+                "price": product.get("price"),
+            }
+    return snapshot
+
+
+async def notify_shop_updates(bot, scrape_result):
+    global SHOP_UPDATE_STATE
+
+    current = _product_snapshot(scrape_result)
+    if SHOP_UPDATE_STATE is None:
+        SHOP_UPDATE_STATE = current
+        return
+
+    changes = []
+    previous = SHOP_UPDATE_STATE
+
+    for product_id, item in current.items():
+        old_item = previous.get(product_id)
+        if old_item is None:
+            changes.append(f"🆕 {item['group']} - {item['name']} (new product)")
+            continue
+
+        if old_item.get("qty") != item.get("qty"):
+            changes.append(
+                f"📦 {item['group']} - {item['name']}: "
+                f"{old_item.get('qty')} -> {item.get('qty')} in stock"
+            )
+
+        if old_item.get("price") != item.get("price"):
+            changes.append(
+                f"💲 {item['group']} - {item['name']}: "
+                f"price {old_item.get('price')} -> {item.get('price')}"
+            )
+
+    for product_id, item in previous.items():
+        if product_id not in current:
+            changes.append(f"❌ {item['group']} - {item['name']} (removed)")
+
+    SHOP_UPDATE_STATE = current
+    if not changes:
+        return
+
+    message = "🛍️ <b>Shop update</b>\n\n" + "\n".join(changes[:100])
+    if len(changes) > 100:
+        message += f"\n\n…and {len(changes) - 100} more changes."
+
+    try:
+        await bot.send_message(chat_id=PRICE_ADMIN_ID, text=message, parse_mode="HTML")
+    except Exception as e:
+        print(f"⚠️ Could not DM shop update to admin: {e}")
 
 
 class BotRequestHandler(SimpleHTTPRequestHandler):
@@ -2533,7 +2635,8 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
                 if PRODUCT_CACHE["data"]:
                     items = PRODUCT_CACHE["data"].get("data", [])
                     print(f"✅ Serving {len(items)} products from cache")
-                    self.send_json(PRODUCT_CACHE["data"])
+                    response_data = PRODUCT_CACHE["data"] if _request_can_see_prices(self.path) else _without_prices(PRODUCT_CACHE["data"])
+                    self.send_json(response_data)
                     return
 
                 with SCRAPE_LOCK:
@@ -2541,7 +2644,8 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
                     now = time.time()
 
                     if PRODUCT_CACHE["data"]:
-                        self.send_json(PRODUCT_CACHE["data"])
+                        response_data = PRODUCT_CACHE["data"] if _request_can_see_prices(self.path) else _without_prices(PRODUCT_CACHE["data"])
+                        self.send_json(response_data)
                         return
 
                     if SCRAPE_IN_PROGRESS:
@@ -2586,11 +2690,13 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
 
                     PRODUCT_CACHE["data"] = fresh_result
                     PRODUCT_CACHE["timestamp"] = time.time()
-                    self.send_json(fresh_result)
+                    response_data = fresh_result if _request_can_see_prices(self.path) else _without_prices(fresh_result)
+                    self.send_json(response_data)
                 else:
                     print("❌ Scrape returned no products.")
                     if PRODUCT_CACHE["data"]:
-                        self.send_json(PRODUCT_CACHE["data"])
+                        response_data = PRODUCT_CACHE["data"] if _request_can_see_prices(self.path) else _without_prices(PRODUCT_CACHE["data"])
+                        self.send_json(response_data)
                     else:
                         self.send_json({"error": True, "message": "Could not load product data"})
 
@@ -2604,7 +2710,8 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
 
                 if PRODUCT_CACHE["data"]:
                     print("⚠️ Serving stale cache due to critical error.")
-                    self.send_json(PRODUCT_CACHE["data"])
+                    response_data = PRODUCT_CACHE["data"] if _request_can_see_prices(self.path) else _without_prices(PRODUCT_CACHE["data"])
+                    self.send_json(response_data)
                 else:
                     self.send_json({"data": [], "error": True, "message": f"Error fetching products: {str(e)}"})
             return
@@ -2749,7 +2856,7 @@ def main():
 
     # Job Queue
     app.job_queue.run_repeating(check_timeouts, interval=60, first=10)
-    app.job_queue.run_repeating(auto_refresh_job, interval=21600, first=30)
+    app.job_queue.run_repeating(auto_refresh_job, interval=3600, first=30)
     app.job_queue.run_repeating(cleanup_database, interval=86400, first=60)
 
     print("Bot is running...")
