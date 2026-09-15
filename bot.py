@@ -2229,15 +2229,20 @@ def _format_stock_value(value):
 
 
 async def check_stock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global STOCK_CHECK_STATE, STOCK_CHECK_IN_PROGRESS
+    global STOCK_CHECK_STATE, STOCK_CHECK_IN_PROGRESS, SCRAPE_IN_PROGRESS
 
     if update.effective_user.id not in ADMIN_IDS:
         return
-    if STOCK_CHECK_IN_PROGRESS:
-        await update.message.reply_text("⏳ A stock-only check is already running.")
-        return
 
-    STOCK_CHECK_IN_PROGRESS = True
+    with SCRAPE_LOCK:
+        if STOCK_CHECK_IN_PROGRESS:
+            await update.message.reply_text("⏳ A stock-only check is already running.")
+            return
+        if SCRAPE_IN_PROGRESS:
+            await update.message.reply_text("⏳ The regular shop refresh is still running. Try /checkstock again when it finishes.")
+            return
+        STOCK_CHECK_IN_PROGRESS = True
+
     await update.message.reply_text("🔎 Running stock-only check. Images and the shop cache will not be refreshed.")
 
     try:
@@ -2293,10 +2298,10 @@ async def check_stock_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 # ===== AUTO REFRESH JOB =====
 async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
-    global PRODUCT_CACHE, SCRAPE_IN_PROGRESS
+    global PRODUCT_CACHE, SCRAPE_IN_PROGRESS, STOCK_CHECK_IN_PROGRESS
 
     with SCRAPE_LOCK:
-        if SCRAPE_IN_PROGRESS:
+        if SCRAPE_IN_PROGRESS or STOCK_CHECK_IN_PROGRESS:
             print("⏭️ Skipping auto-refresh: scrape already in progress")
             return
         SCRAPE_IN_PROGRESS = True
