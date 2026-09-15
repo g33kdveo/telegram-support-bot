@@ -2201,16 +2201,94 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👇 <b>Tap below to open the shop:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
 
 
-async def test_notifications_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+LOGIN_NOTIFICATION_SENT = False
+STOCK_CHECK_STATE = None
+STOCK_CHECK_IN_PROGRESS = False
+
+
+def _stock_snapshot(scrape_result):
+    snapshot = {}
+    for group in scrape_result.get("data", []):
+        if not isinstance(group, dict):
+            continue
+        group_name = str(group.get("name", "Unknown product"))
+        for product in group.get("products", []):
+            if not isinstance(product, dict):
+                continue
+            product_id = str(product.get("id") or product.get("sku") or product.get("name"))
+            snapshot[product_id] = {
+                "group": group_name,
+                "name": str(product.get("name", product_id)),
+                "qty": product.get("qty"),
+            }
+    return snapshot
+
+
+def _format_stock_value(value):
+    return "unknown" if value is None or value == "" else str(value)
+
+
+async def check_stock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global STOCK_CHECK_STATE, STOCK_CHECK_IN_PROGRESS
+
     if update.effective_user.id not in ADMIN_IDS:
         return
+    if STOCK_CHECK_IN_PROGRESS:
+        await update.message.reply_text("⏳ A stock-only check is already running.")
+        return
 
-    await context.bot.send_message(
-        chat_id=PRICE_ADMIN_ID,
-        text="🔔 <b>Notification test successful.</b>\nThe bot can DM shop updates to this account.",
-        parse_mode="HTML",
-    )
-    await update.message.reply_text("✅ Test notification sent.")
+    STOCK_CHECK_IN_PROGRESS = True
+    await update.message.reply_text("🔎 Running stock-only check. Images and the shop cache will not be refreshed.")
+
+    try:
+        def run_stock_scrape():
+            scraper = RogersRoofingScraper(
+                username=CHADS_USERNAME,
+                password=CHADS_PASSWORD,
+                api_key=CHADS_API_KEY
+            )
+            return scraper.get_stock_snapshot()
+
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, run_stock_scrape)
+        if not result or not isinstance(result.get("data"), list) or not result["data"]:
+            await update.message.reply_text("❌ Stock-only check failed or returned no products.")
+            return
+
+        current = _stock_snapshot(result)
+        if STOCK_CHECK_STATE is None:
+            STOCK_CHECK_STATE = current
+            await update.message.reply_text(
+                f"✅ Stock baseline saved for {len(current)} variants. Run /checkstock again after changing stock to compare."
+            )
+            return
+
+        changes = []
+        previous = STOCK_CHECK_STATE
+        for product_id, item in current.items():
+            old_item = previous.get(product_id)
+            if old_item and old_item.get("qty") != item.get("qty"):
+                changes.append(
+                    f"📦 <b>{html_escape(item['group'])} - {html_escape(item['name'])}</b>: "
+                    f"{html_escape(_format_stock_value(old_item.get('qty')))} → "
+                    f"{html_escape(_format_stock_value(item.get('qty')))}"
+                )
+        for product_id, item in previous.items():
+            if product_id not in current:
+                changes.append(f"❌ Removed from stock feed: {html_escape(item['group'])} - {html_escape(item['name'])}")
+
+        STOCK_CHECK_STATE = current
+        if not changes:
+            await update.message.reply_text("✅ Stock check complete. No stock changes detected since the last /checkstock.")
+            return
+
+        message = "📊 <b>Stock-only check results</b>\n\n" + "\n".join(changes[:100])
+        if len(changes) > 100:
+            message += f"\n\n…and {len(changes) - 100} more changes."
+        await context.bot.send_message(chat_id=PRICE_ADMIN_ID, text=message, parse_mode="HTML")
+        await update.message.reply_text(f"✅ Stock check complete. Found {len(changes)} stock change(s); results were sent by DM.")
+    finally:
+        STOCK_CHECK_IN_PROGRESS = False
 
 
 # ===== AUTO REFRESH JOB =====
@@ -2226,15 +2304,19 @@ async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
     print("🔄 Auto-refreshing product cache...")
 
     try:
+        loop = asyncio.get_running_loop()
+
         def run_scrape():
             scraper = RogersRoofingScraper(
                 username=CHADS_USERNAME,
                 password=CHADS_PASSWORD,
-                api_key=CHADS_API_KEY
+                api_key=CHADS_API_KEY,
+                login_callback=lambda: asyncio.run_coroutine_threadsafe(
+                    notify_login_success(context.bot), loop
+                )
             )
             return scraper.get_products()
 
-        loop = asyncio.get_running_loop()
         fresh_result = await loop.run_in_executor(None, run_scrape)
 
         if fresh_result and isinstance(fresh_result.get('data'), list) and len(fresh_result['data']) > 0:
@@ -2253,12 +2335,6 @@ async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
             PRODUCT_CACHE["data"] = fresh_result
             PRODUCT_CACHE["timestamp"] = time.time()
             PRODUCT_CACHE["last_attempt"] = time.time()
-            if fresh_result.get("login_successful"):
-                await context.bot.send_message(
-                    chat_id=PRICE_ADMIN_ID,
-                    text="✅ <b>Shop login successful.</b>\nThe hourly shop refresh completed its site login.",
-                    parse_mode="HTML",
-                )
             await notify_shop_updates(context.bot, fresh_result)
             print(f"✅ Cache Refreshed! {new_count} groups.")
         else:
@@ -2545,6 +2621,22 @@ async def notify_shop_updates(bot, scrape_result):
         await bot.send_message(chat_id=PRICE_ADMIN_ID, text=message, parse_mode="HTML")
     except Exception as e:
         print(f"⚠️ Could not DM shop update to admin: {e}")
+
+
+async def notify_login_success(bot):
+    global LOGIN_NOTIFICATION_SENT
+    if LOGIN_NOTIFICATION_SENT:
+        return
+    LOGIN_NOTIFICATION_SENT = True
+    try:
+        await bot.send_message(
+            chat_id=PRICE_ADMIN_ID,
+            text="✅ <b>Shop login successful.</b>\nThe bot logged in to the shop after deployment.",
+            parse_mode="HTML",
+        )
+    except Exception as e:
+        LOGIN_NOTIFICATION_SENT = False
+        print(f"⚠️ Could not DM shop login notification: {e}")
 
 
 class BotRequestHandler(SimpleHTTPRequestHandler):
@@ -2838,7 +2930,7 @@ def main():
     # Handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("menu", menu_command))
-    app.add_handler(CommandHandler("testnotifications", test_notifications_command))
+    app.add_handler(CommandHandler("checkstock", check_stock_command))
     app.add_handler(CommandHandler("reply", handle_reply_command))
     app.add_handler(CommandHandler("settings", settings_command))
     app.add_handler(CommandHandler("appsettings", appsettings_command))

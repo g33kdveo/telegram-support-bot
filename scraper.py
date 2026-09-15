@@ -34,10 +34,11 @@ CATEGORIES = [
 
 class RogersRoofingScraper:
 
-    def __init__(self, username=None, password=None, cookie_string=None, api_key=None):
+    def __init__(self, username=None, password=None, cookie_string=None, api_key=None, login_callback=None):
         self.username = username
         self.password = password
         self.api_key = api_key
+        self.login_callback = login_callback
         self.base_url = "https://rogersroofing.click"
 
     def _find_chromium(self):
@@ -212,6 +213,8 @@ class RogersRoofingScraper:
                 print(f"  Stored {len(_stored_cookies)} cookies for image proxy")
             except Exception as ce:
                 print(f"  Warning: Could not extract cookies: {ce}")
+            if self.login_callback:
+                self.login_callback()
             return True
         else:
             print("WARNING: May still be on login page. Continuing anyway.")
@@ -443,7 +446,7 @@ class RogersRoofingScraper:
             result_map[img_template] = (variants[0], cache_fname)  # Use largest variant as reference
         return result_map
 
-    async def _scrape_async(self):
+    async def _scrape_async(self, download_images=True):
         print("=" * 60)
         print("Starting Rogers Roofing scraper (scrape endpoint)")
         print("=" * 60)
@@ -553,26 +556,23 @@ class RogersRoofingScraper:
                 print(f"    {b}: {count}")
             print(f"{'='*60}")
 
-            # Normalize group images: convert hardcoded sizes (x250, x300, etc.) to x_imgvariantsize template
-            # so they get the same highest-quality variant treatment as product images
-            print(f"\n--- NORMALIZING GROUP IMAGES ---")
-            normalized_count = 0
-            for g in all_groups:
-                imgs = g.get('imgs')
-                if isinstance(imgs, dict):
-                    for ikey, ival in list(imgs.items()):
-                        if isinstance(ival, str):
-                            # Check if image has hardcoded size like x250, x300, etc.
-                            import re
-                            size_match = re.search(r'x(\d+)-', ival)
-                            if size_match:
-                                # Replace hardcoded size with template
-                                normalized = re.sub(r'x(\d+)-', 'x_imgvariantsize-', ival)
-                                imgs[ikey] = normalized
-                                normalized_count += 1
-            print(f"  Normalized {normalized_count} group images to use variant template")
-
-            await self._download_images(page, all_groups, img_prefix)
+            if download_images:
+                # Normalize group images and populate the image cache for the shop.
+                print(f"\n--- NORMALIZING GROUP IMAGES ---")
+                normalized_count = 0
+                for g in all_groups:
+                    imgs = g.get('imgs')
+                    if isinstance(imgs, dict):
+                        for ikey, ival in list(imgs.items()):
+                            if isinstance(ival, str):
+                                import re
+                                size_match = re.search(r'x(\d+)-', ival)
+                                if size_match:
+                                    normalized = re.sub(r'x(\d+)-', 'x_imgvariantsize-', ival)
+                                    imgs[ikey] = normalized
+                                    normalized_count += 1
+                print(f"  Normalized {normalized_count} group images to use variant template")
+                await self._download_images(page, all_groups, img_prefix)
 
             try:
                 await browser.close()
@@ -610,6 +610,24 @@ class RogersRoofingScraper:
             return loop.run_until_complete(self._scrape_async())
         except Exception as e:
             print(f"Scraper Wrapper Error: {e}")
+            import traceback
+            traceback.print_exc()
+            return {"data": [], "error": True}
+        finally:
+            if loop:
+                try:
+                    loop.close()
+                except:
+                    pass
+
+    def get_stock_snapshot(self):
+        loop = None
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            return loop.run_until_complete(self._scrape_async(download_images=False))
+        except Exception as e:
+            print(f"Stock Snapshot Wrapper Error: {e}")
             import traceback
             traceback.print_exc()
             return {"data": [], "error": True}
