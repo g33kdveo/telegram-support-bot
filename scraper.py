@@ -118,7 +118,7 @@ class RogersRoofingScraper:
     async def _login(self, page):
         if not self.username or not self.password:
             print("No credentials provided, skipping login.")
-            return
+            return False
 
         print("Navigating to login page...")
         for attempt in range(3):
@@ -212,8 +212,10 @@ class RogersRoofingScraper:
                 print(f"  Stored {len(_stored_cookies)} cookies for image proxy")
             except Exception as ce:
                 print(f"  Warning: Could not extract cookies: {ce}")
+            return True
         else:
             print("WARNING: May still be on login page. Continuing anyway.")
+            return False
 
     async def _fetch_scrape_endpoint(self, page):
         url = f"{self.base_url}/api/products/scrape"
@@ -499,7 +501,7 @@ class RogersRoofingScraper:
             if age_handled:
                 print("Age verification completed.")
 
-            await self._login(page)
+            login_successful = await self._login(page)
 
             scrape_data = await self._fetch_scrape_endpoint(page)
             if not scrape_data or not isinstance(scrape_data.get('data'), list):
@@ -584,6 +586,7 @@ class RogersRoofingScraper:
                 "imageSizeVariants": scrape_data.get('imageSizeVariants', IMAGE_SIZE_VARIANTS),
                 "lastUpdated": scrape_data.get('lastUpdated'),
                 "nextUpdate": scrape_data.get('nextUpdate'),
+                "login_successful": login_successful,
             }
 
         except Exception as e:

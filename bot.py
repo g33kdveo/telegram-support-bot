@@ -546,11 +546,11 @@ def get_webapp_url(user_id, admin_mode=False):
     if not base_url:
         return None
 
-    is_admin = "1" if (user_id == PRICE_ADMIN_ID or (admin_mode and user_id in ADMIN_IDS)) else "0"
+    is_admin = "1" if (admin_mode and user_id in ADMIN_IDS) else "0"
     params = {"admin": is_admin}
     if is_admin == "1":
         params["token"] = ADMIN_TOKEN
-    if user_id == PRICE_ADMIN_ID:
+    if admin_mode and user_id == PRICE_ADMIN_ID:
         params["prices"] = "1"
 
     return f"{base_url}?{urllib.parse.urlencode(params)}"
@@ -2201,6 +2201,18 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👇 <b>Tap below to open the shop:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
 
 
+async def test_notifications_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in ADMIN_IDS:
+        return
+
+    await context.bot.send_message(
+        chat_id=PRICE_ADMIN_ID,
+        text="🔔 <b>Notification test successful.</b>\nThe bot can DM shop updates to this account.",
+        parse_mode="HTML",
+    )
+    await update.message.reply_text("✅ Test notification sent.")
+
+
 # ===== AUTO REFRESH JOB =====
 async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
     global PRODUCT_CACHE, SCRAPE_IN_PROGRESS
@@ -2241,6 +2253,12 @@ async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
             PRODUCT_CACHE["data"] = fresh_result
             PRODUCT_CACHE["timestamp"] = time.time()
             PRODUCT_CACHE["last_attempt"] = time.time()
+            if fresh_result.get("login_successful"):
+                await context.bot.send_message(
+                    chat_id=PRICE_ADMIN_ID,
+                    text="✅ <b>Shop login successful.</b>\nThe hourly shop refresh completed its site login.",
+                    parse_mode="HTML",
+                )
             await notify_shop_updates(context.bot, fresh_result)
             print(f"✅ Cache Refreshed! {new_count} groups.")
         else:
@@ -2816,6 +2834,7 @@ def main():
     # Handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("menu", menu_command))
+    app.add_handler(CommandHandler("testnotifications", test_notifications_command))
     app.add_handler(CommandHandler("reply", handle_reply_command))
     app.add_handler(CommandHandler("settings", settings_command))
     app.add_handler(CommandHandler("appsettings", appsettings_command))

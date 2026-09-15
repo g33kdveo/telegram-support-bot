@@ -162,6 +162,67 @@
             margin-top: auto;
         }
 
+        .admin-price-summary {
+            margin-top: 4px;
+            color: var(--button-color);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .pricing-graph {
+            margin-top: 18px;
+            border-top: 1px solid var(--secondary-bg);
+            padding-top: 14px;
+        }
+
+        .pricing-graph-title {
+            color: var(--hint-color);
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .pricing-graph-chart {
+            display: flex;
+            align-items: end;
+            gap: 8px;
+            height: 120px;
+            padding: 0 4px 24px;
+            border-bottom: 1px solid var(--secondary-bg);
+        }
+
+        .pricing-graph-column {
+            display: flex;
+            flex: 1;
+            min-width: 0;
+            height: 100%;
+            flex-direction: column;
+            justify-content: end;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .pricing-graph-price {
+            color: var(--text-color);
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .pricing-graph-bar {
+            width: 100%;
+            max-width: 42px;
+            min-height: 6px;
+            border-radius: 4px 4px 0 0;
+            background: var(--button-color);
+        }
+
+        .pricing-graph-quantity {
+            color: var(--hint-color);
+            font-size: 10px;
+            white-space: nowrap;
+        }
+
         /* Modal */
         .modal-overlay {
             position: fixed;
@@ -452,6 +513,18 @@
     const API_URL = window.location.hostname === 'localhost' 
         ? "/api/products" 
         : `${window.location.protocol}//${window.location.hostname}/api/products`;
+    const WEBAPP_PARAMS = new URLSearchParams(window.location.search);
+
+    function buildApiUrl(path, params = {}) {
+        const url = new URL(path, window.location.origin);
+        const token = WEBAPP_PARAMS.get('token');
+        const prices = WEBAPP_PARAMS.get('prices');
+        if (token) url.searchParams.set('token', token);
+        if (prices) url.searchParams.set('prices', prices);
+        Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+        return url.toString();
+    }
+
     const PREFERRED_ORDER = ["Accessories", "In-House", "Carts", "Concentrates", "Disposables", "Edibles", "Flower", "Pre-rolls"];
 
     // STATE
@@ -517,7 +590,7 @@
     async function loadSettings() {
         try {
             const resp = await fetch(
-                `${API_URL.replace('/api/products', '/api/settings')}?t=${Date.now()}`,
+                buildApiUrl(API_URL.replace('/api/products', '/api/settings'), { t: Date.now() }),
                 { cache: 'no-store' }
             );
             if (resp.ok) {
@@ -543,7 +616,7 @@
             
             // Fetch with aggressive cache bypass headers
             const response = await fetch(
-                `${API_URL}?t=${cacheBreaker}&nocache=${random}`,
+                buildApiUrl(API_URL, { t: cacheBreaker, nocache: random }),
                 {
                     method: 'GET',
                     cache: 'no-store',
@@ -744,6 +817,69 @@
         return value === undefined || value === null || value === '' ? null : String(value);
     }
 
+    function getPricingTiers(product) {
+        if (!product || !isAdmin) return [];
+        const candidates = [
+            product.priceTiers, product.pricingTiers, product.pricing_tiers,
+            product.volumePricing, product.volume_pricing, product.bulkPricing,
+            product.bulk_pricing, product.priceBreaks, product.price_breaks,
+            Array.isArray(product.prices) ? product.prices : null
+        ];
+        const rawTiers = candidates.find(value => Array.isArray(value));
+        if (!rawTiers) return [];
+
+        return rawTiers.map((tier, index) => {
+            if (!tier || typeof tier !== 'object') return null;
+            const quantity = tier.minQty ?? tier.min_quantity ?? tier.minimumQuantity ??
+                tier.quantity ?? tier.qty ?? tier.from ?? tier.minimum ?? index + 1;
+            const price = tier.price ?? tier.unitPrice ?? tier.unit_price ?? tier.amount ?? tier.cost;
+            const numericPrice = Number.parseFloat(String(price).replace(/[^0-9.\-]/g, ''));
+            const numericQuantity = Number.parseInt(String(quantity).replace(/[^0-9]/g, ''), 10);
+            if (!Number.isFinite(numericPrice) || !Number.isFinite(numericQuantity)) return null;
+            return { quantity: numericQuantity, price: numericPrice };
+        }).filter(Boolean).sort((a, b) => a.quantity - b.quantity);
+    }
+
+    function getGroupPricingTiers(group, variants) {
+        const groupTiers = getPricingTiers(group);
+        if (groupTiers.length) return groupTiers;
+        for (const variant of variants || []) {
+            const variantTiers = getPricingTiers(variant);
+            if (variantTiers.length) return variantTiers;
+        }
+        return [];
+    }
+
+    function renderAdminPriceSummary(group, variants) {
+        if (!isAdmin) return '';
+        const tiers = getGroupPricingTiers(group, variants);
+        if (tiers.length > 1) {
+            return `<div class="admin-price-summary">$${tiers[0].price.toFixed(2)} - $${tiers[tiers.length - 1].price.toFixed(2)}</div>`;
+        }
+        const price = (variants || []).map(getProductPrice).find(value => value !== null);
+        return price === undefined ? '' : `<div class="admin-price-summary">$${price}</div>`;
+    }
+
+    function renderPricingGraph(group, variants) {
+        const tiers = getGroupPricingTiers(group, variants);
+        if (!isAdmin || tiers.length < 2) return '';
+        const maxPrice = Math.max(...tiers.map(tier => tier.price));
+        const minPrice = Math.min(...tiers.map(tier => tier.price));
+        const priceRange = maxPrice - minPrice || 1;
+        const columns = tiers.map(tier => {
+            const height = 24 + ((tier.price - minPrice) / priceRange) * 76;
+            return `<div class="pricing-graph-column">
+                <div class="pricing-graph-price">$${tier.price.toFixed(2)}</div>
+                <div class="pricing-graph-bar" style="height:${height.toFixed(1)}%"></div>
+                <div class="pricing-graph-quantity">${tier.quantity}+ pcs</div>
+            </div>`;
+        }).join('');
+        return `<div class="pricing-graph">
+            <div class="pricing-graph-title">Volume pricing</div>
+            <div class="pricing-graph-chart">${columns}</div>
+        </div>`;
+    }
+
     function parseProductInfo(group) {
         const name = group.name;
         const desc = group.desc;
@@ -902,6 +1038,7 @@
                 <div class="pc-meta">${info.formulation}${optionsCount > 1 ? ' · ' + optionsCount + ' options' : ''}</div>
                 <img src="${imgUrl}" class="product-image" onerror="this.style.display='none'" loading="lazy">
                 <div class="pc-footer">${stockText}${info.volume ? ' · ' + info.volume : ''}</div>
+                ${renderAdminPriceSummary(group, variants)}
                 ${isAdmin ? `
                     <div class="admin-overlay">
                         <button class="btn-hide" onclick="toggleHide(${groupId})">
@@ -1004,6 +1141,7 @@
             ${imagesHtml}
             <div class="modal-desc">${group.desc || 'No description available.'}</div>
             ${variantsHtml}
+            ${renderPricingGraph(group, variants)}
         `;
         modal.style.display = 'flex';
     }
