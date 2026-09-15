@@ -2441,7 +2441,7 @@ def _load_initial_cache():
 
 
 PRODUCT_CACHE = _load_initial_cache()
-CACHE_DURATION = 3600
+CACHE_DURATION = 1800
 FAILURE_COOLDOWN = 3600
 SCRAPE_LOCK = threading.Lock()
 SCRAPE_IN_PROGRESS = False
@@ -2483,16 +2483,17 @@ def _product_snapshot(scrape_result):
     for group in scrape_result.get("data", []):
         if not isinstance(group, dict):
             continue
+        group_id = str(group.get("id") or group.get("slug") or group.get("name"))
+        variants = {}
         for product in group.get("products", []):
             if not isinstance(product, dict):
                 continue
             product_id = str(product.get("id") or product.get("sku") or product.get("name"))
-            snapshot[product_id] = {
-                "group": group.get("name", "Unknown product"),
-                "name": product.get("name", product_id),
-                "qty": product.get("qty"),
-                "price": product.get("price"),
-            }
+            variants[product_id] = str(product.get("name", product_id))
+        snapshot[group_id] = {
+            "name": str(group.get("name", group_id)),
+            "variants": variants,
+        }
     return snapshot
 
 
@@ -2507,27 +2508,30 @@ async def notify_shop_updates(bot, scrape_result):
     changes = []
     previous = SHOP_UPDATE_STATE
 
-    for product_id, item in current.items():
-        old_item = previous.get(product_id)
+    for group_id, item in current.items():
+        old_item = previous.get(group_id)
         if old_item is None:
-            changes.append(f"🆕 {item['group']} - {item['name']} (new product)")
+            changes.append(f"🆕 <b>Product added:</b> {html_escape(item['name'])}")
             continue
 
-        if old_item.get("qty") != item.get("qty"):
-            changes.append(
-                f"📦 {item['group']} - {item['name']}: "
-                f"{old_item.get('qty')} -> {item.get('qty')} in stock"
-            )
+        old_variants = old_item.get("variants", {})
+        for variant_id, variant_name in item["variants"].items():
+            if variant_id not in old_variants:
+                changes.append(
+                    f"🌱 <b>Flavor/strain added:</b> {html_escape(variant_name)} "
+                    f"({html_escape(item['name'])})"
+                )
 
-        if old_item.get("price") != item.get("price"):
-            changes.append(
-                f"💲 {item['group']} - {item['name']}: "
-                f"price {old_item.get('price')} -> {item.get('price')}"
-            )
+        for variant_id, variant_name in old_variants.items():
+            if variant_id not in item["variants"]:
+                changes.append(
+                    f"🌱 <b>Flavor/strain removed:</b> {html_escape(variant_name)} "
+                    f"({html_escape(item['name'])})"
+                )
 
-    for product_id, item in previous.items():
-        if product_id not in current:
-            changes.append(f"❌ {item['group']} - {item['name']} (removed)")
+    for group_id, item in previous.items():
+        if group_id not in current:
+            changes.append(f"❌ <b>Product removed:</b> {html_escape(item['name'])}")
 
     SHOP_UPDATE_STATE = current
     if not changes:
@@ -2875,7 +2879,7 @@ def main():
 
     # Job Queue
     app.job_queue.run_repeating(check_timeouts, interval=60, first=10)
-    app.job_queue.run_repeating(auto_refresh_job, interval=3600, first=30)
+    app.job_queue.run_repeating(auto_refresh_job, interval=1800, first=30)
     app.job_queue.run_repeating(cleanup_database, interval=86400, first=60)
 
     print("Bot is running...")
