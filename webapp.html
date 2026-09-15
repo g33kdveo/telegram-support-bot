@@ -287,6 +287,7 @@
             border-top: 1px solid #ccc;
             display: none; /* Hidden by default */
             justify-content: center;
+            gap: 8px;
             z-index: 900;
         }
 
@@ -299,7 +300,19 @@
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            width: 100%;
+            flex: 1;
+        }
+
+        .admin-stock-btn {
+            background: var(--bg-color);
+            color: var(--text-color);
+            border: 1px solid var(--button-color);
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            flex: 1;
         }
 
         .admin-overlay {
@@ -502,6 +515,7 @@
 <!-- Admin Save Bar -->
 <div class="admin-bar">
     <button class="admin-btn" onclick="saveAdminSettings()">💾 Save Changes</button>
+    <button id="admin-stock-toggle" class="admin-stock-btn" onclick="toggleAdminStockView()">Show Full Menu</button>
 </div>
 
 <script>
@@ -532,6 +546,7 @@
     let CATEGORIES = [];
     let settings = { h: [], r: {} };
     let isAdmin = false;
+    let showAllAdminProducts = false;
     let adminToken = '';
     let currentImgPrefix = "";
     let selectedCategory = null;
@@ -770,6 +785,16 @@
         render();
     }
 
+    function toggleAdminStockView() {
+        if (!isAdmin) return;
+        showAllAdminProducts = !showAllAdminProducts;
+        const toggle = document.getElementById('admin-stock-toggle');
+        if (toggle) {
+            toggle.textContent = showAllAdminProducts ? 'Hide Out-of-Stock' : 'Show Full Menu';
+        }
+        render();
+    }
+
     function selectCategory(cat) {
         selectedCategory = cat;
         renderCategories();
@@ -989,7 +1014,7 @@
             inStockVariants.forEach(p => totalStock += safeQty(p.qty));
 
             const isOutOfStock = totalStock <= 0;
-            if (isOutOfStock && !isAdmin) return;
+            if (isOutOfStock && (!isAdmin || !showAllAdminProducts)) return;
 
             const groupId = variants.length > 0 ? variants[0].id : 0;
             const isHidden = settings.h.includes(groupId);
