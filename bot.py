@@ -2275,15 +2275,19 @@ async def _run_check_stock_command(update: Update, context: ContextTypes.DEFAULT
     await update.message.reply_text("🔎 Running stock-only check. Images and the shop cache will not be refreshed.")
 
     try:
+        loop = asyncio.get_running_loop()
+
         def run_stock_scrape():
             scraper = RogersRoofingScraper(
                 username=CHADS_USERNAME,
                 password=CHADS_PASSWORD,
-                api_key=CHADS_API_KEY
+                api_key=CHADS_API_KEY,
+                login_callback=lambda: asyncio.run_coroutine_threadsafe(
+                    notify_login_success(context.bot), loop
+                )
             )
             return scraper.get_stock_snapshot()
 
-        loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, run_stock_scrape)
         if not result or not isinstance(result.get("data"), list) or not result["data"]:
             await update.message.reply_text("❌ Stock-only check failed or returned no products.")
@@ -2371,7 +2375,7 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
             PRODUCT_CACHE["data"] = fresh_result
             PRODUCT_CACHE["timestamp"] = time.time()
             PRODUCT_CACHE["last_attempt"] = time.time()
-            await notify_shop_updates(context.bot, fresh_result)
+            await notify_shop_updates(context.bot, fresh_result, send_notifications=False)
             print(f"✅ Cache Refreshed! {new_count} groups.")
         else:
             print("❌ Scrape returned no products. Keeping existing cache.")
@@ -2800,7 +2804,7 @@ def _format_stock_notification(item, variant):
     )
 
 
-async def notify_shop_updates(bot, scrape_result):
+async def notify_shop_updates(bot, scrape_result, send_notifications=True):
     global SHOP_UPDATE_STATE, SHOP_NOTIFICATION_TIMES
 
     current = _normalize_product_snapshot(_product_snapshot(scrape_result))
@@ -2864,10 +2868,10 @@ async def notify_shop_updates(bot, scrape_result):
 
     SHOP_UPDATE_STATE = current
     _save_shop_update_state(current, SHOP_NOTIFICATION_TIMES)
-    if not notifications:
+    if not send_notifications or not notifications:
         return
 
-    for notification in notifications:
+    for index, notification in enumerate(notifications):
         try:
             await bot.send_message(
                 chat_id=PRICE_ADMIN_ID,
@@ -2876,6 +2880,8 @@ async def notify_shop_updates(bot, scrape_result):
             )
         except Exception as e:
             print(f"⚠️ Could not DM new-product notification: {e}")
+        if index < len(notifications) - 1:
+            await asyncio.sleep(2)
 
 
 async def notify_login_success(bot):
