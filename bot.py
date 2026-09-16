@@ -67,6 +67,7 @@ SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp
 STOCK_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stock_monitor_state.json")
 SESSION_REFRESH_COOLDOWN = 10 * 60
 STOCK_NOTIFICATION_COOLDOWN = 24 * 60 * 60
+MANUAL_STOCK_CHECK_COOLDOWN = 5 * 60
 STOCK_MONITOR_RETRY_DELAY = 5
 STOCK_MONITOR_MAX_ATTEMPTS = 3
 ADMIN_TOKEN = hashlib.sha256((TOKEN or "fallback").encode()).hexdigest()[:32]
@@ -2213,6 +2214,8 @@ STOCK_MONITOR_AUTH_WARNING_SENT = False
 LAST_SESSION_REFRESH_ATTEMPT = 0
 STOCK_MONITOR_FAILURE_COUNT = 0
 STOCK_MONITOR_FAILURE_WARNING_SENT = False
+MANUAL_CHECK_PENDING = False
+LAST_MANUAL_CHECK = 0
 
 
 def _stock_snapshot(scrape_result):
@@ -2238,19 +2241,36 @@ def _format_stock_value(value):
 
 
 async def check_stock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global STOCK_CHECK_STATE, STOCK_CHECK_IN_PROGRESS, SCRAPE_IN_PROGRESS
+    global MANUAL_CHECK_PENDING, LAST_MANUAL_CHECK
 
     if update.effective_user.id not in ADMIN_IDS:
         return
 
-    with SCRAPE_LOCK:
-        if STOCK_CHECK_IN_PROGRESS:
-            await update.message.reply_text("⏳ A stock-only check is already running.")
-            return
-        if SCRAPE_IN_PROGRESS:
-            await update.message.reply_text("⏳ The regular shop refresh is still running. Try /checkstock again when it finishes.")
-            return
-        STOCK_CHECK_IN_PROGRESS = True
+    now = time.time()
+    if MANUAL_CHECK_PENDING:
+        await update.message.reply_text("⏳ A stock check is already queued or running. Please wait for it to finish.")
+        return
+
+    cooldown_remaining = MANUAL_STOCK_CHECK_COOLDOWN - (now - LAST_MANUAL_CHECK)
+    if cooldown_remaining > 0:
+        minutes = max(1, int((cooldown_remaining + 59) // 60))
+        await update.message.reply_text(f"⏳ /checkstock is on cooldown. Try again in about {minutes} minute(s).")
+        return
+
+    MANUAL_CHECK_PENDING = True
+    try:
+        async with SCRAPE_COORDINATOR_LOCK:
+            await _wait_for_active_scrape()
+            await _run_check_stock_command(update, context)
+    finally:
+        MANUAL_CHECK_PENDING = False
+        LAST_MANUAL_CHECK = time.time()
+
+
+async def _run_check_stock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global STOCK_CHECK_STATE, STOCK_CHECK_IN_PROGRESS, SCRAPE_IN_PROGRESS
+
+    await _claim_stock_check()
 
     await update.message.reply_text("🔎 Running stock-only check. Images and the shop cache will not be refreshed.")
 
@@ -2307,13 +2327,15 @@ async def check_stock_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 # ===== AUTO REFRESH JOB =====
 async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
+    async with SCRAPE_COORDINATOR_LOCK:
+        await _wait_for_active_scrape()
+        await _run_auto_refresh_job(context)
+
+
+async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
     global PRODUCT_CACHE, SCRAPE_IN_PROGRESS, STOCK_CHECK_IN_PROGRESS
 
-    with SCRAPE_LOCK:
-        if SCRAPE_IN_PROGRESS or STOCK_CHECK_IN_PROGRESS:
-            print("⏭️ Skipping auto-refresh: scrape already in progress")
-            return
-        SCRAPE_IN_PROGRESS = True
+    await _claim_full_scrape()
 
     print("🔄 Auto-refreshing product cache...")
 
@@ -2362,15 +2384,17 @@ async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
 
 
 async def stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
+    async with SCRAPE_COORDINATOR_LOCK:
+        await _wait_for_active_scrape()
+        await _run_stock_monitor_job(context)
+
+
+async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
     global SCRAPE_IN_PROGRESS, STOCK_MONITOR_AUTH_WARNING_SENT
     global LAST_SESSION_REFRESH_ATTEMPT, STOCK_MONITOR_FAILURE_COUNT
     global STOCK_MONITOR_FAILURE_WARNING_SENT
 
-    with SCRAPE_LOCK:
-        if SCRAPE_IN_PROGRESS or STOCK_CHECK_IN_PROGRESS:
-            print("⏭️ Skipping 60-second stock monitor: another scrape is running")
-            return
-        SCRAPE_IN_PROGRESS = True
+    await _claim_full_scrape()
 
     try:
         loop = asyncio.get_running_loop()
@@ -2405,7 +2429,7 @@ async def stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
 
         if time.time() - LAST_SESSION_REFRESH_ATTEMPT >= SESSION_REFRESH_COOLDOWN:
             LAST_SESSION_REFRESH_ATTEMPT = time.time()
-            await auto_refresh_job(context)
+            await _run_auto_refresh_job(context)
         return
 
     if not result.get("ok"):
@@ -2629,6 +2653,34 @@ SCRAPE_LOCK = threading.Lock()
 SCRAPE_IN_PROGRESS = False
 SHOP_UPDATE_STATE = None
 SHOP_NOTIFICATION_TIMES = {}
+SCRAPE_COORDINATOR_LOCK = asyncio.Lock()
+
+
+async def _wait_for_active_scrape():
+    while True:
+        with SCRAPE_LOCK:
+            active = SCRAPE_IN_PROGRESS or STOCK_CHECK_IN_PROGRESS
+        if not active:
+            return
+        await asyncio.sleep(1)
+
+
+async def _claim_full_scrape():
+    while True:
+        with SCRAPE_LOCK:
+            if not SCRAPE_IN_PROGRESS and not STOCK_CHECK_IN_PROGRESS:
+                globals()["SCRAPE_IN_PROGRESS"] = True
+                return
+        await asyncio.sleep(1)
+
+
+async def _claim_stock_check():
+    while True:
+        with SCRAPE_LOCK:
+            if not SCRAPE_IN_PROGRESS and not STOCK_CHECK_IN_PROGRESS:
+                globals()["STOCK_CHECK_IN_PROGRESS"] = True
+                return
+        await asyncio.sleep(1)
 
 
 def _without_prices(value):
