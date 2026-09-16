@@ -25,7 +25,7 @@ def patched_launcher_init(self, *args, **kwargs):
     original_launcher_init(self, *args, **kwargs)
 pyppeteer.launcher.Launcher.__init__ = patched_launcher_init
 
-from scraper import RogersRoofingScraper
+from scraper import RogersRoofingScraper, fetch_authenticated_stock_snapshot
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -64,6 +64,9 @@ REFERRAL_TOPIC_ID = 575
 RETENTION_DAYS = int(os.getenv("RETENTION_DAYS") or 15)
 DELETE_TIMEOUT = 14 * 24 * 60 * 60
 SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp_settings.json")
+STOCK_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stock_monitor_state.json")
+SESSION_REFRESH_COOLDOWN = 10 * 60
+STOCK_NOTIFICATION_COOLDOWN = 24 * 60 * 60
 ADMIN_TOKEN = hashlib.sha256((TOKEN or "fallback").encode()).hexdigest()[:32]
 
 # ===== GLOBAL STATE =====
@@ -2204,6 +2207,8 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 LOGIN_NOTIFICATION_SENT = False
 STOCK_CHECK_STATE = None
 STOCK_CHECK_IN_PROGRESS = False
+STOCK_MONITOR_AUTH_WARNING_SENT = False
+LAST_SESSION_REFRESH_ATTEMPT = 0
 
 
 def _stock_snapshot(scrape_result):
@@ -2350,6 +2355,72 @@ async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
     finally:
         with SCRAPE_LOCK:
             SCRAPE_IN_PROGRESS = False
+
+
+async def stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
+    global SCRAPE_IN_PROGRESS, STOCK_MONITOR_AUTH_WARNING_SENT
+    global LAST_SESSION_REFRESH_ATTEMPT
+
+    with SCRAPE_LOCK:
+        if SCRAPE_IN_PROGRESS or STOCK_CHECK_IN_PROGRESS:
+            print("⏭️ Skipping 60-second stock monitor: another scrape is running")
+            return
+        SCRAPE_IN_PROGRESS = True
+
+    try:
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            fetch_authenticated_stock_snapshot,
+            CHADS_API_KEY,
+        )
+    finally:
+        with SCRAPE_LOCK:
+            SCRAPE_IN_PROGRESS = False
+
+    if result.get("auth_required"):
+        if not STOCK_MONITOR_AUTH_WARNING_SENT:
+            STOCK_MONITOR_AUTH_WARNING_SENT = True
+            try:
+                await context.bot.send_message(
+                    chat_id=PRICE_ADMIN_ID,
+                    text="⚠️ Stock monitor session expired. Attempting a guarded re-login.",
+                )
+            except Exception as e:
+                print(f"⚠️ Could not send stock monitor warning: {e}")
+
+        if time.time() - LAST_SESSION_REFRESH_ATTEMPT >= SESSION_REFRESH_COOLDOWN:
+            LAST_SESSION_REFRESH_ATTEMPT = time.time()
+            await auto_refresh_job(context)
+        return
+
+    if not result.get("ok"):
+        print(f"⚠️ 60-second stock monitor failed: {result.get('error')}")
+        return
+
+    STOCK_MONITOR_AUTH_WARNING_SENT = False
+    await notify_shop_updates(
+        context.bot,
+        {"data": _snapshot_to_groups(result["snapshot"])},
+    )
+
+
+def _snapshot_to_groups(snapshot):
+    return [
+        {
+            "id": group_id,
+            "name": item["name"],
+            "products": [
+                {
+                    "id": variant_id,
+                    "name": variant.get("name", variant_id),
+                    "qty": variant.get("qty"),
+                }
+                for variant_id, variant in item["variants"].items()
+            ],
+        }
+        for group_id, item in snapshot.items()
+    ]
 
 
 # ===== BACKGROUND JOBS =====
@@ -2527,6 +2598,7 @@ FAILURE_COOLDOWN = 3600
 SCRAPE_LOCK = threading.Lock()
 SCRAPE_IN_PROGRESS = False
 SHOP_UPDATE_STATE = None
+SHOP_NOTIFICATION_TIMES = {}
 
 
 def _without_prices(value):
@@ -2570,7 +2642,10 @@ def _product_snapshot(scrape_result):
             if not isinstance(product, dict):
                 continue
             product_id = str(product.get("id") or product.get("sku") or product.get("name"))
-            variants[product_id] = str(product.get("name", product_id))
+            variants[product_id] = {
+                "name": str(product.get("name", product_id)),
+                "qty": product.get("qty"),
+            }
         snapshot[group_id] = {
             "name": str(group.get("name", group_id)),
             "variants": variants,
@@ -2578,54 +2653,137 @@ def _product_snapshot(scrape_result):
     return snapshot
 
 
+def _load_shop_update_state():
+    try:
+        with open(STOCK_STATE_FILE, "r", encoding="utf-8") as f:
+            state = json.load(f)
+        if not isinstance(state, dict):
+            return None, {}
+        if "snapshot" in state:
+            return state.get("snapshot") or {}, state.get("notification_times") or {}
+        return state, {}
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None, {}
+
+
+def _save_shop_update_state(snapshot, notification_times):
+    try:
+        with open(STOCK_STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump({"snapshot": snapshot, "notification_times": notification_times}, f)
+    except OSError as e:
+        print(f"⚠️ Could not save stock monitor state: {e}")
+
+
+def _quantity_number(value):
+    if value is None or value == "":
+        return None
+    try:
+        return float(str(value).replace("+", "").replace(",", "").strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _normalize_product_snapshot(snapshot):
+    normalized = {}
+    for group_id, group in (snapshot or {}).items():
+        if not isinstance(group, dict):
+            continue
+        variants = {}
+        for variant_id, variant in (group.get("variants") or {}).items():
+            if isinstance(variant, dict):
+                variants[str(variant_id)] = {
+                    "name": str(variant.get("name", variant_id)),
+                    "qty": variant.get("qty"),
+                }
+            else:
+                variants[str(variant_id)] = {"name": str(variant), "qty": None}
+        normalized[str(group_id)] = {
+            "name": str(group.get("name", group_id)),
+            "variants": variants,
+        }
+    return normalized
+
+
 async def notify_shop_updates(bot, scrape_result):
-    global SHOP_UPDATE_STATE
+    global SHOP_UPDATE_STATE, SHOP_NOTIFICATION_TIMES
 
-    current = _product_snapshot(scrape_result)
+    current = _normalize_product_snapshot(_product_snapshot(scrape_result))
     if SHOP_UPDATE_STATE is None:
-        SHOP_UPDATE_STATE = current
-        return
+        SHOP_UPDATE_STATE, SHOP_NOTIFICATION_TIMES = _load_shop_update_state()
+        if SHOP_UPDATE_STATE is None:
+            SHOP_UPDATE_STATE = current
+            _save_shop_update_state(current, SHOP_NOTIFICATION_TIMES)
+            return
 
-    changes = []
-    previous = SHOP_UPDATE_STATE
+    previous = _normalize_product_snapshot(SHOP_UPDATE_STATE)
+    notifications = []
+    now = time.time()
 
     for group_id, item in current.items():
         old_item = previous.get(group_id)
         if old_item is None:
-            changes.append(f"🆕 <b>Product added:</b> {html_escape(item['name'])}")
+            if len(item["variants"]) > 1:
+                for variant_id, variant in item["variants"].items():
+                    key = f"variant:{group_id}:{variant_id}"
+                    if now - SHOP_NOTIFICATION_TIMES.get(key, 0) >= STOCK_NOTIFICATION_COOLDOWN:
+                        notifications.append(
+                            f"🆕 <b>Stock updated:</b> {html_escape(item['name'])} - "
+                            f"{html_escape(variant['name'])}"
+                        )
+                        SHOP_NOTIFICATION_TIMES[key] = now
+            else:
+                key = f"group:{group_id}"
+                if now - SHOP_NOTIFICATION_TIMES.get(key, 0) >= STOCK_NOTIFICATION_COOLDOWN:
+                    notifications.append(f"🆕 <b>Product added:</b> {html_escape(item['name'])}")
+                    SHOP_NOTIFICATION_TIMES[key] = now
             continue
 
-        old_variants = old_item.get("variants", {})
-        for variant_id, variant_name in item["variants"].items():
-            if variant_id not in old_variants:
-                changes.append(
-                    f"🌱 <b>Flavor/strain added:</b> {html_escape(variant_name)} "
-                    f"({html_escape(item['name'])})"
-                )
+        for variant_id, variant in item["variants"].items():
+            old_variant = old_item["variants"].get(variant_id)
+            key = (
+                f"variant:{group_id}:{variant_id}"
+                if len(item["variants"]) > 1
+                else f"group:{group_id}"
+            )
+            if old_variant is None:
+                if now - SHOP_NOTIFICATION_TIMES.get(key, 0) >= STOCK_NOTIFICATION_COOLDOWN:
+                    notifications.append(
+                        f"🆕 <b>Stock updated:</b> {html_escape(item['name'])} - "
+                        f"{html_escape(variant['name'])}"
+                    )
+                    SHOP_NOTIFICATION_TIMES[key] = now
+                continue
 
-        for variant_id, variant_name in old_variants.items():
-            if variant_id not in item["variants"]:
-                changes.append(
-                    f"🌱 <b>Flavor/strain removed:</b> {html_escape(variant_name)} "
-                    f"({html_escape(item['name'])})"
+            old_quantity = _quantity_number(old_variant.get("qty"))
+            current_quantity = _quantity_number(variant.get("qty"))
+            if (
+                old_quantity is not None
+                and current_quantity is not None
+                and current_quantity > old_quantity
+                and now - SHOP_NOTIFICATION_TIMES.get(key, 0) >= STOCK_NOTIFICATION_COOLDOWN
+            ):
+                notifications.append(
+                    f"📦 <b>Stock updated:</b> {html_escape(item['name'])} - "
+                    f"{html_escape(variant['name'])}: "
+                    f"{html_escape(_format_stock_value(old_variant.get('qty')))} → "
+                    f"{html_escape(_format_stock_value(variant.get('qty')))}"
                 )
-
-    for group_id, item in previous.items():
-        if group_id not in current:
-            changes.append(f"❌ <b>Product removed:</b> {html_escape(item['name'])}")
+                SHOP_NOTIFICATION_TIMES[key] = now
 
     SHOP_UPDATE_STATE = current
-    if not changes:
+    _save_shop_update_state(current, SHOP_NOTIFICATION_TIMES)
+    if not notifications:
         return
 
-    message = "🛍️ <b>Shop update</b>\n\n" + "\n".join(changes[:100])
-    if len(changes) > 100:
-        message += f"\n\n…and {len(changes) - 100} more changes."
-
-    try:
-        await bot.send_message(chat_id=PRICE_ADMIN_ID, text=message, parse_mode="HTML")
-    except Exception as e:
-        print(f"⚠️ Could not DM shop update to admin: {e}")
+    for notification in notifications:
+        try:
+            await bot.send_message(
+                chat_id=PRICE_ADMIN_ID,
+                text=notification,
+                parse_mode="HTML",
+            )
+        except Exception as e:
+            print(f"⚠️ Could not DM new-product notification: {e}")
 
 
 async def notify_login_success(bot):
@@ -2971,6 +3129,7 @@ def main():
 
     # Job Queue
     app.job_queue.run_repeating(check_timeouts, interval=60, first=10)
+    app.job_queue.run_repeating(stock_monitor_job, interval=60, first=60)
     app.job_queue.run_repeating(auto_refresh_job, interval=1800, first=30)
     app.job_queue.run_repeating(cleanup_database, interval=86400, first=60)
 

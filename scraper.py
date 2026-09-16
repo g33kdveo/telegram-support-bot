@@ -20,6 +20,61 @@ _stored_user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.
 def get_stored_cookies():
     return _stored_cookies, _stored_user_agent
 
+
+def fetch_authenticated_stock_snapshot(api_key, base_url="https://rogersroofing.click"):
+    cookies, user_agent = get_stored_cookies()
+    if not cookies:
+        return {"ok": False, "auth_required": True, "error": "No authenticated session"}
+
+    cookie_jar = {
+        cookie.get("name"): cookie.get("value")
+        for cookie in cookies
+        if cookie.get("name")
+    }
+    headers = {"User-Agent": user_agent}
+    if api_key:
+        headers["X-Api-Key"] = api_key
+
+    try:
+        response = requests.get(
+            f"{base_url}/api/products/scrape",
+            headers=headers,
+            cookies=cookie_jar,
+            timeout=30,
+        )
+        if (
+            response.status_code in (401, 403)
+            or "login" in response.url.lower()
+            or "text/html" in response.headers.get("Content-Type", "").lower()
+        ):
+            return {"ok": False, "auth_required": True, "error": f"HTTP {response.status_code}"}
+        response.raise_for_status()
+        payload = response.json()
+    except Exception as e:
+        return {"ok": False, "auth_required": False, "error": str(e)}
+
+    if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
+        return {"ok": False, "auth_required": False, "error": "Unexpected API response"}
+
+    snapshot = {}
+    for group in payload["data"]:
+        if not isinstance(group, dict):
+            continue
+        group_id = str(group.get("id") or group.get("sku") or group.get("name"))
+        snapshot[group_id] = {
+            "name": str(group.get("name", group_id)),
+            "variants": {
+                str(product.get("id") or product.get("sku") or product.get("name")): {
+                    "name": str(product.get("name", "")),
+                    "qty": product.get("qty"),
+                }
+                for product in group.get("products", [])
+                if isinstance(product, dict)
+            },
+        }
+
+    return {"ok": True, "auth_required": False, "snapshot": snapshot}
+
 IMAGE_PATH_PREFIX = "/uploads/products/"
 IMAGE_SIZE = 450
 IMAGE_SIZE_VARIANTS = [950, 750, 450, 400, 375, 325, 300, 250, 225, 178, 80]
