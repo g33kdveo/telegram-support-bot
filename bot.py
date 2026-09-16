@@ -67,6 +67,8 @@ SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp
 STOCK_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stock_monitor_state.json")
 SESSION_REFRESH_COOLDOWN = 10 * 60
 STOCK_NOTIFICATION_COOLDOWN = 24 * 60 * 60
+STOCK_MONITOR_RETRY_DELAY = 5
+STOCK_MONITOR_MAX_ATTEMPTS = 3
 ADMIN_TOKEN = hashlib.sha256((TOKEN or "fallback").encode()).hexdigest()[:32]
 
 # ===== GLOBAL STATE =====
@@ -2209,6 +2211,8 @@ STOCK_CHECK_STATE = None
 STOCK_CHECK_IN_PROGRESS = False
 STOCK_MONITOR_AUTH_WARNING_SENT = False
 LAST_SESSION_REFRESH_ATTEMPT = 0
+STOCK_MONITOR_FAILURE_COUNT = 0
+STOCK_MONITOR_FAILURE_WARNING_SENT = False
 
 
 def _stock_snapshot(scrape_result):
@@ -2359,7 +2363,8 @@ async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
 
 async def stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
     global SCRAPE_IN_PROGRESS, STOCK_MONITOR_AUTH_WARNING_SENT
-    global LAST_SESSION_REFRESH_ATTEMPT
+    global LAST_SESSION_REFRESH_ATTEMPT, STOCK_MONITOR_FAILURE_COUNT
+    global STOCK_MONITOR_FAILURE_WARNING_SENT
 
     with SCRAPE_LOCK:
         if SCRAPE_IN_PROGRESS or STOCK_CHECK_IN_PROGRESS:
@@ -2369,11 +2374,20 @@ async def stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
 
     try:
         loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(
-            None,
-            fetch_authenticated_stock_snapshot,
-            CHADS_API_KEY,
-        )
+        result = None
+        try:
+            for attempt in range(STOCK_MONITOR_MAX_ATTEMPTS):
+                result = await loop.run_in_executor(
+                    None,
+                    fetch_authenticated_stock_snapshot,
+                    CHADS_API_KEY,
+                )
+                if result.get("ok") or result.get("auth_required"):
+                    break
+                if attempt < STOCK_MONITOR_MAX_ATTEMPTS - 1:
+                    await asyncio.sleep(STOCK_MONITOR_RETRY_DELAY)
+        except Exception as e:
+            result = {"ok": False, "auth_required": False, "error": str(e)}
     finally:
         with SCRAPE_LOCK:
             SCRAPE_IN_PROGRESS = False
@@ -2395,9 +2409,24 @@ async def stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
         return
 
     if not result.get("ok"):
-        print(f"⚠️ 60-second stock monitor failed: {result.get('error')}")
+        STOCK_MONITOR_FAILURE_COUNT += 1
+        print(
+            f"⚠️ 60-second stock monitor failed "
+            f"({STOCK_MONITOR_FAILURE_COUNT} consecutive cycle(s)): {result.get('error')}"
+        )
+        if STOCK_MONITOR_FAILURE_COUNT >= 3 and not STOCK_MONITOR_FAILURE_WARNING_SENT:
+            STOCK_MONITOR_FAILURE_WARNING_SENT = True
+            try:
+                await context.bot.send_message(
+                    chat_id=PRICE_ADMIN_ID,
+                    text="⚠️ Stock monitor is having repeated API/network failures. The 30-minute full scraper remains active.",
+                )
+            except Exception as e:
+                print(f"⚠️ Could not send stock monitor failure warning: {e}")
         return
 
+    STOCK_MONITOR_FAILURE_COUNT = 0
+    STOCK_MONITOR_FAILURE_WARNING_SENT = False
     STOCK_MONITOR_AUTH_WARNING_SENT = False
     await notify_shop_updates(
         context.bot,
@@ -2410,6 +2439,7 @@ def _snapshot_to_groups(snapshot):
         {
             "id": group_id,
             "name": item["name"],
+            "cat": item.get("category", "Uncategorized"),
             "products": [
                 {
                     "id": variant_id,
@@ -2648,6 +2678,7 @@ def _product_snapshot(scrape_result):
             }
         snapshot[group_id] = {
             "name": str(group.get("name", group_id)),
+            "category": str(group.get("cat") or group.get("category") or "Uncategorized"),
             "variants": variants,
         }
     return snapshot
@@ -2699,9 +2730,22 @@ def _normalize_product_snapshot(snapshot):
                 variants[str(variant_id)] = {"name": str(variant), "qty": None}
         normalized[str(group_id)] = {
             "name": str(group.get("name", group_id)),
+            "category": str(group.get("category") or "Uncategorized"),
             "variants": variants,
         }
     return normalized
+
+
+def _format_stock_notification(item, variant):
+    product_name = html_escape(item["name"])
+    variant_name = str(variant.get("name") or "").strip()
+    category = html_escape(item.get("category") or "Uncategorized")
+    if not variant_name or variant_name.casefold() == str(item["name"]).strip().casefold():
+        return f"🆕 🔥 <b>New product added:</b> {product_name} ({category})"
+    return (
+        f"🆕 🔥 <b>New product added:</b> {product_name} - "
+        f"{html_escape(variant_name)} ({category})"
+    )
 
 
 async def notify_shop_updates(bot, scrape_result):
@@ -2727,14 +2771,14 @@ async def notify_shop_updates(bot, scrape_result):
                     key = f"variant:{group_id}:{variant_id}"
                     if now - SHOP_NOTIFICATION_TIMES.get(key, 0) >= STOCK_NOTIFICATION_COOLDOWN:
                         notifications.append(
-                            f"🆕 <b>Stock updated:</b> {html_escape(item['name'])} - "
-                            f"{html_escape(variant['name'])}"
+                            _format_stock_notification(item, variant)
                         )
                         SHOP_NOTIFICATION_TIMES[key] = now
             else:
                 key = f"group:{group_id}"
                 if now - SHOP_NOTIFICATION_TIMES.get(key, 0) >= STOCK_NOTIFICATION_COOLDOWN:
-                    notifications.append(f"🆕 <b>Product added:</b> {html_escape(item['name'])}")
+                    variant = next(iter(item["variants"].values()), {"name": ""})
+                    notifications.append(_format_stock_notification(item, variant))
                     SHOP_NOTIFICATION_TIMES[key] = now
             continue
 
@@ -2748,8 +2792,7 @@ async def notify_shop_updates(bot, scrape_result):
             if old_variant is None:
                 if now - SHOP_NOTIFICATION_TIMES.get(key, 0) >= STOCK_NOTIFICATION_COOLDOWN:
                     notifications.append(
-                        f"🆕 <b>Stock updated:</b> {html_escape(item['name'])} - "
-                        f"{html_escape(variant['name'])}"
+                        _format_stock_notification(item, variant)
                     )
                     SHOP_NOTIFICATION_TIMES[key] = now
                 continue
@@ -2763,10 +2806,7 @@ async def notify_shop_updates(bot, scrape_result):
                 and now - SHOP_NOTIFICATION_TIMES.get(key, 0) >= STOCK_NOTIFICATION_COOLDOWN
             ):
                 notifications.append(
-                    f"📦 <b>Stock updated:</b> {html_escape(item['name'])} - "
-                    f"{html_escape(variant['name'])}: "
-                    f"{html_escape(_format_stock_value(old_variant.get('qty')))} → "
-                    f"{html_escape(_format_stock_value(variant.get('qty')))}"
+                    _format_stock_notification(item, variant)
                 )
                 SHOP_NOTIFICATION_TIMES[key] = now
 

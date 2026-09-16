@@ -63,6 +63,7 @@ def fetch_authenticated_stock_snapshot(api_key, base_url="https://rogersroofing.
         group_id = str(group.get("id") or group.get("sku") or group.get("name"))
         snapshot[group_id] = {
             "name": str(group.get("name", group_id)),
+            "category": str(group.get("cat") or group.get("category") or "Uncategorized"),
             "variants": {
                 str(product.get("id") or product.get("sku") or product.get("name")): {
                     "name": str(product.get("name", "")),
