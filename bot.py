@@ -2629,18 +2629,13 @@ async def notify_shop_updates(bot, scrape_result):
 
 
 async def notify_login_success(bot):
-    global LOGIN_NOTIFICATION_SENT
-    if LOGIN_NOTIFICATION_SENT:
-        return
-    LOGIN_NOTIFICATION_SENT = True
     try:
         await bot.send_message(
             chat_id=PRICE_ADMIN_ID,
-            text="✅ <b>Shop login successful.</b>\nThe bot logged in to the shop after deployment.",
+            text="✅ Successful login completed.",
             parse_mode="HTML",
         )
     except Exception as e:
-        LOGIN_NOTIFICATION_SENT = False
         print(f"⚠️ Could not DM shop login notification: {e}")
 
 
