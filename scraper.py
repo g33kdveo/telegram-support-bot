@@ -80,6 +80,7 @@ IMAGE_PATH_PREFIX = "/uploads/products/"
 IMAGE_SIZE = 450
 IMAGE_SIZE_VARIANTS = [950, 750, 450, 400, 375, 325, 300, 250, 225, 178, 80]
 IMAGE_MIN_SIZE = 300  # Minimum acceptable image size to prevent tiny fallbacks
+MAX_IMAGE_DOWNLOADS_BEFORE_SKIP = 1500
 
 CATEGORIES = [
     "Accessories", "BYOB", "Carts", "Concentrates",
@@ -351,8 +352,10 @@ class RogersRoofingScraper:
     async def _download_images(self, page, groups, img_prefix):
         img_cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cached_images")
         os.makedirs(img_cache_dir, exist_ok=True)
-        
-        # Clear cached images to ensure we get fresh, highest-quality versions
+
+        # The image catalog can be very large and some sites change image behavior without warning.
+        # To avoid killing the whole scrape, skip eager prefetching when the batch is too large or the
+        # source format becomes non-public/unreliable.
         print(f"\n--- CLEARING IMAGE CACHE ---")
         cleared_count = 0
         if os.path.exists(img_cache_dir):
@@ -360,10 +363,10 @@ class RogersRoofingScraper:
                 try:
                     os.remove(os.path.join(img_cache_dir, f))
                     cleared_count += 1
-                except Exception as e:
+                except Exception:
                     pass
         print(f"  Cleared {cleared_count} old cached images")
-        
+
         print(f"\n--- DOWNLOADING IMAGES ---")
 
         # Build URL variant mapping (template -> list of variants from largest to smallest)
@@ -403,8 +406,15 @@ class RogersRoofingScraper:
 
         print(f"  Unique images: {len(url_map)}")
 
+        if len(url_map) > MAX_IMAGE_DOWNLOADS_BEFORE_SKIP:
+            print(
+                f"  Skipping eager image download for {len(url_map)} unique images. "
+                "The scraper will keep the source URLs and rely on direct public image access."
+            )
+            return {}
+
         if url_map and page:
-            batch_size = 50
+            batch_size = 15
             items = list(url_map.items())
             downloaded = 0
             failed = 0
@@ -413,22 +423,22 @@ class RogersRoofingScraper:
             
             for i in range(0, total, batch_size):
                 batch = items[i:i + batch_size]
-                # Prepare variants list for JS (map of template -> variants list)
+                if not batch:
+                    break
                 variants_for_js = {template: variants for template, (variants, _, _) in batch}
-                
+
                 results = {}
                 for attempt in range(2):
                     try:
                         results = await page.evaluate('''async (variantsMap) => {
                             const out = {};
-                            const CONCURRENCY = 10;
+                            const CONCURRENCY = 6;
                             const templates = Object.keys(variantsMap);
-                            
+
                             for (let ti = 0; ti < templates.length; ti += CONCURRENCY) {
                                 const templateChunk = templates.slice(ti, ti + CONCURRENCY);
                                 await Promise.allSettled(templateChunk.map(async (template) => {
                                     const variants = variantsMap[template];
-                                    // Try each variant from largest to smallest
                                     for (const url of variants) {
                                         try {
                                             const r = await fetch(url, {credentials: 'include'});
@@ -441,13 +451,12 @@ class RogersRoofingScraper:
                                                     reader.readAsDataURL(blob);
                                                 });
                                                 out[template] = {data: b64, url: url};
-                                                return; // Success, stop trying variants
+                                                return;
                                             }
-                                        } catch(e) {
-                                            // Try next variant
+                                        } catch (e) {
+                                            // Try next variant.
                                         }
                                     }
-                                    // All variants failed
                                     out[template] = {error: 'All variants failed'};
                                 }));
                             }
@@ -462,17 +471,23 @@ class RogersRoofingScraper:
                             print(f"  Batch failed: {batch_err}")
                             results = {}
 
+                if not results:
+                    print("  Skipping batch because the image endpoint returned no usable data.")
+                    break
+
                 for img_template, (variants, cache_fname, ext) in batch:
                     result = results.get(img_template, {})
                     b64_data = result.get('data') if isinstance(result, dict) else None
                     if b64_data and ',' in b64_data:
-                        raw_bytes = base64.b64decode(b64_data.split(',', 1)[1])
+                        try:
+                            raw_bytes = base64.b64decode(b64_data.split(',', 1)[1])
+                        except Exception:
+                            raw_bytes = b''
                         if len(raw_bytes) > 500:
                             with open(os.path.join(img_cache_dir, cache_fname), 'wb') as imgf:
                                 imgf.write(raw_bytes)
                             downloaded += 1
                             used_url = result.get('url', 'unknown')
-                            # Extract size from URL if possible and log to console
                             size_match = used_url.split('x')
                             size_str = size_match[1].split('/')[0] if len(size_match) > 1 else '?'
                             if size_str != '?':
@@ -481,14 +496,17 @@ class RogersRoofingScraper:
                             failed += 1
                     else:
                         failed += 1
-                
+
                 processed = min(i + batch_size, total)
                 elapsed = time.time() - start_time
                 rate = processed / elapsed if elapsed > 0 else 0
                 remaining = (total - processed) / rate if rate > 0 else 0
                 print(f"  Progress: {processed}/{total} ({downloaded} ok, {failed} fail) ~{remaining:.0f}s remaining")
+                if downloaded == 0 and processed >= 200:
+                    print("  Image download is still failing; stopping early to avoid killing the scrape.")
+                    break
                 await asyncio.sleep(0.05)
-            
+
             print(f"  Downloaded: {downloaded}, Failed: {failed}, Time: {time.time() - start_time:.1f}s")
         else:
             print("  No images to download")
@@ -628,7 +646,10 @@ class RogersRoofingScraper:
                                     imgs[ikey] = normalized
                                     normalized_count += 1
                 print(f"  Normalized {normalized_count} group images to use variant template")
-                await self._download_images(page, all_groups, img_prefix)
+                try:
+                    await self._download_images(page, all_groups, img_prefix)
+                except Exception as e:
+                    print(f"  Image download aborted safely: {e}")
 
             try:
                 await browser.close()
