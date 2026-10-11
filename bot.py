@@ -3013,6 +3013,18 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
                     self.wfile.write(b"Missing image URL")
                     return
 
+                # The source image URLs are public and should be loaded by the browser directly.
+                # The proxy was re-fetching stale/broken CDN paths from the server and resulting in
+                # a flood of 404s. Redirecting to the real URL avoids that failure while keeping the
+                # UI stable and letting the browser load the image normally.
+                if img_url.startswith("https://") and not raw_path.startswith("__cached__:"):
+                    self.send_response(302)
+                    self.send_header('Location', img_url)
+                    self.send_header('Cache-Control', 'public, max-age=86400')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    return
+
                 req = urllib.request.Request(
                     img_url,
                     headers=_build_image_request_headers(img_url, cookies=cookies, user_agent=user_agent),
