@@ -40,6 +40,8 @@ from telegram.ext import (
     CallbackQueryHandler, ContextTypes
 )
 
+BOT_INSTANCE_ID = uuid.uuid4().hex[:8]
+
 # ===== CONFIG =====
 TOKEN = os.getenv("BOT_TOKEN")
 PRICE_ADMIN_ID = 6006281662
@@ -2219,6 +2221,7 @@ STOCK_MONITOR_FAILURE_WARNING_SENT = False
 STOCK_MONITOR_RATE_LIMIT_UNTIL = 0
 STOCK_API_RATE_LIMIT_COUNT = 0
 STOCK_MONITOR_STARTED = False
+STARTUP_FULL_JOB_SCHEDULED = False
 LAST_FULL_SCRAPE_COMPLETED = 0
 FULL_SCRAPE_GENERATION = 0
 MANUAL_CHECK_PENDING = False
@@ -2295,6 +2298,11 @@ async def _run_check_stock_command(update: Update, context: ContextTypes.DEFAULT
     global STOCK_CHECK_STATE, STOCK_CHECK_IN_PROGRESS, SCRAPE_IN_PROGRESS
 
     await _claim_stock_check()
+    run_id = uuid.uuid4().hex[:8]
+    print(
+        f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+        f"source=checkstock run={run_id}] starting stock-only comparison"
+    )
 
     await update.message.reply_text("🔎 Running stock-only check. Images and the shop cache will not be refreshed.")
 
@@ -2306,6 +2314,9 @@ async def _run_check_stock_command(update: Update, context: ContextTypes.DEFAULT
                 username=CHADS_USERNAME,
                 password=CHADS_PASSWORD,
                 api_key=CHADS_API_KEY,
+                run_id=run_id,
+                run_label="checkstock",
+                instance_id=BOT_INSTANCE_ID,
                 login_callback=lambda: asyncio.run_coroutine_threadsafe(
                     notify_login_success(context.bot), loop
                 )
@@ -2357,10 +2368,20 @@ async def _run_check_stock_command(update: Update, context: ContextTypes.DEFAULT
 async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
     global LAST_FULL_SCRAPE_COMPLETED
 
+    run_id = uuid.uuid4().hex[:8]
+    source = getattr(getattr(context, "job", None), "name", None) or "full-scrape"
+    print(
+        f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+        f"source={source} run={run_id}] requested; waiting for priority coordinator"
+    )
     async with _scrape_slot("full"):
+        print(
+            f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+            f"source={source} run={run_id}] acquired full-scrape slot"
+        )
         _pause_stock_monitor(context)
         try:
-            refreshed = await _run_auto_refresh_job(context)
+            refreshed = await _run_auto_refresh_job(context, run_id)
         finally:
             if locals().get("refreshed", False):
                 LAST_FULL_SCRAPE_COMPLETED = time.time()
@@ -2398,9 +2419,11 @@ def _schedule_rate_limited_auto_refresh(context, delay):
     )
 
 
-async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
+async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE, run_id=None):
     global PRODUCT_CACHE, SCRAPE_IN_PROGRESS, STOCK_CHECK_IN_PROGRESS
     global STOCK_MONITOR_RATE_LIMIT_UNTIL
+
+    run_id = run_id or uuid.uuid4().hex[:8]
 
     cooldown_remaining = STOCK_MONITOR_RATE_LIMIT_UNTIL - time.time()
     if cooldown_remaining > 0:
@@ -2410,7 +2433,10 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
 
     await _claim_full_scrape()
 
-    print("🔄 Auto-refreshing product cache...")
+    print(
+        f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+        f"source=full run={run_id}] starting catalog refresh"
+    )
 
     try:
         loop = asyncio.get_running_loop()
@@ -2420,6 +2446,9 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
                 username=CHADS_USERNAME,
                 password=CHADS_PASSWORD,
                 api_key=CHADS_API_KEY,
+                run_id=run_id,
+                run_label="full",
+                instance_id=BOT_INSTANCE_ID,
                 login_callback=lambda: asyncio.run_coroutine_threadsafe(
                     notify_login_success(context.bot), loop
                 )
@@ -2433,7 +2462,8 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
             STOCK_MONITOR_RATE_LIMIT_UNTIL = time.time() + retry_after
             PRODUCT_CACHE["last_attempt"] = time.time()
             print(
-                f"⚠️ Full scraper received HTTP 429; keeping existing cache and "
+                f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+                f"source=full run={run_id}] HTTP 429; keeping existing cache and "
                 f"retrying after {retry_after:.0f}s."
             )
             _schedule_rate_limited_auto_refresh(context, retry_after)
@@ -2441,7 +2471,10 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
 
         if fresh_result and isinstance(fresh_result.get('data'), list) and len(fresh_result['data']) > 0:
             new_count = len(fresh_result['data'])
-            print(f"📊 Scrape found: {new_count} groups")
+            print(
+                f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+                f"source=full run={run_id}] found {new_count} groups"
+            )
 
             if not fresh_result.get('imagePathPrefix'):
                 fresh_result['imagePathPrefix'] = "/products/"
@@ -2462,7 +2495,10 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
                 send_notifications=False,
                 update_baseline=False,
             )
-            print(f"✅ Cache Refreshed! {new_count} groups.")
+            print(
+                f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+                f"source=full run={run_id}] cache refreshed: {new_count} groups"
+            )
             return True
         else:
             print("❌ Scrape returned no products. Keeping existing cache.")
@@ -2507,20 +2543,35 @@ def _pause_stock_monitor(context):
 
 async def stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
     generation = FULL_SCRAPE_GENERATION
+    run_id = uuid.uuid4().hex[:8]
+    print(
+        f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+        f"source=stock-monitor run={run_id}] requested"
+    )
     async with _scrape_slot("monitor"):
         if generation != FULL_SCRAPE_GENERATION or not STOCK_MONITOR_STARTED:
+            print(
+                f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+                f"source=stock-monitor run={run_id}] discarded as stale after full-scrape priority"
+            )
             return
         first_allowed_run = LAST_FULL_SCRAPE_COMPLETED + 60
         if time.time() < first_allowed_run:
             return
-        await _run_stock_monitor_job(context)
+        print(
+            f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+            f"source=stock-monitor run={run_id}] acquired scrape slot"
+        )
+        await _run_stock_monitor_job(context, run_id)
 
 
-async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
+async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE, run_id=None):
     global SCRAPE_IN_PROGRESS, STOCK_MONITOR_AUTH_WARNING_SENT
     global LAST_SESSION_REFRESH_ATTEMPT, STOCK_MONITOR_FAILURE_COUNT
     global STOCK_MONITOR_FAILURE_WARNING_SENT
     global STOCK_MONITOR_RATE_LIMIT_UNTIL
+
+    run_id = run_id or uuid.uuid4().hex[:8]
 
     await _claim_full_scrape()
 
@@ -2540,6 +2591,10 @@ async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
                 }
             else:
                 for attempt in range(STOCK_MONITOR_MAX_ATTEMPTS):
+                    print(
+                        f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+                        f"source=stock-monitor run={run_id}] request attempt {attempt + 1}"
+                    )
                     result = await loop.run_in_executor(
                         None,
                         fetch_authenticated_stock_snapshot,
@@ -2549,6 +2604,11 @@ async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
                         retry_after = _stock_api_rate_limit_delay(result.get("retry_after"))
                         STOCK_MONITOR_RATE_LIMIT_UNTIL = time.time() + retry_after
                         result["retry_after"] = retry_after
+                        print(
+                            f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+                            f"source=stock-monitor run={run_id}] API returned 429; "
+                            f"cooldown {retry_after:.0f}s"
+                        )
                         break
                     if result.get("ok") or result.get("auth_required"):
                         break
@@ -2578,8 +2638,9 @@ async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
 
     if result.get("cooldown_active"):
         print(
-            f"⏸️ 60-second stock monitor paused by API rate limit; "
-            f"retrying in {math.ceil(result['retry_after'])}s."
+            f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+            f"source=stock-monitor run={run_id}] paused by API rate limit; "
+            f"retrying in {math.ceil(result['retry_after'])}s"
         )
         return
 
@@ -2591,7 +2652,8 @@ async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
     if not result.get("ok"):
         STOCK_MONITOR_FAILURE_COUNT += 1
         print(
-            f"⚠️ 60-second stock monitor failed "
+            f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+            f"source=stock-monitor run={run_id}] failed "
             f"({STOCK_MONITOR_FAILURE_COUNT} consecutive cycle(s)): {result.get('error')}"
         )
         if STOCK_MONITOR_FAILURE_COUNT >= 3 and not STOCK_MONITOR_FAILURE_WARNING_SENT:
@@ -2610,6 +2672,11 @@ async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
     STOCK_MONITOR_FAILURE_WARNING_SENT = False
     STOCK_MONITOR_AUTH_WARNING_SENT = False
     STOCK_MONITOR_RATE_LIMIT_UNTIL = 0
+    print(
+        f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+        f"source=stock-monitor run={run_id}] snapshot succeeded: "
+        f"{len(result['snapshot'])} groups"
+    )
     await notify_shop_updates(
         context.bot,
         {"data": _snapshot_to_groups(result["snapshot"])},
@@ -2787,12 +2854,19 @@ async def set_commands(app):
 
 
 async def startup_post_init(app):
-    app.job_queue.run_once(
-        auto_refresh_job,
-        when=0,
-        name="startup_product_refresh",
-        job_kwargs={"misfire_grace_time": 60},
-    )
+    global STARTUP_FULL_JOB_SCHEDULED
+    if not STARTUP_FULL_JOB_SCHEDULED:
+        app.job_queue.run_once(
+            auto_refresh_job,
+            when=0,
+            name="startup_product_refresh",
+            job_kwargs={"misfire_grace_time": 60},
+        )
+        STARTUP_FULL_JOB_SCHEDULED = True
+        print(
+            f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+            "source=startup] scheduled initial full scrape"
+        )
     try:
         await set_commands(app)
     except Exception as error:

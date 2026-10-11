@@ -1,6 +1,8 @@
 import asyncio
+import io
 import json
 import unittest
+from contextlib import redirect_stdout
 from unittest.mock import AsyncMock, patch
 
 import bot
@@ -179,29 +181,51 @@ class FullScrapeRateLimitTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_startup_schedules_scrape_even_if_command_registration_fails(self):
         class FakeJobQueue:
-            scheduled = None
+            def __init__(self):
+                self.jobs = []
 
             def run_once(self, callback, **kwargs):
-                self.scheduled = (callback, kwargs)
+                self.jobs.append((callback, kwargs))
 
         class FakeApplication:
             def __init__(self):
                 self.job_queue = FakeJobQueue()
 
         app = FakeApplication()
+        was_scheduled = bot.STARTUP_FULL_JOB_SCHEDULED
+        bot.STARTUP_FULL_JOB_SCHEDULED = False
         with patch.object(
             bot,
             "set_commands",
             new=AsyncMock(side_effect=ConnectionError("Telegram API unavailable")),
         ) as set_commands:
-            await bot.startup_post_init(app)
+            try:
+                await bot.startup_post_init(app)
+                await bot.startup_post_init(app)
+            finally:
+                bot.STARTUP_FULL_JOB_SCHEDULED = was_scheduled
 
-        callback, job_kwargs = app.job_queue.scheduled
+        self.assertEqual(len(app.job_queue.jobs), 1)
+        callback, job_kwargs = app.job_queue.jobs[0]
         self.assertEqual(callback, bot.auto_refresh_job)
         self.assertEqual(job_kwargs["when"], 0)
         self.assertEqual(job_kwargs["name"], "startup_product_refresh")
         self.assertEqual(job_kwargs["job_kwargs"]["misfire_grace_time"], 60)
-        set_commands.assert_awaited_once_with(app)
+        self.assertEqual(set_commands.await_count, 2)
+
+    def test_scraper_logs_include_instance_source_and_run_ids(self):
+        scraper = RogersRoofingScraper(
+            run_id="run123",
+            run_label="full",
+            instance_id="inst456",
+        )
+        output = io.StringIO()
+        with redirect_stdout(output):
+            scraper._log("test event")
+
+        self.assertIn("instance=inst456", output.getvalue())
+        self.assertIn("source=full", output.getvalue())
+        self.assertIn("run=run123", output.getvalue())
 
     async def test_browser_scrape_stops_after_one_429_and_keeps_retry_delay(self):
         class RateLimitedPage:

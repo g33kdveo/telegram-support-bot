@@ -5,6 +5,7 @@ import re
 import hashlib
 import time
 import shutil
+import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse
 from pyppeteer import launch
@@ -20,6 +21,7 @@ except ImportError:
 
 _stored_cookies = []
 _stored_user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+SCRAPER_INSTANCE_ID = uuid.uuid4().hex[:8]
 
 def get_stored_cookies():
     return _stored_cookies, _stored_user_agent
@@ -181,13 +183,32 @@ CATEGORIES = [
 
 class RogersRoofingScraper:
 
-    def __init__(self, username=None, password=None, cookie_string=None, api_key=None, login_callback=None):
+    def __init__(
+        self,
+        username=None,
+        password=None,
+        cookie_string=None,
+        api_key=None,
+        login_callback=None,
+        run_id=None,
+        run_label="scrape",
+        instance_id=None,
+    ):
         self.username = username
         self.password = password
         self.api_key = api_key
         self.login_callback = login_callback
         self.base_url = "https://chadsflooring.bz"
         self.rate_limit_retry_after = 0.0
+        self.run_id = run_id or uuid.uuid4().hex[:8]
+        self.run_label = run_label
+        self.instance_id = instance_id or SCRAPER_INSTANCE_ID
+
+    def _log(self, message):
+        print(
+            f"[scrape instance={self.instance_id} pid={os.getpid()} "
+            f"source={self.run_label} run={self.run_id}] {message}"
+        )
 
     def _find_chromium(self):
         exec_path = os.getenv("PUPPETEER_EXECUTABLE_PATH")
@@ -269,7 +290,7 @@ class RogersRoofingScraper:
             print("No credentials provided, skipping login.")
             return False
 
-        print("Navigating to login page...")
+        self._log("Navigating to login page")
         for attempt in range(3):
             try:
                 await page.goto(f"{self.base_url}/login", {'waitUntil': 'domcontentloaded', 'timeout': 120000})
@@ -298,7 +319,7 @@ class RogersRoofingScraper:
                     await asyncio.sleep(0.3)
                     await page.type(sel, self.username, {'delay': 50})
                     email_filled = True
-                    print(f"  Filled username using: {sel}")
+                    self._log(f"Filled username using: {sel}")
                     break
             except:
                 pass
@@ -351,26 +372,26 @@ class RogersRoofingScraper:
         await asyncio.sleep(2)
         current_url = page.url
         if 'login' not in current_url.lower():
-            print("Login successful.")
+            self._log("Login successful")
             global _stored_cookies, _stored_user_agent
             try:
                 _stored_cookies = await page.cookies()
                 ua = await page.evaluate('() => navigator.userAgent')
                 if ua:
                     _stored_user_agent = ua
-                print(f"  Stored {len(_stored_cookies)} cookies for image proxy")
+                self._log(f"Stored {len(_stored_cookies)} cookies for image proxy")
             except Exception as ce:
                 print(f"  Warning: Could not extract cookies: {ce}")
             if self.login_callback:
                 self.login_callback()
             return True
         else:
-            print("WARNING: May still be on login page. Continuing anyway.")
+            self._log("WARNING: May still be on login page; continuing anyway")
             return False
 
     async def _fetch_scrape_endpoint(self, page):
         url = f"{self.base_url}/api/products/scrape"
-        print(f"Fetching scrape endpoint: {url}")
+        self._log(f"Fetching scrape endpoint: {url}")
 
         for attempt in range(3):
             try:
@@ -421,9 +442,9 @@ class RogersRoofingScraper:
                             )
                         except (TypeError, ValueError):
                             self.rate_limit_retry_after = RATE_LIMIT_FALLBACK_SECONDS
-                        print(
-                            f"  API rate limited; retry after "
-                            f"{self.rate_limit_retry_after:.0f}s (not retrying immediately)"
+                        self._log(
+                            f"API rate limited; retry after {self.rate_limit_retry_after:.0f}s "
+                            "(not retrying immediately)"
                         )
                         return None
                     print(f"  Attempt {attempt+1}: API error: {data['_error']}")
@@ -638,7 +659,7 @@ class RogersRoofingScraper:
 
     async def _scrape_async(self, download_images=True):
         print("=" * 60)
-        print("Starting Rogers Roofing scraper (scrape endpoint)")
+        self._log("Starting catalog scrape")
         print("=" * 60)
 
         browser = None
@@ -673,7 +694,7 @@ class RogersRoofingScraper:
             )
             await page.setViewport({'width': 1280, 'height': 800})
 
-            print("Navigating to site...")
+            self._log("Navigating to site")
             for attempt in range(3):
                 try:
                     await page.goto(self.base_url, {'waitUntil': 'domcontentloaded', 'timeout': 120000})
@@ -689,7 +710,7 @@ class RogersRoofingScraper:
             if "performing updates" in content.lower() or "maintenance" in content.lower():
                 raise Exception("Site Under Maintenance")
 
-            print("Checking age verification...")
+            self._log("Checking age verification")
             age_handled = await self._handle_age_gate(page)
             if age_handled:
                 print("Age verification completed.")
@@ -778,7 +799,7 @@ class RogersRoofingScraper:
             }
 
         except Exception as e:
-            print(f"Scraper Error: {e}")
+            self._log(f"Scraper failed: {e}")
             import traceback
             traceback.print_exc()
         finally:
@@ -797,7 +818,7 @@ class RogersRoofingScraper:
             asyncio.set_event_loop(loop)
             return loop.run_until_complete(self._scrape_async())
         except Exception as e:
-            print(f"Scraper Wrapper Error: {e}")
+            self._log(f"Scraper wrapper failed: {e}")
             import traceback
             traceback.print_exc()
             return {"data": [], "error": True}
