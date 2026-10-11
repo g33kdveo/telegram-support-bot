@@ -57,7 +57,7 @@ def fetch_authenticated_stock_snapshot(api_key, base_url="https://chadsflooring.
                         retry_at = retry_at.replace(tzinfo=timezone.utc)
                     retry_after = max(1.0, (retry_at - datetime.now(timezone.utc)).total_seconds())
                 except (TypeError, ValueError, OverflowError):
-                    retry_after = 60.0
+                    retry_after = RATE_LIMIT_FALLBACK_SECONDS
             return {
                 "ok": False,
                 "auth_required": False,
@@ -107,6 +107,7 @@ IMAGE_DOWNLOAD_BATCH_SIZE = 60
 IMAGE_DOWNLOAD_CONCURRENCY = 12
 IMAGE_FETCH_TIMEOUT = (3, 10)
 IMAGE_ALL_FAIL_CHECK_COUNT = 75
+RATE_LIMIT_FALLBACK_SECONDS = 300
 
 
 def _apply_cached_image_references(groups, cached_images):
@@ -384,7 +385,7 @@ class RogersRoofingScraper:
                         .then(r => {
                             if (r.status === 429) {
                                 const retryHeader = r.headers.get('Retry-After');
-                                let retryAfter = 60;
+                                let retryAfter = 300;
                                 if (retryHeader) {
                                     const seconds = Number(retryHeader);
                                     if (Number.isFinite(seconds) && seconds > 0) {
@@ -413,9 +414,12 @@ class RogersRoofingScraper:
                 if isinstance(data, dict) and data.get('_error'):
                     if data["_error"] == "HTTP 429":
                         try:
-                            self.rate_limit_retry_after = max(1.0, float(data.get("retry_after") or 60))
+                            self.rate_limit_retry_after = max(
+                                1.0,
+                                float(data.get("retry_after") or RATE_LIMIT_FALLBACK_SECONDS),
+                            )
                         except (TypeError, ValueError):
-                            self.rate_limit_retry_after = 60.0
+                            self.rate_limit_retry_after = RATE_LIMIT_FALLBACK_SECONDS
                         print(
                             f"  API rate limited; retry after "
                             f"{self.rate_limit_retry_after:.0f}s (not retrying immediately)"

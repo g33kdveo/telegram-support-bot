@@ -7,6 +7,21 @@ from scraper import RogersRoofingScraper, fetch_authenticated_stock_snapshot
 
 
 class StockMonitorRateLimitTests(unittest.TestCase):
+    def test_repeated_rate_limits_back_off_and_reset_after_recovery(self):
+        bot._reset_stock_api_rate_limit()
+        try:
+            self.assertEqual(bot._stock_api_rate_limit_delay(), 300)
+            self.assertEqual(bot._stock_api_rate_limit_delay(), 600)
+            self.assertEqual(bot._stock_api_rate_limit_delay(), 1200)
+            self.assertEqual(bot._stock_api_rate_limit_delay(), 1800)
+            self.assertEqual(bot._stock_api_rate_limit_delay(), 1800)
+            self.assertEqual(bot._stock_api_rate_limit_delay(2400), 2400)
+
+            bot._reset_stock_api_rate_limit()
+            self.assertEqual(bot._stock_api_rate_limit_delay(), 300)
+        finally:
+            bot._reset_stock_api_rate_limit()
+
     def test_429_returns_rate_limit_and_retry_after(self):
         class RateLimitedResponse:
             status_code = 429
@@ -21,6 +36,19 @@ class StockMonitorRateLimitTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertTrue(result["rate_limited"])
         self.assertEqual(result["retry_after"], 120)
+
+    def test_429_without_retry_after_uses_five_minute_fallback(self):
+        class RateLimitedResponse:
+            status_code = 429
+            headers = {}
+
+        with patch(
+            "scraper.get_stored_cookies",
+            return_value=([{"name": "session", "value": "test"}], "test-agent"),
+        ), patch("scraper.requests.get", return_value=RateLimitedResponse()):
+            result = fetch_authenticated_stock_snapshot("test-api-key")
+
+        self.assertEqual(result["retry_after"], 300)
 
 
 class FullScrapeRateLimitTests(unittest.IsolatedAsyncioTestCase):

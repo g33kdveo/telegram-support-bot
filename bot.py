@@ -2215,8 +2215,26 @@ LAST_SESSION_REFRESH_ATTEMPT = 0
 STOCK_MONITOR_FAILURE_COUNT = 0
 STOCK_MONITOR_FAILURE_WARNING_SENT = False
 STOCK_MONITOR_RATE_LIMIT_UNTIL = 0
+STOCK_API_RATE_LIMIT_COUNT = 0
 MANUAL_CHECK_PENDING = False
 LAST_MANUAL_CHECK = 0
+
+
+def _stock_api_rate_limit_delay(server_retry_after=None):
+    global STOCK_API_RATE_LIMIT_COUNT
+    STOCK_API_RATE_LIMIT_COUNT += 1
+    fallback = min(300 * (2 ** (STOCK_API_RATE_LIMIT_COUNT - 1)), 1800)
+    try:
+        server_delay = float(server_retry_after)
+    except (TypeError, ValueError):
+        server_delay = 0
+    return max(1.0, fallback, server_delay)
+
+
+def _reset_stock_api_rate_limit():
+    global STOCK_API_RATE_LIMIT_COUNT, STOCK_MONITOR_RATE_LIMIT_UNTIL
+    STOCK_API_RATE_LIMIT_COUNT = 0
+    STOCK_MONITOR_RATE_LIMIT_UNTIL = 0
 
 
 def _stock_snapshot(scrape_result):
@@ -2382,7 +2400,7 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
         fresh_result = await loop.run_in_executor(None, run_scrape)
 
         if fresh_result and fresh_result.get("rate_limited"):
-            retry_after = max(1.0, float(fresh_result.get("retry_after") or 60))
+            retry_after = _stock_api_rate_limit_delay(fresh_result.get("retry_after"))
             STOCK_MONITOR_RATE_LIMIT_UNTIL = time.time() + retry_after
             PRODUCT_CACHE["last_attempt"] = time.time()
             print(
@@ -2408,7 +2426,7 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
             PRODUCT_CACHE["data"] = fresh_result
             PRODUCT_CACHE["timestamp"] = time.time()
             PRODUCT_CACHE["last_attempt"] = time.time()
-            STOCK_MONITOR_RATE_LIMIT_UNTIL = 0
+            _reset_stock_api_rate_limit()
             await notify_shop_updates(context.bot, fresh_result, send_notifications=False)
             print(f"✅ Cache Refreshed! {new_count} groups.")
         else:
@@ -2455,8 +2473,9 @@ async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
                         CHADS_API_KEY,
                     )
                     if result.get("rate_limited"):
-                        retry_after = max(1.0, float(result.get("retry_after") or 60))
+                        retry_after = _stock_api_rate_limit_delay(result.get("retry_after"))
                         STOCK_MONITOR_RATE_LIMIT_UNTIL = time.time() + retry_after
+                        result["retry_after"] = retry_after
                         break
                     if result.get("ok") or result.get("auth_required"):
                         break
@@ -2501,6 +2520,7 @@ async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
                 print(f"⚠️ Could not send stock monitor failure warning: {e}")
         return
 
+    _reset_stock_api_rate_limit()
     STOCK_MONITOR_FAILURE_COUNT = 0
     STOCK_MONITOR_FAILURE_WARNING_SENT = False
     STOCK_MONITOR_AUTH_WARNING_SENT = False
