@@ -2706,6 +2706,7 @@ async def startup_post_init(app):
         auto_refresh_job,
         when=0,
         name="startup_product_refresh",
+        job_kwargs={"misfire_grace_time": 60},
     )
     try:
         await set_commands(app)

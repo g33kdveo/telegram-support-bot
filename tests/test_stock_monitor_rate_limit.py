@@ -75,6 +75,7 @@ class FullScrapeRateLimitTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(callback, bot.auto_refresh_job)
         self.assertEqual(job_kwargs["when"], 0)
         self.assertEqual(job_kwargs["name"], "startup_product_refresh")
+        self.assertEqual(job_kwargs["job_kwargs"]["misfire_grace_time"], 60)
         set_commands.assert_awaited_once_with(app)
 
     async def test_browser_scrape_stops_after_one_429_and_keeps_retry_delay(self):
