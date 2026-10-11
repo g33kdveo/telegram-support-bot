@@ -2738,7 +2738,7 @@ def _product_snapshot(scrape_result):
     return snapshot
 
 
-def _resolve_image_url(raw_path, base_url="https://rogersroofing.click"):
+def _resolve_image_url(raw_path, base_url="https://chadsflooring.bz"):
     if not raw_path:
         return None
     if raw_path.startswith(("http://", "https://")):
@@ -2755,7 +2755,7 @@ def _resolve_image_url(raw_path, base_url="https://rogersroofing.click"):
 def _build_image_request_headers(img_url, cookies=None, user_agent=None):
     headers = {
         "User-Agent": user_agent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://rogersroofing.click/",
+        "Referer": "https://chadsflooring.bz/",
         "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
     }
@@ -3005,7 +3005,7 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
                         return
 
                 cookies, user_agent = get_stored_cookies()
-                img_url = _resolve_image_url(raw_path, "https://rogersroofing.click")
+                img_url = _resolve_image_url(raw_path, "https://chadsflooring.bz")
                 if not img_url:
                     self.send_response(400)
                     self.send_header('Content-Type', 'text/plain')

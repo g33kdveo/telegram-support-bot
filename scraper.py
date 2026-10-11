@@ -21,7 +21,7 @@ def get_stored_cookies():
     return _stored_cookies, _stored_user_agent
 
 
-def fetch_authenticated_stock_snapshot(api_key, base_url="https://rogersroofing.click"):
+def fetch_authenticated_stock_snapshot(api_key, base_url="https://chadsflooring.bz"):
     cookies, user_agent = get_stored_cookies()
     if not cookies:
         return {"ok": False, "auth_required": True, "error": "No authenticated session"}
@@ -95,7 +95,7 @@ class RogersRoofingScraper:
         self.password = password
         self.api_key = api_key
         self.login_callback = login_callback
-        self.base_url = "https://rogersroofing.click"
+        self.base_url = "https://chadsflooring.bz"
 
     def _find_chromium(self):
         exec_path = os.getenv("PUPPETEER_EXECUTABLE_PATH")
