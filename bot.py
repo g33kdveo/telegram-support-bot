@@ -2702,7 +2702,11 @@ async def set_commands(app):
 
 
 async def startup_post_init(app):
-    app.create_task(_run_auto_refresh_job(app), name="startup_product_refresh")
+    app.job_queue.run_once(
+        auto_refresh_job,
+        when=0,
+        name="startup_product_refresh",
+    )
     try:
         await set_commands(app)
     except Exception as error:

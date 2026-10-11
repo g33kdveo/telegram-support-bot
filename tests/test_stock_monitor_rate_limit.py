@@ -53,13 +53,15 @@ class StockMonitorRateLimitTests(unittest.TestCase):
 
 class FullScrapeRateLimitTests(unittest.IsolatedAsyncioTestCase):
     async def test_startup_schedules_scrape_even_if_command_registration_fails(self):
+        class FakeJobQueue:
+            scheduled = None
+
+            def run_once(self, callback, **kwargs):
+                self.scheduled = (callback, kwargs)
+
         class FakeApplication:
             def __init__(self):
-                self.scheduled_tasks = []
-
-            def create_task(self, coroutine, name=None):
-                coroutine.close()
-                self.scheduled_tasks.append(name)
+                self.job_queue = FakeJobQueue()
 
         app = FakeApplication()
         with patch.object(
@@ -69,7 +71,10 @@ class FullScrapeRateLimitTests(unittest.IsolatedAsyncioTestCase):
         ) as set_commands:
             await bot.startup_post_init(app)
 
-        self.assertEqual(app.scheduled_tasks, ["startup_product_refresh"])
+        callback, job_kwargs = app.job_queue.scheduled
+        self.assertEqual(callback, bot.auto_refresh_job)
+        self.assertEqual(job_kwargs["when"], 0)
+        self.assertEqual(job_kwargs["name"], "startup_product_refresh")
         set_commands.assert_awaited_once_with(app)
 
     async def test_browser_scrape_stops_after_one_429_and_keeps_retry_delay(self):
