@@ -50,7 +50,7 @@ WEBAPP_URL = os.getenv("WEBAPP_URL")
 CHADS_USERNAME = os.getenv("CHADS_USERNAME")
 CHADS_PASSWORD = os.getenv("CHADS_PASSWORD")
 CHADS_COOKIE = os.getenv("CHADS_COOKIE")
-CHADS_API_KEY = "10158.9.0d7ce251-dea2-5c52-af9d-437fddfcaf14"
+CHADS_API_KEY = "10158.426.2c537a06-1eeb-5fb9-8467-fd12c44af451"
 
 if not WEBAPP_URL and os.getenv("RAILWAY_PUBLIC_DOMAIN"):
     WEBAPP_URL = f"https://{os.getenv('RAILWAY_PUBLIC_DOMAIN')}/webapp.html"
