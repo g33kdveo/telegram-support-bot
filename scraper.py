@@ -143,6 +143,7 @@ class RogersRoofingScraper:
         self.api_key = api_key
         self.login_callback = login_callback
         self.base_url = "https://chadsflooring.bz"
+        self.rate_limit_retry_after = 0.0
 
     def _find_chromium(self):
         exec_path = os.getenv("PUPPETEER_EXECUTABLE_PATH")
@@ -339,6 +340,22 @@ class RogersRoofingScraper:
                         headers: headers
                     })
                         .then(r => {
+                            if (r.status === 429) {
+                                const retryHeader = r.headers.get('Retry-After');
+                                let retryAfter = 60;
+                                if (retryHeader) {
+                                    const seconds = Number(retryHeader);
+                                    if (Number.isFinite(seconds) && seconds > 0) {
+                                        retryAfter = seconds;
+                                    } else {
+                                        const retryAt = Date.parse(retryHeader);
+                                        if (Number.isFinite(retryAt)) {
+                                            retryAfter = Math.max(1, (retryAt - Date.now()) / 1000);
+                                        }
+                                    }
+                                }
+                                return JSON.stringify({_error: 'HTTP 429', retry_after: retryAfter});
+                            }
                             if (!r.ok) return JSON.stringify({_error: 'HTTP ' + r.status});
                             return r.text();
                         })
@@ -352,6 +369,16 @@ class RogersRoofingScraper:
 
                 data = json.loads(json_text)
                 if isinstance(data, dict) and data.get('_error'):
+                    if data["_error"] == "HTTP 429":
+                        try:
+                            self.rate_limit_retry_after = max(1.0, float(data.get("retry_after") or 60))
+                        except (TypeError, ValueError):
+                            self.rate_limit_retry_after = 60.0
+                        print(
+                            f"  API rate limited; retry after "
+                            f"{self.rate_limit_retry_after:.0f}s (not retrying immediately)"
+                        )
+                        return None
                     print(f"  Attempt {attempt+1}: API error: {data['_error']}")
                     await asyncio.sleep(3)
                     continue
@@ -647,7 +674,11 @@ class RogersRoofingScraper:
             scrape_data = await self._fetch_scrape_endpoint(page)
             if not scrape_data or not isinstance(scrape_data.get('data'), list):
                 print("ERROR: Failed to fetch scrape endpoint")
-                return {"data": []}
+                return {
+                    "data": [],
+                    "rate_limited": self.rate_limit_retry_after > 0,
+                    "retry_after": self.rate_limit_retry_after,
+                }
 
             all_groups = scrape_data['data']
             img_prefix = scrape_data.get('imagePathPrefix', IMAGE_PATH_PREFIX)

@@ -2336,8 +2336,30 @@ async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
     await _run_auto_refresh_job(context)
 
 
+def _schedule_rate_limited_auto_refresh(context, delay):
+    job_queue = getattr(context, "job_queue", None)
+    if job_queue is None:
+        return
+
+    job_name = "rate_limited_auto_refresh"
+    for job in job_queue.get_jobs_by_name(job_name):
+        job.schedule_removal()
+    job_queue.run_once(
+        auto_refresh_job,
+        when=max(1.0, delay),
+        name=job_name,
+    )
+
+
 async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
     global PRODUCT_CACHE, SCRAPE_IN_PROGRESS, STOCK_CHECK_IN_PROGRESS
+    global STOCK_MONITOR_RATE_LIMIT_UNTIL
+
+    cooldown_remaining = STOCK_MONITOR_RATE_LIMIT_UNTIL - time.time()
+    if cooldown_remaining > 0:
+        print(f"⏳ Full scrape deferred for {cooldown_remaining:.0f}s due to API rate limit.")
+        _schedule_rate_limited_auto_refresh(context, cooldown_remaining)
+        return
 
     await _claim_full_scrape()
 
@@ -2359,6 +2381,17 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
 
         fresh_result = await loop.run_in_executor(None, run_scrape)
 
+        if fresh_result and fresh_result.get("rate_limited"):
+            retry_after = max(1.0, float(fresh_result.get("retry_after") or 60))
+            STOCK_MONITOR_RATE_LIMIT_UNTIL = time.time() + retry_after
+            PRODUCT_CACHE["last_attempt"] = time.time()
+            print(
+                f"⚠️ Full scraper received HTTP 429; keeping existing cache and "
+                f"retrying after {retry_after:.0f}s."
+            )
+            _schedule_rate_limited_auto_refresh(context, retry_after)
+            return
+
         if fresh_result and isinstance(fresh_result.get('data'), list) and len(fresh_result['data']) > 0:
             new_count = len(fresh_result['data'])
             print(f"📊 Scrape found: {new_count} groups")
@@ -2375,6 +2408,7 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
             PRODUCT_CACHE["data"] = fresh_result
             PRODUCT_CACHE["timestamp"] = time.time()
             PRODUCT_CACHE["last_attempt"] = time.time()
+            STOCK_MONITOR_RATE_LIMIT_UNTIL = 0
             await notify_shop_updates(context.bot, fresh_result, send_notifications=False)
             print(f"✅ Cache Refreshed! {new_count} groups.")
         else:
