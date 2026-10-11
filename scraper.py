@@ -102,7 +102,31 @@ IMAGE_PATH_PREFIX = "/uploads/products/"
 IMAGE_SIZE = 450
 IMAGE_SIZE_VARIANTS = [950, 750, 450, 400, 375, 325, 300, 250, 225, 178, 80]
 IMAGE_MIN_SIZE = 300  # Minimum acceptable image size to prevent tiny fallbacks
-MAX_IMAGE_DOWNLOADS_BEFORE_SKIP = 1500
+IMAGE_DOWNLOAD_BATCH_SIZE = 15
+
+
+def _apply_cached_image_references(groups, cached_images):
+    for group in groups:
+        group_images = group.get('imgs')
+        if isinstance(group_images, dict):
+            for image_key, image_value in group_images.items():
+                if isinstance(image_value, str) and image_value in cached_images:
+                    group_images[image_key] = f"__cached__:{cached_images[image_value]}"
+
+        products = group.get('products')
+        if not isinstance(products, list):
+            continue
+        for product in products:
+            if not isinstance(product, dict):
+                continue
+            product_images = product.get('images')
+            if isinstance(product_images, list):
+                product['images'] = [
+                    f"__cached__:{cached_images[image_value]}"
+                    if isinstance(image_value, str) and image_value in cached_images
+                    else image_value
+                    for image_value in product_images
+                ]
 
 CATEGORIES = [
     "Accessories", "BYOB", "Carts", "Concentrates",
@@ -354,13 +378,9 @@ class RogersRoofingScraper:
         size_val = size if size is not None else IMAGE_SIZE
 
         if 'x_imgvariantsize' in resolved.lower():
-            resolved = resolved.replace('x_imgvariantsize', f'x{size_val}')
+            resolved = re.sub(r'x_imgvariantsize', f'x{size_val}', resolved, flags=re.IGNORECASE)
         elif re.search(r'(?i)(?:^|/)[xX]\d+-', resolved):
-            # The site may already use a concrete size token (for example x750-...) in the current API.
-            # Keep that exact format rather than forcing the older placeholder rewrite, but still prepend
-            # the product path when the source value is missing it.
-            if not resolved.startswith('/') and not resolved.startswith('http'):
-                resolved = '/' + resolved.lstrip('/')
+            pass
         elif resolved.startswith('/'):
             pass
 
@@ -369,7 +389,8 @@ class RogersRoofingScraper:
         elif resolved.startswith('/uploads/') or resolved.startswith('uploads/'):
             return self.base_url + '/' + resolved.lstrip('/')
         else:
-            return self.base_url + img_prefix + resolved
+            prefix = (img_prefix or IMAGE_PATH_PREFIX).strip('/')
+            return f"{self.base_url.rstrip('/')}/{prefix}/{resolved.lstrip('/')}"
     
     def _get_image_url_variants(self, img_val, img_prefix):
         """Generate a list of image URL variants from largest to smallest, respecting minimum size."""
@@ -382,25 +403,11 @@ class RogersRoofingScraper:
                 url = self._resolve_image_url(img_val, img_prefix, size)
                 if url:
                     variants.append(url)
-        return variants
+        return list(dict.fromkeys(variants))
 
     async def _download_images(self, page, groups, img_prefix):
         img_cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cached_images")
         os.makedirs(img_cache_dir, exist_ok=True)
-
-        # The image catalog can be very large and some sites change image behavior without warning.
-        # To avoid killing the whole scrape, skip eager prefetching when the batch is too large or the
-        # source format becomes non-public/unreliable.
-        print(f"\n--- CLEARING IMAGE CACHE ---")
-        cleared_count = 0
-        if os.path.exists(img_cache_dir):
-            for f in os.listdir(img_cache_dir):
-                try:
-                    os.remove(os.path.join(img_cache_dir, f))
-                    cleared_count += 1
-                except Exception:
-                    pass
-        print(f"  Cleared {cleared_count} old cached images")
 
         print(f"\n--- DOWNLOADING IMAGES ---")
 
@@ -441,16 +448,19 @@ class RogersRoofingScraper:
 
         print(f"  Unique images: {len(url_map)}")
 
-        if len(url_map) > MAX_IMAGE_DOWNLOADS_BEFORE_SKIP:
-            print(
-                f"  Skipping eager image download for {len(url_map)} unique images. "
-                "The scraper will keep the source URLs and rely on direct public image access."
-            )
-            return {}
+        items = []
+        cached_before = 0
+        for img_template, cache_entry in url_map.items():
+            cache_fname = cache_entry[1]
+            cache_path = os.path.join(img_cache_dir, cache_fname)
+            if os.path.isfile(cache_path) and os.path.getsize(cache_path) > 500:
+                cached_before += 1
+            else:
+                items.append((img_template, cache_entry))
+        print(f"  Reusing {cached_before} cached images; downloading {len(items)}")
 
-        if url_map and page:
-            batch_size = 15
-            items = list(url_map.items())
+        if items and page:
+            batch_size = IMAGE_DOWNLOAD_BATCH_SIZE
             downloaded = 0
             failed = 0
             total = len(items)
@@ -475,8 +485,13 @@ class RogersRoofingScraper:
                                 await Promise.allSettled(templateChunk.map(async (template) => {
                                     const variants = variantsMap[template];
                                     for (const url of variants) {
+                                        const controller = new AbortController();
+                                        const timeout = setTimeout(() => controller.abort(), 10000);
                                         try {
-                                            const r = await fetch(url, {credentials: 'include'});
+                                            const r = await fetch(url, {
+                                                credentials: 'include',
+                                                signal: controller.signal
+                                            });
                                             if (r.ok) {
                                                 const blob = await r.blob();
                                                 const reader = new FileReader();
@@ -490,6 +505,8 @@ class RogersRoofingScraper:
                                             }
                                         } catch (e) {
                                             // Try next variant.
+                                        } finally {
+                                            clearTimeout(timeout);
                                         }
                                     }
                                     out[template] = {error: 'All variants failed'};
@@ -507,8 +524,10 @@ class RogersRoofingScraper:
                             results = {}
 
                 if not results:
-                    print("  Skipping batch because the image endpoint returned no usable data.")
-                    break
+                    print("  Image batch failed; continuing with the next batch.")
+                    failed += len(batch)
+                    await asyncio.sleep(0.1)
+                    continue
 
                 for img_template, (variants, cache_fname, ext) in batch:
                     result = results.get(img_template, {})
@@ -532,19 +551,28 @@ class RogersRoofingScraper:
                     else:
                         failed += 1
 
-                processed = min(i + batch_size, total)
+                processed = min(i + len(batch), total)
                 elapsed = time.time() - start_time
                 rate = processed / elapsed if elapsed > 0 else 0
                 remaining = (total - processed) / rate if rate > 0 else 0
                 print(f"  Progress: {processed}/{total} ({downloaded} ok, {failed} fail) ~{remaining:.0f}s remaining")
-                if downloaded == 0 and processed >= 200:
-                    print("  Image download is still failing; stopping early to avoid killing the scrape.")
-                    break
                 await asyncio.sleep(0.05)
 
             print(f"  Downloaded: {downloaded}, Failed: {failed}, Time: {time.time() - start_time:.1f}s")
-        else:
+        elif items:
+            print("  No browser page is available; keeping source image URLs")
+        elif not url_map:
             print("  No images to download")
+        else:
+            print("  All detected images are already cached")
+
+        cached_images = {}
+        for img_template, (_, cache_fname, _) in url_map.items():
+            cache_path = os.path.join(img_cache_dir, cache_fname)
+            if os.path.isfile(cache_path) and os.path.getsize(cache_path) > 500:
+                cached_images[img_template] = cache_fname
+
+        _apply_cached_image_references(groups, cached_images)
 
         cached_count = len(os.listdir(img_cache_dir)) if os.path.exists(img_cache_dir) else 0
         print(f"  Total cached images on disk: {cached_count}")
@@ -552,7 +580,8 @@ class RogersRoofingScraper:
         # Return url_map with primary URL for UI (will use highest available from cache)
         result_map = {}
         for img_template, (variants, cache_fname, ext) in url_map.items():
-            result_map[img_template] = (variants[0], cache_fname)  # Use largest variant as reference
+            if img_template in cached_images:
+                result_map[img_template] = (variants[0], cache_fname)
         return result_map
 
     async def _scrape_async(self, download_images=True):
