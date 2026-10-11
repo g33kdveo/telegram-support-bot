@@ -448,18 +448,23 @@ class RogersRoofingScraper:
 
         if 'x_imgvariantsize' in resolved.lower():
             resolved = re.sub(r'x_imgvariantsize', f'x{size_val}', resolved, flags=re.IGNORECASE)
-        elif re.search(r'(?i)(?:^|/)[xX]\d+-', resolved):
-            pass
-        elif resolved.startswith('/'):
-            pass
 
         if resolved.startswith('http://') or resolved.startswith('https://'):
             return resolved
-        elif resolved.startswith('/uploads/') or resolved.startswith('uploads/'):
-            return self.base_url + '/' + resolved.lstrip('/')
+
+        normalized_path = resolved.lstrip('/')
+        if normalized_path.startswith('uploads/'):
+            path = '/' + normalized_path
+        elif normalized_path.startswith('products/'):
+            path = IMAGE_PATH_PREFIX + normalized_path[len('products/'):]
         else:
-            prefix = (img_prefix or IMAGE_PATH_PREFIX).strip('/')
-            return f"{self.base_url.rstrip('/')}/{prefix}/{resolved.lstrip('/')}"
+            prefix = (img_prefix or '').strip('/')
+            if prefix.startswith('uploads/'):
+                path = '/' + prefix.rstrip('/') + '/' + normalized_path
+            else:
+                path = IMAGE_PATH_PREFIX + normalized_path
+
+        return self.base_url.rstrip('/') + '/' + path.lstrip('/')
     
     def _get_image_url_variants(self, img_val, img_prefix):
         """Generate a list of image URL variants from largest to smallest, respecting minimum size."""
@@ -683,11 +688,18 @@ class RogersRoofingScraper:
                 }
 
             all_groups = scrape_data['data']
-            img_prefix = scrape_data.get('imagePathPrefix', IMAGE_PATH_PREFIX)
-            if not img_prefix.startswith('/'):
-                img_prefix = '/' + img_prefix
+            source_img_prefix = str(scrape_data.get('imagePathPrefix') or '').strip()
+            if source_img_prefix.lstrip('/').startswith('uploads/'):
+                img_prefix = '/' + source_img_prefix.strip('/')
+            else:
+                img_prefix = IMAGE_PATH_PREFIX
             if not img_prefix.endswith('/'):
                 img_prefix += '/'
+            if source_img_prefix and img_prefix != source_img_prefix:
+                print(
+                    f"  Normalized unsupported image prefix {source_img_prefix!r} "
+                    f"to {img_prefix!r}"
+                )
 
             total_variants = sum(len(g.get('products', [])) for g in all_groups)
             has_imgs = sum(1 for g in all_groups if g.get('imgs') and isinstance(g['imgs'], dict) and len(g['imgs']) > 0)

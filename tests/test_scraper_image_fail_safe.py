@@ -29,6 +29,22 @@ class ScraperImageSafetyTests(unittest.TestCase):
 
         self.assertEqual(variants, ["https://chadsflooring.bz/uploads/products/x750-product.jpg.webp"])
 
+    def test_products_path_is_mapped_to_uploads_products(self):
+        scraper = RogersRoofingScraper()
+
+        self.assertEqual(
+            scraper._resolve_image_url("/products/x250-AW4A5015.webp", "/products/"),
+            "https://chadsflooring.bz/uploads/products/x250-AW4A5015.webp",
+        )
+
+    def test_bare_api_prefix_does_not_drop_uploads_path(self):
+        scraper = RogersRoofingScraper()
+
+        self.assertEqual(
+            scraper._resolve_image_url("x250-AW4A5015.webp", "/"),
+            "https://chadsflooring.bz/uploads/products/x250-AW4A5015.webp",
+        )
+
     def test_successful_downloads_are_used_by_group_and_variant_images(self):
         groups = [{
             "imgs": {"main": "group-image"},
