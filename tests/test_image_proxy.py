@@ -1,8 +1,9 @@
 import inspect
 import unittest
+from unittest.mock import Mock, patch
 
 import bot
-from bot import _build_image_request_headers, _resolve_image_url
+from bot import _build_image_request_headers, _fetch_product_image, _resolve_image_url
 
 
 class ImageProxyTests(unittest.TestCase):
@@ -23,6 +24,30 @@ class ImageProxyTests(unittest.TestCase):
     def test_resolve_image_url_keeps_current_size_format(self):
         resolved = _resolve_image_url("x750-something.jpg.webp", "https://chadsflooring.bz")
         self.assertEqual(resolved, "https://chadsflooring.bz/x750-something.jpg.webp")
+
+    def test_fetch_product_image_uses_session_cookie(self):
+        response = Mock(status_code=200, content=b"image-bytes")
+        response.headers = {"Content-Type": "image/webp"}
+
+        with patch("bot.requests.get", return_value=response) as get:
+            result, redirect_url = _fetch_product_image(
+                "https://chadsflooring.bz/uploads/products/test.webp",
+                cookies=[{"name": "session", "value": "abc123"}],
+                user_agent="test-agent",
+            )
+
+        self.assertIsNone(redirect_url)
+        self.assertEqual(result, (b"image-bytes", "image/webp"))
+        self.assertIn("session=abc123", get.call_args.kwargs["headers"]["Cookie"])
+        self.assertFalse(get.call_args.kwargs["allow_redirects"])
+
+    def test_external_image_is_not_fetched_by_server(self):
+        with patch("bot.requests.get") as get:
+            result, redirect_url = _fetch_product_image("https://cdn.example.com/test.webp")
+
+        self.assertIsNone(result)
+        self.assertEqual(redirect_url, "https://cdn.example.com/test.webp")
+        get.assert_not_called()
 
     def test_monitor_jobs_do_not_reenter_the_same_lock(self):
         auto_refresh_source = inspect.getsource(bot.auto_refresh_job)

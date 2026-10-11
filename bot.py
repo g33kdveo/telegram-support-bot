@@ -11,7 +11,7 @@ import re
 import hashlib
 import urllib.parse
 import threading
-import urllib.request
+import requests
 from html import escape as html_escape
 from http.server import SimpleHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 
@@ -2802,6 +2802,44 @@ def _build_image_request_headers(img_url, cookies=None, user_agent=None):
     return headers
 
 
+def _is_trusted_product_image_url(img_url):
+    parsed = urllib.parse.urlparse(img_url)
+    return parsed.scheme == "https" and parsed.hostname in {
+        "chadsflooring.bz",
+        "www.chadsflooring.bz",
+    }
+
+
+def _fetch_product_image(img_url, cookies=None, user_agent=None):
+    current_url = img_url
+    headers = _build_image_request_headers(img_url, cookies, user_agent)
+
+    for _ in range(4):
+        if not _is_trusted_product_image_url(current_url):
+            return None, current_url
+
+        response = requests.get(current_url, headers=headers, timeout=15, allow_redirects=False)
+        if 300 <= response.status_code < 400:
+            location = response.headers.get("Location")
+            if not location:
+                raise ValueError("Image source returned a redirect without a location")
+            location = urllib.parse.urljoin(current_url, location)
+            if not location.startswith("https://"):
+                raise ValueError("Refusing an insecure image redirect")
+            if not _is_trusted_product_image_url(location):
+                return None, location
+            current_url = location
+            continue
+
+        response.raise_for_status()
+        content_type = response.headers.get("Content-Type", "image/webp")
+        if not content_type.lower().startswith("image/"):
+            raise ValueError(f"Image source returned non-image content: {content_type}")
+        return (response.content, content_type), None
+
+    raise ValueError("Image source redirected too many times")
+
+
 def _load_shop_update_state():
     try:
         with open(STOCK_STATE_FILE, "r", encoding="utf-8") as f:
@@ -3030,11 +3068,14 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
                     self.wfile.write(b"Missing image URL")
                     return
 
-                # The source image URLs are public and should be loaded by the browser directly.
-                # The proxy was re-fetching stale/broken CDN paths from the server and resulting in
-                # a flood of 404s. Redirecting to the real URL avoids that failure while keeping the
-                # UI stable and letting the browser load the image normally.
-                if img_url.startswith("https://") and not raw_path.startswith("__cached__:"):
+                if not img_url.startswith("https://"):
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'text/plain')
+                    self.end_headers()
+                    self.wfile.write(b"HTTPS image URL required")
+                    return
+
+                if not _is_trusted_product_image_url(img_url):
                     self.send_response(302)
                     self.send_header('Location', img_url)
                     self.send_header('Cache-Control', 'public, max-age=86400')
@@ -3042,21 +3083,20 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
                     self.end_headers()
                     return
 
-                req = urllib.request.Request(
+                image_result, redirect_url = _fetch_product_image(
                     img_url,
-                    headers=_build_image_request_headers(img_url, cookies=cookies, user_agent=user_agent),
+                    cookies=cookies,
+                    user_agent=user_agent,
                 )
+                if redirect_url:
+                    self.send_response(302)
+                    self.send_header('Location', redirect_url)
+                    self.send_header('Cache-Control', 'public, max-age=86400')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    return
 
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    img_data = resp.read()
-                    content_type = resp.headers.get('Content-Type', 'image/webp')
-
-                if len(img_data) > 500:
-                    try:
-                        with open(cache_path, 'wb') as cf:
-                            cf.write(img_data)
-                    except:
-                        pass
+                img_data, content_type = image_result
 
                 self.send_response(200)
                 self.send_header('Content-Type', content_type)
