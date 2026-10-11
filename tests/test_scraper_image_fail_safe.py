@@ -1,20 +1,24 @@
-import base64
 import os
 import tempfile
 import unittest
 from unittest.mock import patch
 
 from scraper import (
+    IMAGE_ALL_FAIL_CHECK_COUNT,
     IMAGE_DOWNLOAD_BATCH_SIZE,
+    IMAGE_DOWNLOAD_CONCURRENCY,
     RogersRoofingScraper,
     _apply_cached_image_references,
+    _fetch_image_variants,
 )
 
 
 class ScraperImageSafetyTests(unittest.TestCase):
     def test_image_downloads_run_in_bounded_batches(self):
         self.assertGreater(IMAGE_DOWNLOAD_BATCH_SIZE, 0)
-        self.assertLessEqual(IMAGE_DOWNLOAD_BATCH_SIZE, 50)
+        self.assertLessEqual(IMAGE_DOWNLOAD_CONCURRENCY, 20)
+        self.assertLessEqual(IMAGE_DOWNLOAD_BATCH_SIZE, 100)
+        self.assertGreater(IMAGE_ALL_FAIL_CHECK_COUNT, IMAGE_DOWNLOAD_BATCH_SIZE)
 
     def test_concrete_size_format_is_not_retried_as_duplicate_variants(self):
         scraper = RogersRoofingScraper()
@@ -44,35 +48,97 @@ class ScraperImageSafetyTests(unittest.TestCase):
 
 
 class ScraperImageBatchTests(unittest.IsolatedAsyncioTestCase):
-    async def test_download_continues_after_many_individual_failures(self):
-        class FakePage:
-            calls = 0
+    async def test_download_continues_after_individual_failures(self):
+        groups = [{"imgs": {"main": f"x750-image{index}.webp"}} for index in range(35)]
+        fetched = []
 
-            async def evaluate(self, _script, variants_map):
-                self.calls += 1
-                results = {}
-                for image_template in variants_map:
-                    image_index = int(image_template.rsplit("image", 1)[1].split(".", 1)[0])
-                    if image_index < 200:
-                        results[image_template] = {"error": "not found"}
-                    else:
-                        image_data = base64.b64encode(b"image-bytes" * 60).decode()
-                        results[image_template] = {"data": f"data:image/webp;base64,{image_data}"}
-                return results
+        def fake_fetch(variants, *_args):
+            image_url = variants[0]
+            fetched.append(image_url)
+            image_index = int(image_url.rsplit("image", 1)[1].split(".", 1)[0])
+            if image_index < 3:
+                return None, None, "404 image not found", False
+            return b"image-bytes" * 60, image_url, None, False
 
-        groups = [{"imgs": {"main": f"x_imgvariantsize-image{index}.webp"}} for index in range(205)]
-        page = FakePage()
         scraper = RogersRoofingScraper()
 
         with tempfile.TemporaryDirectory() as temp_dir:
             fake_file = os.path.join(temp_dir, "scraper.py")
-            with patch("scraper.os.path.abspath", return_value=fake_file):
-                await scraper._download_images(page, groups, "/uploads/products/")
+            with patch("scraper.os.path.abspath", return_value=fake_file), patch(
+                "scraper._fetch_image_variants", side_effect=fake_fetch
+            ):
+                await scraper._download_images(None, groups, "/uploads/products/")
 
-        self.assertEqual(page.calls, 14)
-        self.assertEqual(groups[199]["imgs"]["main"], "x_imgvariantsize-image199.webp")
-        self.assertTrue(groups[200]["imgs"]["main"].startswith("__cached__:"))
-        self.assertTrue(groups[204]["imgs"]["main"].startswith("__cached__:"))
+        self.assertEqual(len(fetched), 35)
+        self.assertEqual(groups[2]["imgs"]["main"], "x750-image2.webp")
+        self.assertTrue(groups[3]["imgs"]["main"].startswith("__cached__:"))
+        self.assertTrue(groups[34]["imgs"]["main"].startswith("__cached__:"))
+
+    async def test_stops_early_when_initial_images_all_fail(self):
+        groups = [{"imgs": {"main": f"x750-image{index}.webp"}} for index in range(200)]
+        fetched = []
+
+        def fake_fetch(variants, *_args):
+            fetched.append(variants[0])
+            return None, None, "404 image not found", False
+
+        scraper = RogersRoofingScraper()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake_file = os.path.join(temp_dir, "scraper.py")
+            with patch("scraper.os.path.abspath", return_value=fake_file), patch(
+                "scraper._fetch_image_variants", side_effect=fake_fetch
+            ):
+                await scraper._download_images(None, groups, "/uploads/products/")
+
+        self.assertEqual(len(fetched), IMAGE_DOWNLOAD_BATCH_SIZE * 2)
+
+    async def test_stops_after_image_host_returns_429(self):
+        groups = [{"imgs": {"main": f"x750-image{index}.webp"}} for index in range(200)]
+        fetched = []
+
+        def fake_fetch(variants, *_args):
+            fetched.append(variants[0])
+            return None, variants[0], "429", True
+
+        scraper = RogersRoofingScraper()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake_file = os.path.join(temp_dir, "scraper.py")
+            with patch("scraper.os.path.abspath", return_value=fake_file), patch(
+                "scraper._fetch_image_variants", side_effect=fake_fetch
+            ):
+                await scraper._download_images(None, groups, "/uploads/products/")
+
+        self.assertEqual(len(fetched), IMAGE_DOWNLOAD_BATCH_SIZE)
+
+    def test_fetch_image_variants_rejects_non_image_then_uses_image(self):
+        class Response:
+            def __init__(self, content_type, content):
+                self.status_code = 200
+                self.ok = True
+                self.headers = {"Content-Type": content_type}
+                self.content = content
+
+        responses = [Response("text/html", b"login page"), Response("image/webp", b"x" * 800)]
+        with patch("scraper.requests.get", side_effect=responses) as get:
+            result = _fetch_image_variants(
+                [
+                    "https://chadsflooring.bz/uploads/products/first.webp",
+                    "https://chadsflooring.bz/uploads/products/second.webp",
+                ],
+                [{"name": "session", "value": "abc123", "domain": ".chadsflooring.bz", "path": "/"}],
+                "test-agent",
+                "https://chadsflooring.bz",
+            )
+
+        self.assertEqual(result[0], b"x" * 800)
+        self.assertEqual(result[1], "https://chadsflooring.bz/uploads/products/second.webp")
+        self.assertEqual(get.call_count, 2)
+        self.assertEqual(
+            get.call_args_list[0].kwargs["cookies"].get_dict()["session"],
+            "abc123",
+        )
 
 
 if __name__ == "__main__":

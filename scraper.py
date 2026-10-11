@@ -3,9 +3,10 @@ import json
 import os
 import re
 import hashlib
-import base64
 import time
 import shutil
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import urlparse
 from pyppeteer import launch
 import requests
 from datetime import datetime, timezone
@@ -102,7 +103,10 @@ IMAGE_PATH_PREFIX = "/uploads/products/"
 IMAGE_SIZE = 450
 IMAGE_SIZE_VARIANTS = [950, 750, 450, 400, 375, 325, 300, 250, 225, 178, 80]
 IMAGE_MIN_SIZE = 300  # Minimum acceptable image size to prevent tiny fallbacks
-IMAGE_DOWNLOAD_BATCH_SIZE = 15
+IMAGE_DOWNLOAD_BATCH_SIZE = 60
+IMAGE_DOWNLOAD_CONCURRENCY = 12
+IMAGE_FETCH_TIMEOUT = (3, 10)
+IMAGE_ALL_FAIL_CHECK_COUNT = 75
 
 
 def _apply_cached_image_references(groups, cached_images):
@@ -127,6 +131,44 @@ def _apply_cached_image_references(groups, cached_images):
                     else image_value
                     for image_value in product_images
                 ]
+
+
+def _fetch_image_variants(variants, cookies, user_agent, referer):
+    cookie_jar = requests.cookies.RequestsCookieJar()
+    for cookie in cookies:
+        name = cookie.get("name")
+        if not name:
+            continue
+        cookie_jar.set(
+            name,
+            cookie.get("value", ""),
+            domain=cookie.get("domain") or urlparse(referer).hostname,
+            path=cookie.get("path") or "/",
+        )
+
+    headers = {
+        "User-Agent": user_agent,
+        "Referer": referer.rstrip("/") + "/",
+        "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+    }
+    failures = []
+    for image_url in variants:
+        try:
+            response = requests.get(
+                image_url,
+                headers=headers,
+                cookies=cookie_jar,
+                timeout=IMAGE_FETCH_TIMEOUT,
+            )
+            content_type = response.headers.get("Content-Type", "").lower()
+            if response.status_code == 429:
+                return None, image_url, f"429 {image_url}", True
+            if response.ok and content_type.startswith("image/") and len(response.content) > 500:
+                return response.content, image_url, None, False
+            failures.append(f"{response.status_code} {content_type or 'unknown content type'} {image_url}")
+        except requests.RequestException as error:
+            failures.append(f"{type(error).__name__} {image_url}")
+    return None, None, failures[0] if failures else "no usable image variants", False
 
 CATEGORIES = [
     "Accessories", "BYOB", "Carts", "Concentrates",
@@ -486,108 +528,68 @@ class RogersRoofingScraper:
                 items.append((img_template, cache_entry))
         print(f"  Reusing {cached_before} cached images; downloading {len(items)}")
 
-        if items and page:
-            batch_size = IMAGE_DOWNLOAD_BATCH_SIZE
+        if items:
+            cookies, user_agent = get_stored_cookies()
             downloaded = 0
             failed = 0
             total = len(items)
             start_time = time.time()
-            
-            for i in range(0, total, batch_size):
-                batch = items[i:i + batch_size]
-                if not batch:
-                    break
-                variants_for_js = {template: variants for template, (variants, _, _) in batch}
+            rate_limited = False
+            first_failure = None
 
-                results = {}
-                for attempt in range(2):
-                    try:
-                        results = await page.evaluate('''async (variantsMap) => {
-                            const out = {};
-                            const CONCURRENCY = 6;
-                            const templates = Object.keys(variantsMap);
+            with ThreadPoolExecutor(max_workers=IMAGE_DOWNLOAD_CONCURRENCY) as executor:
+                for i in range(0, total, IMAGE_DOWNLOAD_BATCH_SIZE):
+                    batch = items[i:i + IMAGE_DOWNLOAD_BATCH_SIZE]
+                    futures = {
+                        executor.submit(
+                            _fetch_image_variants,
+                            variants,
+                            cookies,
+                            user_agent,
+                            self.base_url,
+                        ): (img_template, cache_fname)
+                        for img_template, (variants, cache_fname, _) in batch
+                    }
 
-                            for (let ti = 0; ti < templates.length; ti += CONCURRENCY) {
-                                const templateChunk = templates.slice(ti, ti + CONCURRENCY);
-                                await Promise.allSettled(templateChunk.map(async (template) => {
-                                    const variants = variantsMap[template];
-                                    for (const url of variants) {
-                                        const controller = new AbortController();
-                                        const timeout = setTimeout(() => controller.abort(), 10000);
-                                        try {
-                                            const r = await fetch(url, {
-                                                credentials: 'include',
-                                                signal: controller.signal
-                                            });
-                                            if (r.ok) {
-                                                const blob = await r.blob();
-                                                const reader = new FileReader();
-                                                const b64 = await new Promise((resolve, reject) => {
-                                                    reader.onload = () => resolve(reader.result);
-                                                    reader.onerror = reject;
-                                                    reader.readAsDataURL(blob);
-                                                });
-                                                out[template] = {data: b64, url: url};
-                                                return;
-                                            }
-                                        } catch (e) {
-                                            // Try next variant.
-                                        } finally {
-                                            clearTimeout(timeout);
-                                        }
-                                    }
-                                    out[template] = {error: 'All variants failed'};
-                                }));
-                            }
-                            return out;
-                        }''', variants_for_js)
-                        break
-                    except Exception as batch_err:
-                        if attempt == 0:
-                            print(f"  Batch retry after error: {batch_err}")
-                            await asyncio.sleep(1)
-                        else:
-                            print(f"  Batch failed: {batch_err}")
-                            results = {}
-
-                if not results:
-                    print("  Image batch failed; continuing with the next batch.")
-                    failed += len(batch)
-                    await asyncio.sleep(0.1)
-                    continue
-
-                for img_template, (variants, cache_fname, ext) in batch:
-                    result = results.get(img_template, {})
-                    b64_data = result.get('data') if isinstance(result, dict) else None
-                    if b64_data and ',' in b64_data:
+                    for future in as_completed(futures):
+                        img_template, cache_fname = futures[future]
                         try:
-                            raw_bytes = base64.b64decode(b64_data.split(',', 1)[1])
-                        except Exception:
-                            raw_bytes = b''
-                        if len(raw_bytes) > 500:
+                            image_bytes, used_url, error, is_rate_limited = future.result()
+                        except Exception as error:
+                            image_bytes, used_url, is_rate_limited = None, None, False
+                            error = f"{type(error).__name__}: {error}"
+
+                        if image_bytes:
                             with open(os.path.join(img_cache_dir, cache_fname), 'wb') as imgf:
-                                imgf.write(raw_bytes)
+                                imgf.write(image_bytes)
                             downloaded += 1
-                            used_url = result.get('url', 'unknown')
-                            size_match = used_url.split('x')
-                            size_str = size_match[1].split('/')[0] if len(size_match) > 1 else '?'
-                            if size_str != '?':
-                                print(f"    ✓ {cache_fname[:8]}... (x{size_str})")
                         else:
                             failed += 1
-                    else:
-                        failed += 1
+                            if first_failure is None and error:
+                                first_failure = error
+                            rate_limited = rate_limited or is_rate_limited
 
-                processed = min(i + len(batch), total)
-                elapsed = time.time() - start_time
-                rate = processed / elapsed if elapsed > 0 else 0
-                remaining = (total - processed) / rate if rate > 0 else 0
-                print(f"  Progress: {processed}/{total} ({downloaded} ok, {failed} fail) ~{remaining:.0f}s remaining")
-                await asyncio.sleep(0.05)
+                    processed = min(i + len(batch), total)
+                    elapsed = time.time() - start_time
+                    rate = processed / elapsed if elapsed > 0 else 0
+                    remaining = (total - processed) / rate if rate > 0 else 0
+                    print(
+                        f"  Progress: {processed}/{total} ({downloaded} ok, {failed} fail) "
+                        f"~{remaining:.0f}s remaining"
+                    )
+                    if first_failure:
+                        print(f"  First image request failure: {first_failure}")
+                    if rate_limited:
+                        print("  Image source returned HTTP 429; stopping image requests for this scrape.")
+                        break
+                    if downloaded == 0 and processed >= IMAGE_ALL_FAIL_CHECK_COUNT:
+                        print(
+                            f"  No images succeeded in the first {processed}; "
+                            "stopping image requests to avoid a catalog-wide retry storm."
+                        )
+                        break
 
             print(f"  Downloaded: {downloaded}, Failed: {failed}, Time: {time.time() - start_time:.1f}s")
-        elif items:
-            print("  No browser page is available; keeping source image URLs")
         elif not url_map:
             print("  No images to download")
         else:
@@ -726,21 +728,8 @@ class RogersRoofingScraper:
             print(f"{'='*60}")
 
             if download_images:
-                # Normalize group images and populate the image cache for the shop.
-                print(f"\n--- NORMALIZING GROUP IMAGES ---")
-                normalized_count = 0
-                for g in all_groups:
-                    imgs = g.get('imgs')
-                    if isinstance(imgs, dict):
-                        for ikey, ival in list(imgs.items()):
-                            if isinstance(ival, str):
-                                import re
-                                size_match = re.search(r'x(\d+)-', ival)
-                                if size_match:
-                                    normalized = re.sub(r'x(\d+)-', 'x_imgvariantsize-', ival)
-                                    imgs[ikey] = normalized
-                                    normalized_count += 1
-                print(f"  Normalized {normalized_count} group images to use variant template")
+                print("\n--- PRESERVING SOURCE IMAGE SIZES ---")
+                print("  Concrete image sizes are kept as-is; only placeholder URLs get size variants.")
                 try:
                     await self._download_images(page, all_groups, img_prefix)
                 except Exception as e:
