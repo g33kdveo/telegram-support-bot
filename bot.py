@@ -2701,6 +2701,14 @@ async def set_commands(app):
         ], scope=BotCommandScopeChatAdministrators(chat_id=SUPPORT_GROUP_ID))
 
 
+async def startup_post_init(app):
+    app.create_task(_run_auto_refresh_job(app), name="startup_product_refresh")
+    try:
+        await set_commands(app)
+    except Exception as error:
+        print(f"⚠️ Could not register Telegram commands during startup: {error}")
+
+
 def _load_initial_cache():
     import os
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -3355,7 +3363,7 @@ def main():
     if os.getenv("PORT"):
         threading.Thread(target=run_simple_server, daemon=True).start()
 
-    app = ApplicationBuilder().token(TOKEN).post_init(set_commands).build()
+    app = ApplicationBuilder().token(TOKEN).post_init(startup_post_init).build()
 
     # Handlers
     app.add_handler(CommandHandler("start", start))
@@ -3402,7 +3410,7 @@ def main():
     # Job Queue
     app.job_queue.run_repeating(check_timeouts, interval=60, first=10)
     app.job_queue.run_repeating(stock_monitor_job, interval=60, first=60)
-    app.job_queue.run_repeating(auto_refresh_job, interval=1800, first=30)
+    app.job_queue.run_repeating(auto_refresh_job, interval=1800, first=1800)
     app.job_queue.run_repeating(cleanup_database, interval=86400, first=60)
 
     print("Bot is running...")

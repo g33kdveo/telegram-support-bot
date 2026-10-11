@@ -1,6 +1,6 @@
 import json
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import bot
 from scraper import RogersRoofingScraper, fetch_authenticated_stock_snapshot
@@ -52,6 +52,26 @@ class StockMonitorRateLimitTests(unittest.TestCase):
 
 
 class FullScrapeRateLimitTests(unittest.IsolatedAsyncioTestCase):
+    async def test_startup_schedules_scrape_even_if_command_registration_fails(self):
+        class FakeApplication:
+            def __init__(self):
+                self.scheduled_tasks = []
+
+            def create_task(self, coroutine, name=None):
+                coroutine.close()
+                self.scheduled_tasks.append(name)
+
+        app = FakeApplication()
+        with patch.object(
+            bot,
+            "set_commands",
+            new=AsyncMock(side_effect=ConnectionError("Telegram API unavailable")),
+        ) as set_commands:
+            await bot.startup_post_init(app)
+
+        self.assertEqual(app.scheduled_tasks, ["startup_product_refresh"])
+        set_commands.assert_awaited_once_with(app)
+
     async def test_browser_scrape_stops_after_one_429_and_keeps_retry_delay(self):
         class RateLimitedPage:
             calls = 0
