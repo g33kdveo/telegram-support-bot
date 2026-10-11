@@ -1,4 +1,5 @@
 import json
+import math
 import sqlite3
 import os
 import random
@@ -2462,8 +2463,9 @@ async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
                     "ok": False,
                     "auth_required": False,
                     "rate_limited": True,
+                    "cooldown_active": True,
                     "retry_after": cooldown_remaining,
-                    "error": f"HTTP 429 cooldown ({int(cooldown_remaining)}s remaining)",
+                    "error": f"HTTP 429 cooldown ({math.ceil(cooldown_remaining)}s remaining)",
                 }
             else:
                 for attempt in range(STOCK_MONITOR_MAX_ATTEMPTS):
@@ -2501,6 +2503,13 @@ async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
         if time.time() - LAST_SESSION_REFRESH_ATTEMPT >= SESSION_REFRESH_COOLDOWN:
             LAST_SESSION_REFRESH_ATTEMPT = time.time()
             await _run_auto_refresh_job(context)
+        return
+
+    if result.get("cooldown_active"):
+        print(
+            f"⏸️ 60-second stock monitor paused by API rate limit; "
+            f"retrying in {math.ceil(result['retry_after'])}s."
+        )
         return
 
     if not result.get("ok"):

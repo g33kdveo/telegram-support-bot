@@ -51,6 +51,21 @@ class StockMonitorRateLimitTests(unittest.TestCase):
         self.assertEqual(result["retry_after"], 300)
 
 
+class StockMonitorCooldownTests(unittest.IsolatedAsyncioTestCase):
+    async def test_cooldown_tick_is_paused_not_counted_as_failure(self):
+        previous_until = bot.STOCK_MONITOR_RATE_LIMIT_UNTIL
+        previous_failures = bot.STOCK_MONITOR_FAILURE_COUNT
+        bot.STOCK_MONITOR_RATE_LIMIT_UNTIL = bot.time.time() + 30
+        bot.STOCK_MONITOR_FAILURE_COUNT = 4
+        try:
+            with patch.object(bot, "_claim_full_scrape", new=AsyncMock()):
+                await bot._run_stock_monitor_job(object())
+            self.assertEqual(bot.STOCK_MONITOR_FAILURE_COUNT, 4)
+        finally:
+            bot.STOCK_MONITOR_RATE_LIMIT_UNTIL = previous_until
+            bot.STOCK_MONITOR_FAILURE_COUNT = previous_failures
+
+
 class FullScrapeRateLimitTests(unittest.IsolatedAsyncioTestCase):
     async def test_startup_schedules_scrape_even_if_command_registration_fails(self):
         class FakeJobQueue:
