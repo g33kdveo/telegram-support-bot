@@ -67,6 +67,34 @@ class StockMonitorCooldownTests(unittest.IsolatedAsyncioTestCase):
 
 
 class FullScrapeRateLimitTests(unittest.IsolatedAsyncioTestCase):
+    def test_stock_monitor_starts_once_after_full_scrape_with_sixty_second_delay(self):
+        class FakeJobQueue:
+            def __init__(self):
+                self.jobs = []
+
+            def run_repeating(self, callback, **kwargs):
+                self.jobs.append((callback, kwargs))
+
+        class FakeContext:
+            def __init__(self):
+                self.job_queue = FakeJobQueue()
+
+        context = FakeContext()
+        previous_started = bot.STOCK_MONITOR_STARTED
+        bot.STOCK_MONITOR_STARTED = False
+        try:
+            bot._start_stock_monitor_after_full_scrape(context)
+            bot._start_stock_monitor_after_full_scrape(context)
+        finally:
+            bot.STOCK_MONITOR_STARTED = previous_started
+
+        self.assertEqual(len(context.job_queue.jobs), 1)
+        callback, job_kwargs = context.job_queue.jobs[0]
+        self.assertEqual(callback, bot.stock_monitor_job)
+        self.assertEqual(job_kwargs["interval"], 60)
+        self.assertEqual(job_kwargs["first"], 60)
+        self.assertEqual(job_kwargs["name"], "stock_monitor")
+
     async def test_startup_schedules_scrape_even_if_command_registration_fails(self):
         class FakeJobQueue:
             scheduled = None

@@ -2217,6 +2217,7 @@ STOCK_MONITOR_FAILURE_COUNT = 0
 STOCK_MONITOR_FAILURE_WARNING_SENT = False
 STOCK_MONITOR_RATE_LIMIT_UNTIL = 0
 STOCK_API_RATE_LIMIT_COUNT = 0
+STOCK_MONITOR_STARTED = False
 MANUAL_CHECK_PENDING = False
 LAST_MANUAL_CHECK = 0
 
@@ -2428,6 +2429,7 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
             PRODUCT_CACHE["timestamp"] = time.time()
             PRODUCT_CACHE["last_attempt"] = time.time()
             _reset_stock_api_rate_limit()
+            _start_stock_monitor_after_full_scrape(context)
             await notify_shop_updates(context.bot, fresh_result, send_notifications=False)
             print(f"✅ Cache Refreshed! {new_count} groups.")
         else:
@@ -2438,6 +2440,25 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
     finally:
         with SCRAPE_LOCK:
             SCRAPE_IN_PROGRESS = False
+
+
+def _start_stock_monitor_after_full_scrape(context):
+    global STOCK_MONITOR_STARTED
+    if STOCK_MONITOR_STARTED:
+        return
+
+    job_queue = getattr(context, "job_queue", None)
+    if job_queue is None:
+        return
+
+    job_queue.run_repeating(
+        stock_monitor_job,
+        interval=60,
+        first=60,
+        name="stock_monitor",
+    )
+    STOCK_MONITOR_STARTED = True
+    print("✅ 60-second stock monitor scheduled; first check in 60s after full scrape.")
 
 
 async def stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
@@ -3423,7 +3444,6 @@ def main():
 
     # Job Queue
     app.job_queue.run_repeating(check_timeouts, interval=60, first=10)
-    app.job_queue.run_repeating(stock_monitor_job, interval=60, first=60)
     app.job_queue.run_repeating(auto_refresh_job, interval=1800, first=1800)
     app.job_queue.run_repeating(cleanup_database, interval=86400, first=60)
 
