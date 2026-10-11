@@ -1,3 +1,4 @@
+import asyncio
 import json
 import unittest
 from unittest.mock import AsyncMock, patch
@@ -64,6 +65,87 @@ class StockMonitorCooldownTests(unittest.IsolatedAsyncioTestCase):
         finally:
             bot.STOCK_MONITOR_RATE_LIMIT_UNTIL = previous_until
             bot.STOCK_MONITOR_FAILURE_COUNT = previous_failures
+
+
+class ScrapeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
+    async def test_waiting_full_scrape_precedes_later_monitor(self):
+        order = []
+        monitor_started = asyncio.Event()
+        release_monitor = asyncio.Event()
+        full_started = asyncio.Event()
+        release_full = asyncio.Event()
+
+        async def run_monitor():
+            async with bot._scrape_slot("monitor"):
+                order.append("monitor-1")
+                monitor_started.set()
+                await release_monitor.wait()
+
+        async def run_full():
+            async with bot._scrape_slot("full"):
+                order.append("full")
+                full_started.set()
+                await release_full.wait()
+
+        async def run_later_monitor():
+            async with bot._scrape_slot("monitor"):
+                order.append("monitor-2")
+
+        first_monitor = asyncio.create_task(run_monitor())
+        await monitor_started.wait()
+        full_scrape = asyncio.create_task(run_full())
+        await asyncio.sleep(0)
+        later_monitor = asyncio.create_task(run_later_monitor())
+        await asyncio.sleep(0)
+        release_monitor.set()
+        await full_started.wait()
+
+        self.assertEqual(order, ["monitor-1", "full"])
+        release_full.set()
+        await asyncio.gather(first_monitor, full_scrape, later_monitor)
+        self.assertEqual(order, ["monitor-1", "full", "monitor-2"])
+
+    def test_next_full_scrape_is_scheduled_after_completion_delay(self):
+        class FakeJobQueue:
+            def __init__(self):
+                self.jobs = []
+                self.scheduled = None
+
+            def get_jobs_by_name(self, _name):
+                return self.jobs
+
+            def run_once(self, callback, **kwargs):
+                self.scheduled = (callback, kwargs)
+
+        class FakeContext:
+            job_queue = FakeJobQueue()
+
+        context = FakeContext()
+        bot._schedule_next_full_scrape(context, 1800)
+
+        self.assertEqual(context.job_queue.scheduled[0], bot.auto_refresh_job)
+        self.assertEqual(context.job_queue.scheduled[1]["when"], 1800)
+        self.assertEqual(context.job_queue.scheduled[1]["name"], "periodic_full_scrape")
+
+
+class NotificationBaselineTests(unittest.IsolatedAsyncioTestCase):
+    async def test_silent_full_refresh_does_not_overwrite_existing_baseline(self):
+        previous_state = bot.SHOP_UPDATE_STATE
+        previous_times = bot.SHOP_NOTIFICATION_TIMES
+        baseline = {"old": {"name": "Old item", "category": "Flower", "variants": {}}}
+        bot.SHOP_UPDATE_STATE = baseline.copy()
+        bot.SHOP_NOTIFICATION_TIMES = {}
+        try:
+            await bot.notify_shop_updates(
+                object(),
+                {"data": [{"id": "new", "name": "New item", "products": []}]},
+                send_notifications=False,
+                update_baseline=False,
+            )
+            self.assertEqual(bot.SHOP_UPDATE_STATE, baseline)
+        finally:
+            bot.SHOP_UPDATE_STATE = previous_state
+            bot.SHOP_NOTIFICATION_TIMES = previous_times
 
 
 class FullScrapeRateLimitTests(unittest.IsolatedAsyncioTestCase):

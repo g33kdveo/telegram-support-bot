@@ -13,6 +13,7 @@ import hashlib
 import urllib.parse
 import threading
 import requests
+from contextlib import asynccontextmanager
 from html import escape as html_escape
 from http.server import SimpleHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 
@@ -2218,6 +2219,8 @@ STOCK_MONITOR_FAILURE_WARNING_SENT = False
 STOCK_MONITOR_RATE_LIMIT_UNTIL = 0
 STOCK_API_RATE_LIMIT_COUNT = 0
 STOCK_MONITOR_STARTED = False
+LAST_FULL_SCRAPE_COMPLETED = 0
+FULL_SCRAPE_GENERATION = 0
 MANUAL_CHECK_PENDING = False
 LAST_MANUAL_CHECK = 0
 
@@ -2280,7 +2283,7 @@ async def check_stock_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     MANUAL_CHECK_PENDING = True
     try:
-        async with SCRAPE_COORDINATOR_LOCK:
+        async with _scrape_slot("manual"):
             await _wait_for_active_scrape()
             await _run_check_stock_command(update, context)
     finally:
@@ -2352,8 +2355,32 @@ async def _run_check_stock_command(update: Update, context: ContextTypes.DEFAULT
 
 # ===== AUTO REFRESH JOB =====
 async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
-    await _wait_for_active_scrape()
-    await _run_auto_refresh_job(context)
+    global LAST_FULL_SCRAPE_COMPLETED
+
+    async with _scrape_slot("full"):
+        _pause_stock_monitor(context)
+        try:
+            refreshed = await _run_auto_refresh_job(context)
+        finally:
+            if locals().get("refreshed", False):
+                LAST_FULL_SCRAPE_COMPLETED = time.time()
+                _start_stock_monitor_after_full_scrape(context)
+                _schedule_next_full_scrape(context, 1800)
+            elif STOCK_MONITOR_RATE_LIMIT_UNTIL <= time.time():
+                _schedule_next_full_scrape(context, 1800)
+
+
+def _schedule_next_full_scrape(context, delay):
+    job_queue = getattr(context, "job_queue", None)
+    if job_queue is None:
+        return
+    for job in job_queue.get_jobs_by_name("periodic_full_scrape"):
+        job.schedule_removal()
+    job_queue.run_once(
+        auto_refresh_job,
+        when=max(1.0, delay),
+        name="periodic_full_scrape",
+    )
 
 
 def _schedule_rate_limited_auto_refresh(context, delay):
@@ -2379,7 +2406,7 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
     if cooldown_remaining > 0:
         print(f"⏳ Full scrape deferred for {cooldown_remaining:.0f}s due to API rate limit.")
         _schedule_rate_limited_auto_refresh(context, cooldown_remaining)
-        return
+        return False
 
     await _claim_full_scrape()
 
@@ -2410,7 +2437,7 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
                 f"retrying after {retry_after:.0f}s."
             )
             _schedule_rate_limited_auto_refresh(context, retry_after)
-            return
+            return False
 
         if fresh_result and isinstance(fresh_result.get('data'), list) and len(fresh_result['data']) > 0:
             new_count = len(fresh_result['data'])
@@ -2429,14 +2456,21 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
             PRODUCT_CACHE["timestamp"] = time.time()
             PRODUCT_CACHE["last_attempt"] = time.time()
             _reset_stock_api_rate_limit()
-            _start_stock_monitor_after_full_scrape(context)
-            await notify_shop_updates(context.bot, fresh_result, send_notifications=False)
+            await notify_shop_updates(
+                context.bot,
+                fresh_result,
+                send_notifications=False,
+                update_baseline=False,
+            )
             print(f"✅ Cache Refreshed! {new_count} groups.")
+            return True
         else:
             print("❌ Scrape returned no products. Keeping existing cache.")
             PRODUCT_CACHE["last_attempt"] = time.time()
+            return False
     except Exception as e:
         print(f"❌ Error during auto-refresh: {str(e)}")
+        return False
     finally:
         with SCRAPE_LOCK:
             SCRAPE_IN_PROGRESS = False
@@ -2461,9 +2495,25 @@ def _start_stock_monitor_after_full_scrape(context):
     print("✅ 60-second stock monitor scheduled; first check in 60s after full scrape.")
 
 
+def _pause_stock_monitor(context):
+    global STOCK_MONITOR_STARTED, FULL_SCRAPE_GENERATION
+    FULL_SCRAPE_GENERATION += 1
+    job_queue = getattr(context, "job_queue", None)
+    if job_queue is not None:
+        for job in job_queue.get_jobs_by_name("stock_monitor"):
+            job.schedule_removal()
+    STOCK_MONITOR_STARTED = False
+
+
 async def stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
-    await _wait_for_active_scrape()
-    await _run_stock_monitor_job(context)
+    generation = FULL_SCRAPE_GENERATION
+    async with _scrape_slot("monitor"):
+        if generation != FULL_SCRAPE_GENERATION or not STOCK_MONITOR_STARTED:
+            return
+        first_allowed_run = LAST_FULL_SCRAPE_COMPLETED + 60
+        if time.time() < first_allowed_run:
+            return
+        await _run_stock_monitor_job(context)
 
 
 async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
@@ -2523,7 +2573,7 @@ async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
 
         if time.time() - LAST_SESSION_REFRESH_ATTEMPT >= SESSION_REFRESH_COOLDOWN:
             LAST_SESSION_REFRESH_ATTEMPT = time.time()
-            await _run_auto_refresh_job(context)
+            _schedule_rate_limited_auto_refresh(context, 1)
         return
 
     if result.get("cooldown_active"):
@@ -2532,6 +2582,11 @@ async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
             f"retrying in {math.ceil(result['retry_after'])}s."
         )
         return
+
+    if result.get("rate_limited"):
+        retry_after = max(1.0, float(result.get("retry_after") or 300))
+        _pause_stock_monitor(context)
+        _schedule_rate_limited_auto_refresh(context, retry_after)
 
     if not result.get("ok"):
         STOCK_MONITOR_FAILURE_COUNT += 1
@@ -2769,7 +2824,35 @@ SCRAPE_LOCK = threading.Lock()
 SCRAPE_IN_PROGRESS = False
 SHOP_UPDATE_STATE = None
 SHOP_NOTIFICATION_TIMES = {}
-SCRAPE_COORDINATOR_LOCK = asyncio.Lock()
+SCRAPE_COORDINATOR_CONDITION = asyncio.Condition()
+SCRAPE_COORDINATOR_ACTIVE = None
+FULL_SCRAPES_WAITING = 0
+
+
+@asynccontextmanager
+async def _scrape_slot(kind):
+    global SCRAPE_COORDINATOR_ACTIVE, FULL_SCRAPES_WAITING
+    async with SCRAPE_COORDINATOR_CONDITION:
+        is_full_scrape = kind == "full"
+        if is_full_scrape:
+            FULL_SCRAPES_WAITING += 1
+        try:
+            await SCRAPE_COORDINATOR_CONDITION.wait_for(
+                lambda: SCRAPE_COORDINATOR_ACTIVE is None
+                and (is_full_scrape or FULL_SCRAPES_WAITING == 0)
+            )
+        finally:
+            if is_full_scrape:
+                FULL_SCRAPES_WAITING -= 1
+                SCRAPE_COORDINATOR_CONDITION.notify_all()
+        SCRAPE_COORDINATOR_ACTIVE = kind
+
+    try:
+        yield
+    finally:
+        async with SCRAPE_COORDINATOR_CONDITION:
+            SCRAPE_COORDINATOR_ACTIVE = None
+            SCRAPE_COORDINATOR_CONDITION.notify_all()
 
 
 async def _wait_for_active_scrape():
@@ -3006,7 +3089,7 @@ def _format_stock_notification(item, variant):
     )
 
 
-async def notify_shop_updates(bot, scrape_result, send_notifications=True):
+async def notify_shop_updates(bot, scrape_result, send_notifications=True, update_baseline=True):
     global SHOP_UPDATE_STATE, SHOP_NOTIFICATION_TIMES
 
     current = _normalize_product_snapshot(_product_snapshot(scrape_result))
@@ -3016,6 +3099,9 @@ async def notify_shop_updates(bot, scrape_result, send_notifications=True):
             SHOP_UPDATE_STATE = current
             _save_shop_update_state(current, SHOP_NOTIFICATION_TIMES)
             return
+
+    if not send_notifications and not update_baseline:
+        return
 
     previous = _normalize_product_snapshot(SHOP_UPDATE_STATE)
     notifications = []
@@ -3217,90 +3303,17 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith('/api/products'):
-            http_started_scrape = False
-            try:
-                if PRODUCT_CACHE["data"]:
-                    items = PRODUCT_CACHE["data"].get("data", [])
-                    print(f"✅ Serving {len(items)} products from cache")
-                    response_data = PRODUCT_CACHE["data"] if _request_can_see_prices(self.path) else _without_prices(PRODUCT_CACHE["data"])
-                    self.send_json(response_data)
-                    return
-
-                with SCRAPE_LOCK:
-                    global SCRAPE_IN_PROGRESS
-                    now = time.time()
-
-                    if PRODUCT_CACHE["data"]:
-                        response_data = PRODUCT_CACHE["data"] if _request_can_see_prices(self.path) else _without_prices(PRODUCT_CACHE["data"])
-                        self.send_json(response_data)
-                        return
-
-                    if SCRAPE_IN_PROGRESS:
-                        print("⏳ Scrape already in progress. Serving empty.")
-                        self.send_json({"data": [], "error": True, "message": "Scrape in progress, please wait"})
-                        return
-
-                    if now - PRODUCT_CACHE.get("last_attempt", 0) < FAILURE_COOLDOWN:
-                        print("⏳ Scrape cooldown active. Serving empty.")
-                        self.send_json({"data": [], "error": True, "message": "Scrape cooldown active"})
-                        return
-
-                    PRODUCT_CACHE["last_attempt"] = now
-                    SCRAPE_IN_PROGRESS = True
-                    http_started_scrape = True
-
-                try:
-                    print("📂 No cached data - running initial scrape...")
-                    scraper = RogersRoofingScraper(
-                        username=CHADS_USERNAME,
-                        password=CHADS_PASSWORD,
-                        api_key=CHADS_API_KEY
-                    )
-                    fresh_result = scraper.get_products()
-                finally:
-                    if http_started_scrape:
-                        with SCRAPE_LOCK:
-                            SCRAPE_IN_PROGRESS = False
-
-                if fresh_result and isinstance(fresh_result.get('data'), list) and len(fresh_result['data']) > 0:
-                    new_count = len(fresh_result['data'])
-                    print(f"📊 Scrape found: {new_count} products.")
-
-                    if not fresh_result.get('imagePathPrefix'):
-                        fresh_result['imagePathPrefix'] = "/products/"
-
-                    try:
-                        with open("scraped_products.json", "w", encoding="utf-8") as f:
-                            json.dump(fresh_result, f, indent=2)
-                    except:
-                        pass
-
-                    PRODUCT_CACHE["data"] = fresh_result
-                    PRODUCT_CACHE["timestamp"] = time.time()
-                    response_data = fresh_result if _request_can_see_prices(self.path) else _without_prices(fresh_result)
-                    self.send_json(response_data)
-                else:
-                    print("❌ Scrape returned no products.")
-                    if PRODUCT_CACHE["data"]:
-                        response_data = PRODUCT_CACHE["data"] if _request_can_see_prices(self.path) else _without_prices(PRODUCT_CACHE["data"])
-                        self.send_json(response_data)
-                    else:
-                        self.send_json({"error": True, "message": "Could not load product data"})
-
-            except Exception as e:
-                if http_started_scrape:
-                    with SCRAPE_LOCK:
-                        SCRAPE_IN_PROGRESS = False
-                print(f"❌ Critical error in API proxy: {str(e)}")
-                import traceback
-                traceback.print_exc()
-
-                if PRODUCT_CACHE["data"]:
-                    print("⚠️ Serving stale cache due to critical error.")
-                    response_data = PRODUCT_CACHE["data"] if _request_can_see_prices(self.path) else _without_prices(PRODUCT_CACHE["data"])
-                    self.send_json(response_data)
-                else:
-                    self.send_json({"data": [], "error": True, "message": f"Error fetching products: {str(e)}"})
+            if PRODUCT_CACHE["data"]:
+                items = PRODUCT_CACHE["data"].get("data", [])
+                print(f"✅ Serving {len(items)} products from cache")
+                response_data = PRODUCT_CACHE["data"] if _request_can_see_prices(self.path) else _without_prices(PRODUCT_CACHE["data"])
+                self.send_json(response_data)
+            else:
+                print("⏳ Product cache is not ready; serving retryable response without starting another scraper.")
+                self.send_json(
+                    {"data": [], "error": True, "message": "Initial catalog refresh is in progress"},
+                    status=503,
+                )
             return
 
         return super().do_GET()
@@ -3444,7 +3457,6 @@ def main():
 
     # Job Queue
     app.job_queue.run_repeating(check_timeouts, interval=60, first=10)
-    app.job_queue.run_repeating(auto_refresh_job, interval=1800, first=1800)
     app.job_queue.run_repeating(cleanup_database, interval=86400, first=60)
 
     print("Bot is running...")
