@@ -99,7 +99,8 @@ def fetch_authenticated_stock_snapshot(api_key, base_url="https://chadsflooring.
 
     return {"ok": True, "auth_required": False, "snapshot": snapshot}
 
-IMAGE_PATH_PREFIX = "/uploads/products/"
+IMAGE_CDN_BASE_URL = "https://img.chadsflooring.bz"
+IMAGE_PATH_PREFIX = "/products/"
 IMAGE_SIZE = 450
 IMAGE_SIZE_VARIANTS = [950, 750, 450, 400, 375, 325, 300, 250, 225, 178, 80]
 IMAGE_MIN_SIZE = 300  # Minimum acceptable image size to prevent tiny fallbacks
@@ -453,22 +454,27 @@ class RogersRoofingScraper:
         if 'x_imgvariantsize' in resolved.lower():
             resolved = re.sub(r'x_imgvariantsize', f'x{size_val}', resolved, flags=re.IGNORECASE)
 
-        if resolved.startswith('http://') or resolved.startswith('https://'):
-            return resolved
+        if resolved.startswith(('http://', 'https://')):
+            parsed = urlparse(resolved)
+            if parsed.hostname == 'img.chadsflooring.bz':
+                return resolved
+            if parsed.hostname in {'chadsflooring.bz', 'www.chadsflooring.bz'}:
+                resolved = parsed.path
+            else:
+                return resolved
 
         normalized_path = resolved.lstrip('/')
-        if normalized_path.startswith('uploads/'):
-            path = '/' + normalized_path
-        elif normalized_path.startswith('products/'):
-            path = IMAGE_PATH_PREFIX + normalized_path[len('products/'):]
-        else:
-            prefix = (img_prefix or '').strip('/')
-            if prefix.startswith('uploads/'):
-                path = '/' + prefix.rstrip('/') + '/' + normalized_path
-            else:
-                path = IMAGE_PATH_PREFIX + normalized_path
+        if normalized_path.startswith('uploads/products/'):
+            normalized_path = normalized_path[len('uploads/'):]
+        elif not normalized_path.startswith('products/'):
+            prefix = (img_prefix or IMAGE_PATH_PREFIX).strip('/')
+            if prefix.startswith('uploads/products/'):
+                prefix = 'products'
+            elif prefix != 'products':
+                prefix = 'products'
+            normalized_path = f"{prefix}/{normalized_path}"
 
-        return self.base_url.rstrip('/') + '/' + path.lstrip('/')
+        return f"{IMAGE_CDN_BASE_URL}/{normalized_path}"
     
     def _get_image_url_variants(self, img_val, img_prefix):
         """Generate a list of image URL variants from largest to smallest, respecting minimum size."""
@@ -693,15 +699,12 @@ class RogersRoofingScraper:
 
             all_groups = scrape_data['data']
             source_img_prefix = str(scrape_data.get('imagePathPrefix') or '').strip()
-            if source_img_prefix.lstrip('/').startswith('uploads/'):
-                img_prefix = '/' + source_img_prefix.strip('/')
-            else:
-                img_prefix = IMAGE_PATH_PREFIX
+            img_prefix = IMAGE_PATH_PREFIX
             if not img_prefix.endswith('/'):
                 img_prefix += '/'
             if source_img_prefix and img_prefix != source_img_prefix:
                 print(
-                    f"  Normalized unsupported image prefix {source_img_prefix!r} "
+                    f"  Normalized image prefix {source_img_prefix!r} "
                     f"to {img_prefix!r}"
                 )
 

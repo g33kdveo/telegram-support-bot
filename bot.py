@@ -2415,7 +2415,7 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
             print(f"📊 Scrape found: {new_count} groups")
 
             if not fresh_result.get('imagePathPrefix'):
-                fresh_result['imagePathPrefix'] = "/uploads/products/"
+                fresh_result['imagePathPrefix'] = "/products/"
 
             try:
                 with open("scraped_products.json", "w", encoding="utf-8") as f:
@@ -2812,15 +2812,23 @@ def _product_snapshot(scrape_result):
 def _resolve_image_url(raw_path, base_url="https://chadsflooring.bz"):
     if not raw_path:
         return None
-    if raw_path.startswith(("http://", "https://")):
-        return raw_path
     if raw_path.startswith("//"):
-        return "https:" + raw_path if base_url.startswith("https://") else "http:" + raw_path
-    if raw_path.startswith("/"):
-        return f"{base_url.rstrip('/')}{raw_path}"
-    if raw_path.startswith("uploads/"):
-        return f"{base_url.rstrip('/')}/{raw_path}"
-    return f"{base_url.rstrip('/')}/{raw_path.lstrip('/')}"
+        raw_path = "https:" + raw_path
+
+    if raw_path.startswith(("http://", "https://")):
+        parsed = urllib.parse.urlparse(raw_path)
+        if parsed.hostname == "img.chadsflooring.bz":
+            return raw_path
+        if parsed.hostname not in {"chadsflooring.bz", "www.chadsflooring.bz"}:
+            return raw_path
+        raw_path = parsed.path
+
+    path = raw_path.lstrip("/")
+    if path.startswith("uploads/products/"):
+        path = path[len("uploads/"):]
+    elif not path.startswith("products/"):
+        path = "products/" + path
+    return f"https://img.chadsflooring.bz/{path}"
 
 
 def _build_image_request_headers(img_url, cookies=None, user_agent=None):
@@ -2858,10 +2866,7 @@ def _build_image_request_headers(img_url, cookies=None, user_agent=None):
 
 def _is_trusted_product_image_url(img_url):
     parsed = urllib.parse.urlparse(img_url)
-    return parsed.scheme == "https" and parsed.hostname in {
-        "chadsflooring.bz",
-        "www.chadsflooring.bz",
-    }
+    return parsed.scheme == "https" and parsed.hostname == "img.chadsflooring.bz"
 
 
 def _fetch_product_image(img_url, cookies=None, user_agent=None):
@@ -3219,7 +3224,7 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
                     print(f"📊 Scrape found: {new_count} products.")
 
                     if not fresh_result.get('imagePathPrefix'):
-                        fresh_result['imagePathPrefix'] = "/uploads/products/"
+                        fresh_result['imagePathPrefix'] = "/products/"
 
                     try:
                         with open("scraped_products.json", "w", encoding="utf-8") as f:

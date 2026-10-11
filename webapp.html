@@ -567,7 +567,7 @@
             // Keep the current source format if the API already uses concrete size tokens such as x750-...
             // instead of forcing the legacy placeholder rewrite.
         } else if (!img.startsWith('http://') && !img.startsWith('https://')) {
-            let prefix = currentImgPrefix || '/uploads/products/';
+            let prefix = currentImgPrefix || '/products/';
             if (!prefix.startsWith('/')) prefix = '/' + prefix;
             if (!prefix.endsWith('/')) prefix += '/';
             img = prefix + img.replace(/^\//, '');
@@ -579,7 +579,7 @@
         } else if (img.startsWith('/uploads/') || img.startsWith('uploads/')) {
             remotePath = '/' + img.replace(/^\//, '');
         } else {
-            let prefix = currentImgPrefix || '/uploads/products/';
+            let prefix = currentImgPrefix || '/products/';
             if (!prefix.startsWith('/')) prefix = '/' + prefix;
             if (!prefix.endsWith('/')) prefix += '/';
             remotePath = prefix + img.replace(/^\//, '');

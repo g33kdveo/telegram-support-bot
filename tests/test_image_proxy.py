@@ -19,11 +19,18 @@ class ImageProxyTests(unittest.TestCase):
 
     def test_resolve_image_url_from_relative_path(self):
         resolved = _resolve_image_url("/uploads/products/test.jpg", "https://chadsflooring.bz")
-        self.assertEqual(resolved, "https://chadsflooring.bz/uploads/products/test.jpg")
+        self.assertEqual(resolved, "https://img.chadsflooring.bz/products/test.jpg")
+
+    def test_resolve_image_url_matches_current_cdn_example(self):
+        resolved = _resolve_image_url("/products/x375-015-1791589213355.png.webp")
+        self.assertEqual(
+            resolved,
+            "https://img.chadsflooring.bz/products/x375-015-1791589213355.png.webp",
+        )
 
     def test_resolve_image_url_keeps_current_size_format(self):
         resolved = _resolve_image_url("x750-something.jpg.webp", "https://chadsflooring.bz")
-        self.assertEqual(resolved, "https://chadsflooring.bz/x750-something.jpg.webp")
+        self.assertEqual(resolved, "https://img.chadsflooring.bz/products/x750-something.jpg.webp")
 
     def test_fetch_product_image_uses_session_cookie(self):
         response = Mock(status_code=200, content=b"image-bytes")
@@ -31,7 +38,7 @@ class ImageProxyTests(unittest.TestCase):
 
         with patch("bot.requests.get", return_value=response) as get:
             result, redirect_url = _fetch_product_image(
-                "https://chadsflooring.bz/uploads/products/test.webp",
+                "https://img.chadsflooring.bz/products/test.webp",
                 cookies=[{"name": "session", "value": "abc123"}],
                 user_agent="test-agent",
             )
