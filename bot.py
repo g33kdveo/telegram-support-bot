@@ -2214,6 +2214,7 @@ STOCK_MONITOR_AUTH_WARNING_SENT = False
 LAST_SESSION_REFRESH_ATTEMPT = 0
 STOCK_MONITOR_FAILURE_COUNT = 0
 STOCK_MONITOR_FAILURE_WARNING_SENT = False
+STOCK_MONITOR_RATE_LIMIT_UNTIL = 0
 MANUAL_CHECK_PENDING = False
 LAST_MANUAL_CHECK = 0
 
@@ -2395,6 +2396,7 @@ async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
     global SCRAPE_IN_PROGRESS, STOCK_MONITOR_AUTH_WARNING_SENT
     global LAST_SESSION_REFRESH_ATTEMPT, STOCK_MONITOR_FAILURE_COUNT
     global STOCK_MONITOR_FAILURE_WARNING_SENT
+    global STOCK_MONITOR_RATE_LIMIT_UNTIL
 
     await _claim_full_scrape()
 
@@ -2402,16 +2404,30 @@ async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
         loop = asyncio.get_running_loop()
         result = None
         try:
-            for attempt in range(STOCK_MONITOR_MAX_ATTEMPTS):
-                result = await loop.run_in_executor(
-                    None,
-                    fetch_authenticated_stock_snapshot,
-                    CHADS_API_KEY,
-                )
-                if result.get("ok") or result.get("auth_required"):
-                    break
-                if attempt < STOCK_MONITOR_MAX_ATTEMPTS - 1:
-                    await asyncio.sleep(STOCK_MONITOR_RETRY_DELAY)
+            cooldown_remaining = STOCK_MONITOR_RATE_LIMIT_UNTIL - time.time()
+            if cooldown_remaining > 0:
+                result = {
+                    "ok": False,
+                    "auth_required": False,
+                    "rate_limited": True,
+                    "retry_after": cooldown_remaining,
+                    "error": f"HTTP 429 cooldown ({int(cooldown_remaining)}s remaining)",
+                }
+            else:
+                for attempt in range(STOCK_MONITOR_MAX_ATTEMPTS):
+                    result = await loop.run_in_executor(
+                        None,
+                        fetch_authenticated_stock_snapshot,
+                        CHADS_API_KEY,
+                    )
+                    if result.get("rate_limited"):
+                        retry_after = max(1.0, float(result.get("retry_after") or 60))
+                        STOCK_MONITOR_RATE_LIMIT_UNTIL = time.time() + retry_after
+                        break
+                    if result.get("ok") or result.get("auth_required"):
+                        break
+                    if attempt < STOCK_MONITOR_MAX_ATTEMPTS - 1:
+                        await asyncio.sleep(STOCK_MONITOR_RETRY_DELAY)
         except Exception as e:
             result = {"ok": False, "auth_required": False, "error": str(e)}
     finally:
@@ -2454,6 +2470,7 @@ async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
     STOCK_MONITOR_FAILURE_COUNT = 0
     STOCK_MONITOR_FAILURE_WARNING_SENT = False
     STOCK_MONITOR_AUTH_WARNING_SENT = False
+    STOCK_MONITOR_RATE_LIMIT_UNTIL = 0
     await notify_shop_updates(
         context.bot,
         {"data": _snapshot_to_groups(result["snapshot"])},

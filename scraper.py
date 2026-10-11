@@ -1,12 +1,15 @@
 import asyncio
 import json
 import os
+import re
 import hashlib
 import base64
 import time
 import shutil
 from pyppeteer import launch
 import requests
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 
 try:
     from dotenv import load_dotenv
@@ -42,6 +45,25 @@ def fetch_authenticated_stock_snapshot(api_key, base_url="https://chadsflooring.
             cookies=cookie_jar,
             timeout=30,
         )
+        if response.status_code == 429:
+            retry_after = response.headers.get("Retry-After")
+            try:
+                retry_after = max(1.0, float(retry_after))
+            except (TypeError, ValueError):
+                try:
+                    retry_at = parsedate_to_datetime(retry_after)
+                    if retry_at.tzinfo is None:
+                        retry_at = retry_at.replace(tzinfo=timezone.utc)
+                    retry_after = max(1.0, (retry_at - datetime.now(timezone.utc)).total_seconds())
+                except (TypeError, ValueError, OverflowError):
+                    retry_after = 60.0
+            return {
+                "ok": False,
+                "auth_required": False,
+                "rate_limited": True,
+                "retry_after": retry_after,
+                "error": "HTTP 429: Too Many Requests",
+            }
         if (
             response.status_code in (401, 403)
             or "login" in response.url.lower()
@@ -324,11 +346,24 @@ class RogersRoofingScraper:
         return None
 
     def _resolve_image_url(self, img_val, img_prefix, size=None):
-        """Resolve a single image URL, optionally with a specific size"""
+        """Resolve a single image URL, optionally with a specific size."""
         if not isinstance(img_val, str) or not img_val:
             return None
+
+        resolved = img_val.strip()
         size_val = size if size is not None else IMAGE_SIZE
-        resolved = img_val.replace('x_imgvariantsize', f'x{size_val}')
+
+        if 'x_imgvariantsize' in resolved.lower():
+            resolved = resolved.replace('x_imgvariantsize', f'x{size_val}')
+        elif re.search(r'(?i)(?:^|/)[xX]\d+-', resolved):
+            # The site may already use a concrete size token (for example x750-...) in the current API.
+            # Keep that exact format rather than forcing the older placeholder rewrite, but still prepend
+            # the product path when the source value is missing it.
+            if not resolved.startswith('/') and not resolved.startswith('http'):
+                resolved = '/' + resolved.lstrip('/')
+        elif resolved.startswith('/'):
+            pass
+
         if resolved.startswith('http://') or resolved.startswith('https://'):
             return resolved
         elif resolved.startswith('/uploads/') or resolved.startswith('uploads/'):

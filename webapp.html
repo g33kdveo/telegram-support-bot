@@ -560,7 +560,18 @@
             return apiBase + '/api/img?u=' + encodeURIComponent(raw);
         }
 
-        let img = raw.replace(/x_imgvariantsize/g, 'x' + String(size));
+        let img = String(raw);
+        if (img.includes('x_imgvariantsize')) {
+            img = img.replace(/x_imgvariantsize/gi, 'x' + String(size));
+        } else if (/(?:^|\/)[xX]\d+-/.test(img)) {
+            // Keep the current source format if the API already uses concrete size tokens such as x750-...
+            // instead of forcing the legacy placeholder rewrite.
+        } else if (!img.startsWith('http://') && !img.startsWith('https://')) {
+            let prefix = currentImgPrefix || '/uploads/products/';
+            if (!prefix.startsWith('/')) prefix = '/' + prefix;
+            if (!prefix.endsWith('/')) prefix += '/';
+            img = prefix + img.replace(/^\//, '');
+        }
 
         let remotePath;
         if (img.startsWith('http://') || img.startsWith('https://')) {
@@ -571,7 +582,7 @@
             let prefix = currentImgPrefix || '/uploads/products/';
             if (!prefix.startsWith('/')) prefix = '/' + prefix;
             if (!prefix.endsWith('/')) prefix += '/';
-            remotePath = prefix + img;
+            remotePath = prefix + img.replace(/^\//, '');
         }
         remotePath = remotePath.replace(/([^:])\/\//g, '$1/');
 
