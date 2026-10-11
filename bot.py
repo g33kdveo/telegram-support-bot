@@ -25,7 +25,7 @@ def patched_launcher_init(self, *args, **kwargs):
     original_launcher_init(self, *args, **kwargs)
 pyppeteer.launcher.Launcher.__init__ = patched_launcher_init
 
-from scraper import RogersRoofingScraper, fetch_authenticated_stock_snapshot
+from scraper import RogersRoofingScraper, fetch_authenticated_stock_snapshot, get_stored_cookies
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -2331,9 +2331,8 @@ async def _run_check_stock_command(update: Update, context: ContextTypes.DEFAULT
 
 # ===== AUTO REFRESH JOB =====
 async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
-    async with SCRAPE_COORDINATOR_LOCK:
-        await _wait_for_active_scrape()
-        await _run_auto_refresh_job(context)
+    await _wait_for_active_scrape()
+    await _run_auto_refresh_job(context)
 
 
 async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
@@ -2388,9 +2387,8 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
 
 
 async def stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
-    async with SCRAPE_COORDINATOR_LOCK:
-        await _wait_for_active_scrape()
-        await _run_stock_monitor_job(context)
+    await _wait_for_active_scrape()
+    await _run_stock_monitor_job(context)
 
 
 async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
@@ -2740,6 +2738,53 @@ def _product_snapshot(scrape_result):
     return snapshot
 
 
+def _resolve_image_url(raw_path, base_url="https://rogersroofing.click"):
+    if not raw_path:
+        return None
+    if raw_path.startswith(("http://", "https://")):
+        return raw_path
+    if raw_path.startswith("//"):
+        return "https:" + raw_path if base_url.startswith("https://") else "http:" + raw_path
+    if raw_path.startswith("/"):
+        return f"{base_url.rstrip('/')}{raw_path}"
+    if raw_path.startswith("uploads/"):
+        return f"{base_url.rstrip('/')}/{raw_path}"
+    return f"{base_url.rstrip('/')}/{raw_path.lstrip('/')}"
+
+
+def _build_image_request_headers(img_url, cookies=None, user_agent=None):
+    headers = {
+        "User-Agent": user_agent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://rogersroofing.click/",
+        "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+
+    cookie_pairs = []
+    seen_names = set()
+    for cookie in cookies or []:
+        if not isinstance(cookie, dict):
+            continue
+        name = str(cookie.get("name") or "").strip()
+        value = str(cookie.get("value") or "").strip()
+        if not name or name in seen_names:
+            continue
+        seen_names.add(name)
+        cookie_pairs.append(f"{name}={value}")
+
+    if CHADS_COOKIE and not cookie_pairs:
+        for part in CHADS_COOKIE.split(";"):
+            pair = part.strip()
+            if "=" in pair:
+                name, value = pair.split("=", 1)
+                cookie_pairs.append(f"{name.strip()}={value.strip()}")
+
+    if cookie_pairs:
+        headers["Cookie"] = "; ".join(cookie_pairs)
+
+    return headers
+
+
 def _load_shop_update_state():
     try:
         with open(STOCK_STATE_FILE, "r", encoding="utf-8") as f:
@@ -2959,18 +3004,19 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
                         self.wfile.write(b"Cached image not found")
                         return
 
-                if raw_path.startswith('http://') or raw_path.startswith('https://'):
-                    img_url = raw_path
-                else:
-                    if not raw_path.startswith('/'):
-                        raw_path = '/' + raw_path
-                    img_url = f"https://rogersroofing.click{raw_path}"
+                cookies, user_agent = get_stored_cookies()
+                img_url = _resolve_image_url(raw_path, "https://rogersroofing.click")
+                if not img_url:
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'text/plain')
+                    self.end_headers()
+                    self.wfile.write(b"Missing image URL")
+                    return
 
-                req = urllib.request.Request(img_url, headers={
-                    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Referer': 'https://rogersroofing.click/',
-                    'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-                })
+                req = urllib.request.Request(
+                    img_url,
+                    headers=_build_image_request_headers(img_url, cookies=cookies, user_agent=user_agent),
+                )
 
                 with urllib.request.urlopen(req, timeout=15) as resp:
                     img_data = resp.read()
