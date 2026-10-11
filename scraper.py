@@ -453,6 +453,14 @@ class RogersRoofingScraper:
 
         if 'x_imgvariantsize' in resolved.lower():
             resolved = re.sub(r'x_imgvariantsize', f'x{size_val}', resolved, flags=re.IGNORECASE)
+        elif size is not None:
+            resolved = re.sub(
+                r'(^|/)x\d+-',
+                lambda match: f"{match.group(1)}x{size_val}-",
+                resolved,
+                count=1,
+                flags=re.IGNORECASE,
+            )
 
         if resolved.startswith(('http://', 'https://')):
             parsed = urlparse(resolved)

@@ -20,14 +20,25 @@ class ScraperImageSafetyTests(unittest.TestCase):
         self.assertLessEqual(IMAGE_DOWNLOAD_BATCH_SIZE, 100)
         self.assertGreater(IMAGE_ALL_FAIL_CHECK_COUNT, IMAGE_DOWNLOAD_BATCH_SIZE)
 
-    def test_concrete_size_format_is_not_retried_as_duplicate_variants(self):
+    def test_concrete_size_format_generates_larger_variants_and_keeps_source_size(self):
         scraper = RogersRoofingScraper()
         variants = scraper._get_image_url_variants(
-            "x750-product.jpg.webp",
+            "x375-015-1791589213355.png.webp",
             "/uploads/products/",
         )
 
-        self.assertEqual(variants, ["https://img.chadsflooring.bz/products/x750-product.jpg.webp"])
+        self.assertEqual(
+            variants,
+            [
+                "https://img.chadsflooring.bz/products/x950-015-1791589213355.png.webp",
+                "https://img.chadsflooring.bz/products/x750-015-1791589213355.png.webp",
+                "https://img.chadsflooring.bz/products/x450-015-1791589213355.png.webp",
+                "https://img.chadsflooring.bz/products/x400-015-1791589213355.png.webp",
+                "https://img.chadsflooring.bz/products/x375-015-1791589213355.png.webp",
+                "https://img.chadsflooring.bz/products/x325-015-1791589213355.png.webp",
+                "https://img.chadsflooring.bz/products/x300-015-1791589213355.png.webp",
+            ],
+        )
 
     def test_products_path_uses_image_cdn(self):
         scraper = RogersRoofingScraper()
@@ -155,6 +166,38 @@ class ScraperImageBatchTests(unittest.IsolatedAsyncioTestCase):
             get.call_args_list[0].kwargs["cookies"].get_dict()["session"],
             "abc123",
         )
+
+    def test_fetch_image_variants_uses_largest_available_size(self):
+        class Response:
+            def __init__(self, status_code, content_type, content):
+                self.status_code = status_code
+                self.ok = status_code == 200
+                self.headers = {"Content-Type": content_type}
+                self.content = content
+
+        responses = [
+            Response(404, "text/html", b"not found"),
+            Response(200, "image/webp", b"x" * 900),
+        ]
+        candidate_urls = [
+            "https://img.chadsflooring.bz/products/x950-photo.webp",
+            "https://img.chadsflooring.bz/products/x750-photo.webp",
+            "https://img.chadsflooring.bz/products/x450-photo.webp",
+        ]
+
+        with patch("scraper.requests.get", side_effect=responses) as get:
+            image_bytes, chosen_url, error, rate_limited = _fetch_image_variants(
+                candidate_urls,
+                [],
+                "test-agent",
+                "https://chadsflooring.bz",
+            )
+
+        self.assertEqual(image_bytes, b"x" * 900)
+        self.assertEqual(chosen_url, candidate_urls[1])
+        self.assertIsNone(error)
+        self.assertFalse(rate_limited)
+        self.assertEqual(get.call_count, 2)
 
 
 if __name__ == "__main__":
