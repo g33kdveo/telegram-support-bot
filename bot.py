@@ -41,6 +41,7 @@ from telegram.ext import (
 )
 
 BOT_INSTANCE_ID = uuid.uuid4().hex[:8]
+BOT_STARTED_AT = time.time()
 
 # ===== CONFIG =====
 TOKEN = os.getenv("BOT_TOKEN")
@@ -2222,11 +2223,20 @@ STOCK_MONITOR_FAILURE_WARNING_SENT = False
 STOCK_MONITOR_RATE_LIMIT_UNTIL = 0
 STOCK_API_RATE_LIMIT_COUNT = 0
 STOCK_MONITOR_STARTED = False
+STOCK_MONITOR_INTERVAL = 60
+FULL_CATALOG_INTERVAL = 30 * 60
+MONITOR_PRE_FULL_BUFFER = 60
+NEXT_FULL_SCRAPE_AT = 0
+LOGIN_NOTIFICATION_TIMES = {}
 STARTUP_FULL_JOB_SCHEDULED = False
 LAST_FULL_SCRAPE_COMPLETED = 0
 FULL_SCRAPE_GENERATION = 0
 STOCK_MONITOR_COMPARISONS_SINCE_FULL = 0
 STOCK_CHANGES_DETECTED_SINCE_FULL = 0
+STOCK_QUANTITY_CHANGE_HISTORY = []
+LAST_STOCK_MONITOR_SUCCESS = 0
+LAST_STOCK_MONITOR_GROUP_COUNT = 0
+LAST_STOCK_MONITOR_COMPARISON_COMPLETED = False
 MANUAL_CHECK_PENDING = False
 LAST_MANUAL_CHECK = 0
 
@@ -2246,6 +2256,18 @@ def _reset_stock_api_rate_limit():
     global STOCK_API_RATE_LIMIT_COUNT, STOCK_MONITOR_RATE_LIMIT_UNTIL
     STOCK_API_RATE_LIMIT_COUNT = 0
     STOCK_MONITOR_RATE_LIMIT_UNTIL = 0
+
+
+def _adapt_stock_monitor_interval(retry_after):
+    global STOCK_MONITOR_INTERVAL
+    previous_interval = STOCK_MONITOR_INTERVAL
+    STOCK_MONITOR_INTERVAL = max(STOCK_MONITOR_INTERVAL, math.ceil(retry_after))
+    if STOCK_MONITOR_INTERVAL > previous_interval:
+        print(
+            f"[stock-monitor] cadence backed off from {previous_interval}s "
+            f"to {STOCK_MONITOR_INTERVAL}s after API rate limit"
+        )
+    return STOCK_MONITOR_INTERVAL
 
 
 def _stock_snapshot(scrape_result):
@@ -2291,6 +2313,50 @@ def _snapshot_collision_key(base_id, occurrence):
 
 def _format_stock_value(value):
     return "unknown" if value is None or value == "" else str(value)
+
+
+def _stock_changes_report(now=None):
+    now = time.time() if now is None else now
+    cutoff = now - 30 * 60
+    recent_changes = [
+        change for change in STOCK_QUANTITY_CHANGE_HISTORY
+        if change["timestamp"] >= cutoff
+    ]
+
+    if LAST_STOCK_MONITOR_SUCCESS <= 0:
+        lines = ["Stock monitor has not completed a successful snapshot in this process."]
+    else:
+        checked_at = time.strftime(
+            "%Y-%m-%d %H:%M:%S UTC",
+            time.gmtime(LAST_STOCK_MONITOR_SUCCESS),
+        )
+        age_seconds = max(0, int(now - LAST_STOCK_MONITOR_SUCCESS))
+        lines = [
+            f"Last successful monitor snapshot: {checked_at} ({age_seconds}s ago)",
+            f"Logical groups in snapshot: {LAST_STOCK_MONITOR_GROUP_COUNT}",
+        ]
+        if age_seconds >= 30 * 60:
+            lines.append("Latest successful snapshot is older than 30 minutes.")
+        elif not LAST_STOCK_MONITOR_COMPARISON_COMPLETED:
+            lines.append("Snapshot succeeded, but no comparison baseline was available yet.")
+
+    lines.append(f"Quantity changes in the last 30 minutes: {len(recent_changes)}")
+    if recent_changes:
+        lines.append("Recent sample (up to 10):")
+        for change in sorted(recent_changes, key=lambda entry: entry["timestamp"], reverse=True)[:10]:
+            lines.append(
+                f"• {change['group']} - {change['variant']}: "
+                f"{_format_stock_value(change['old_qty'])} → {_format_stock_value(change['new_qty'])}"
+            )
+    elif LAST_STOCK_MONITOR_COMPARISON_COMPLETED and now - LAST_STOCK_MONITOR_SUCCESS < 30 * 60:
+        lines.append("No quantity changes were detected by successful comparisons in this window.")
+    return "📊 Stock monitor diagnostics (read-only; no scrape)\n" + "\n".join(lines)
+
+
+async def stock_changes_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.effective_user or update.effective_user.id not in ADMIN_IDS:
+        return
+    await update.message.reply_text(_stock_changes_report())
 
 
 async def check_stock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2343,9 +2409,6 @@ async def _run_check_stock_command(update: Update, context: ContextTypes.DEFAULT
                 run_id=run_id,
                 run_label="checkstock",
                 instance_id=BOT_INSTANCE_ID,
-                login_callback=lambda: asyncio.run_coroutine_threadsafe(
-                    notify_login_success(context.bot, run_id), loop
-                )
             )
             return scraper.get_stock_snapshot()
 
@@ -2394,6 +2457,7 @@ async def _run_check_stock_command(update: Update, context: ContextTypes.DEFAULT
 async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
     global LAST_FULL_SCRAPE_COMPLETED
     global STOCK_MONITOR_COMPARISONS_SINCE_FULL, STOCK_CHANGES_DETECTED_SINCE_FULL
+    global NEXT_FULL_SCRAPE_AT
 
     run_id = uuid.uuid4().hex[:8]
     source = getattr(getattr(context, "job", None), "name", None) or "full-scrape"
@@ -2402,6 +2466,7 @@ async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
         f"source={source} run={run_id}] requested; waiting for priority coordinator"
     )
     async with _scrape_slot("full"):
+        full_started_at = time.time()
         print(
             f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
             f"source={source} run={run_id}] acquired full-scrape slot"
@@ -2411,6 +2476,9 @@ async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
         try:
             refreshed = await _run_auto_refresh_job(context, run_id)
         finally:
+            login_dm_at = LOGIN_NOTIFICATION_TIMES.pop(run_id, None)
+            cycle_anchor = login_dm_at or full_started_at
+            NEXT_FULL_SCRAPE_AT = cycle_anchor + FULL_CATALOG_INTERVAL
             if locals().get("refreshed", False):
                 await _report_stock_cycle_summary(context, run_id)
                 STOCK_MONITOR_COMPARISONS_SINCE_FULL = 0
@@ -2420,7 +2488,7 @@ async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
             elif monitor_was_started:
                 cooldown = max(1.0, STOCK_MONITOR_RATE_LIMIT_UNTIL - time.time())
                 _schedule_stock_monitor_resume(context, cooldown)
-            _schedule_next_full_scrape(context, 1800)
+            _schedule_next_full_scrape(context, FULL_CATALOG_INTERVAL, anchor_time=cycle_anchor)
 
 
 async def _report_stock_cycle_summary(context, full_run_id):
@@ -2450,16 +2518,23 @@ async def _report_stock_cycle_summary(context, full_run_id):
         )
 
 
-def _schedule_next_full_scrape(context, delay):
+def _schedule_next_full_scrape(context, delay=FULL_CATALOG_INTERVAL, anchor_time=None):
     job_queue = getattr(context, "job_queue", None)
     if job_queue is None:
         return
+    scheduled_at = time.time()
+    run_at = (anchor_time if anchor_time is not None else scheduled_at) + delay
+    run_after = max(1.0, run_at - scheduled_at)
     for job in job_queue.get_jobs_by_name("periodic_full_scrape"):
         job.schedule_removal()
     job_queue.run_once(
         auto_refresh_job,
-        when=max(1.0, delay),
+        when=run_after,
         name="periodic_full_scrape",
+    )
+    print(
+        f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} source=full-scheduler] "
+        f"next catalog run at {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime(run_at))}"
     )
 
 
@@ -2488,23 +2563,14 @@ async def resume_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
             )
             return
         if not STOCK_MONITOR_STARTED:
-            _start_stock_monitor_after_full_scrape(context)
+            _start_stock_monitor_after_full_scrape(context, first_delay=1)
 
 
 async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE, run_id=None):
     global PRODUCT_CACHE, SCRAPE_IN_PROGRESS, STOCK_CHECK_IN_PROGRESS
-    global STOCK_MONITOR_RATE_LIMIT_UNTIL
+    global STOCK_MONITOR_RATE_LIMIT_UNTIL, STOCK_MONITOR_INTERVAL
 
     run_id = run_id or uuid.uuid4().hex[:8]
-
-    cooldown_remaining = STOCK_MONITOR_RATE_LIMIT_UNTIL - time.time()
-    if cooldown_remaining > 0:
-        print(
-            f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
-            f"source=full run={run_id}] skipped: API cooldown has "
-            f"{math.ceil(cooldown_remaining)}s remaining; next full run stays on its 30-minute schedule"
-        )
-        return False
 
     await _claim_full_scrape()
 
@@ -2535,6 +2601,7 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE, run_id=None)
         if fresh_result and fresh_result.get("rate_limited"):
             retry_after = _stock_api_rate_limit_delay(fresh_result.get("retry_after"))
             STOCK_MONITOR_RATE_LIMIT_UNTIL = time.time() + retry_after
+            _adapt_stock_monitor_interval(retry_after)
             PRODUCT_CACHE["last_attempt"] = time.time()
             print(
                 f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
@@ -2586,7 +2653,7 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE, run_id=None)
             SCRAPE_IN_PROGRESS = False
 
 
-def _start_stock_monitor_after_full_scrape(context):
+def _start_stock_monitor_after_full_scrape(context, first_delay=None):
     global STOCK_MONITOR_STARTED
     if STOCK_MONITOR_STARTED:
         return
@@ -2597,12 +2664,16 @@ def _start_stock_monitor_after_full_scrape(context):
 
     job_queue.run_repeating(
         stock_monitor_job,
-        interval=60,
-        first=60,
+        interval=STOCK_MONITOR_INTERVAL,
+        first=STOCK_MONITOR_INTERVAL if first_delay is None else max(1, first_delay),
         name="stock_monitor",
     )
     STOCK_MONITOR_STARTED = True
-    print("✅ 60-second stock monitor scheduled; first check in 60s after full scrape.")
+    scheduled_first = STOCK_MONITOR_INTERVAL if first_delay is None else max(1, first_delay)
+    print(
+        f"✅ Stock monitor scheduled every {STOCK_MONITOR_INTERVAL}s; "
+        f"first check in {scheduled_first}s."
+    )
 
 
 def _pause_stock_monitor(context):
@@ -2632,11 +2703,26 @@ async def stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
         first_allowed_run = LAST_FULL_SCRAPE_COMPLETED + 60
         if time.time() < first_allowed_run:
             return
+        if not _monitor_window_is_open():
+            print(
+                f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+                f"source=stock-monitor run={run_id}] skipped: within "
+                f"{MONITOR_PRE_FULL_BUFFER}s of scheduled full scrape"
+            )
+            _pause_stock_monitor(context)
+            return
         print(
             f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
             f"source=stock-monitor run={run_id}] acquired scrape slot"
         )
         await _run_stock_monitor_job(context, run_id)
+
+
+def _monitor_window_is_open(now=None):
+    if not NEXT_FULL_SCRAPE_AT:
+        return True
+    now = time.time() if now is None else now
+    return now + MONITOR_PRE_FULL_BUFFER < NEXT_FULL_SCRAPE_AT
 
 
 async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE, run_id=None):
@@ -2726,6 +2812,7 @@ async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE, run_id=None
 
     if result.get("rate_limited"):
         retry_after = max(1.0, float(result.get("retry_after") or 300))
+        _adapt_stock_monitor_interval(retry_after)
         _pause_stock_monitor(context)
         _schedule_stock_monitor_resume(context, retry_after)
 
@@ -2771,6 +2858,28 @@ async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE, run_id=None
     if comparison and comparison.get("compared"):
         STOCK_MONITOR_COMPARISONS_SINCE_FULL += 1
         STOCK_CHANGES_DETECTED_SINCE_FULL += comparison["detected_changes"]
+    _record_stock_monitor_result(result, comparison)
+
+
+def _record_stock_monitor_result(result, comparison):
+    global LAST_STOCK_MONITOR_SUCCESS, LAST_STOCK_MONITOR_GROUP_COUNT
+    global LAST_STOCK_MONITOR_COMPARISON_COMPLETED, STOCK_QUANTITY_CHANGE_HISTORY
+
+    checked_at = time.time()
+    snapshot = result.get("snapshot") or {}
+    LAST_STOCK_MONITOR_SUCCESS = checked_at
+    LAST_STOCK_MONITOR_GROUP_COUNT = len(snapshot)
+    LAST_STOCK_MONITOR_COMPARISON_COMPLETED = bool(comparison and comparison.get("compared"))
+
+    if comparison:
+        for change in comparison.get("quantity_changes", []):
+            STOCK_QUANTITY_CHANGE_HISTORY.append({"timestamp": checked_at, **change})
+
+    cutoff = checked_at - 30 * 60
+    STOCK_QUANTITY_CHANGE_HISTORY = [
+        change for change in STOCK_QUANTITY_CHANGE_HISTORY
+        if change["timestamp"] >= cutoff
+    ][-250:]
 
 
 def _snapshot_to_groups(snapshot):
@@ -2907,6 +3016,7 @@ async def set_commands(app):
         BotCommand("start", "Show the main menu"),
         BotCommand("menu", "Open the Shop"),
         BotCommand("mytickets", "View your active tickets"),
+        BotCommand("stockchanges", "Verify recent stock checks"),
         BotCommand("close", "Close current ticket"),
         BotCommand("review", "Leave a review"),
         BotCommand("refer", "Get your referral code"),
@@ -2920,6 +3030,7 @@ async def set_commands(app):
             BotCommand("reply", "Reply to a ticket"),
             BotCommand("settings", "Admin Settings"),
             BotCommand("appsettings", "Manage Web App"),
+            BotCommand("stockchanges", "Verify recent stock checks"),
             BotCommand("ticketinfo", "View ticket details"),
             BotCommand("ticketstatus", "Update ticket status"),
             BotCommand("block", "Block a user"),
@@ -2934,6 +3045,7 @@ async def set_commands(app):
             BotCommand("reply", "Reply to a ticket"),
             BotCommand("settings", "Admin Settings"),
             BotCommand("appsettings", "Manage Web App"),
+            BotCommand("stockchanges", "Verify recent stock checks"),
             BotCommand("ticketinfo", "View ticket details"),
             BotCommand("ticketstatus", "Update ticket status"),
             BotCommand("block", "Block a user"),
@@ -2955,7 +3067,9 @@ async def startup_post_init(app):
         STARTUP_FULL_JOB_SCHEDULED = True
         print(
             f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
-            "source=startup] scheduled initial full scrape"
+            f"source=startup] process started at "
+            f"{time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime(BOT_STARTED_AT))}; "
+            "scheduled initial full scrape"
         )
     try:
         await set_commands(app)
@@ -3275,43 +3389,15 @@ def _normalize_product_snapshot(snapshot):
     return normalized
 
 
-def _format_new_product_notification(item):
+def _format_stock_notification(item, variant):
     product_name = html_escape(item["name"])
-    category = html_escape(item.get("category") or "Uncategorized")
-    variants = list(dict.fromkeys(
-        str(variant.get("name") or "").strip()
-        for variant in item["variants"].values()
-        if str(variant.get("name") or "").strip()
-    ))
-    text = f"🆕 🔥 <b>New product added:</b> {product_name} ({category})"
-    if variants:
-        shown = ", ".join(html_escape(name) for name in variants[:5])
-        remaining = len(variants) - 5
-        if remaining > 0:
-            shown += f", and {remaining} more"
-        text += f"\n<b>Available variations:</b> {shown}"
-    return text
-
-
-def _format_new_variant_notification(item, variant):
-    return (
-        f"🆕 🌿 <b>New variation added:</b> "
-        f"{html_escape(item['name'])} - {html_escape(variant['name'])} "
-        f"({html_escape(item.get('category') or 'Uncategorized')})"
-    )
-
-
-def _format_stock_quantity_change(item, variant, old_quantity, current_quantity):
-    item_name = html_escape(item["name"])
     variant_name = str(variant.get("name") or "").strip()
-    label = item_name
-    if variant_name and variant_name.casefold() != str(item["name"]).strip().casefold():
-        label += f" - {html_escape(variant_name)}"
     category = html_escape(item.get("category") or "Uncategorized")
+    if not variant_name or variant_name.casefold() == str(item["name"]).strip().casefold():
+        return f"🆕 🔥 <b>New product added:</b> {product_name} ({category})"
     return (
-        f"📦 <b>Stock changed:</b> {label} ({category}): "
-        f"{html_escape(_format_stock_value(old_quantity))} → "
-        f"{html_escape(_format_stock_value(current_quantity))}"
+        f"🆕 🔥 <b>New product added:</b> {product_name} - "
+        f"{html_escape(variant_name)} ({category})"
     )
 
 
@@ -3343,6 +3429,7 @@ async def notify_shop_updates(
 
     previous = _normalize_product_snapshot(SHOP_UPDATE_STATE)
     notifications = []
+    quantity_changes = []
     detected_changes = 0
     now = time.time()
 
@@ -3350,10 +3437,18 @@ async def notify_shop_updates(
         old_item = previous.get(group_id)
         if old_item is None:
             detected_changes += 1
-            key = f"group:{group_id}"
-            if now - SHOP_NOTIFICATION_TIMES.get(key, 0) >= STOCK_NOTIFICATION_COOLDOWN:
-                notifications.append(_format_new_product_notification(item))
-                SHOP_NOTIFICATION_TIMES[key] = now
+            if len(item["variants"]) > 1:
+                for variant_id, variant in item["variants"].items():
+                    key = f"variant:{group_id}:{variant_id}"
+                    if now - SHOP_NOTIFICATION_TIMES.get(key, 0) >= STOCK_NOTIFICATION_COOLDOWN:
+                        notifications.append(_format_stock_notification(item, variant))
+                        SHOP_NOTIFICATION_TIMES[key] = now
+            else:
+                key = f"group:{group_id}"
+                if now - SHOP_NOTIFICATION_TIMES.get(key, 0) >= STOCK_NOTIFICATION_COOLDOWN:
+                    variant = next(iter(item["variants"].values()), {"name": ""})
+                    notifications.append(_format_stock_notification(item, variant))
+                    SHOP_NOTIFICATION_TIMES[key] = now
             continue
 
         for variant_id, variant in item["variants"].items():
@@ -3366,9 +3461,7 @@ async def notify_shop_updates(
             if old_variant is None:
                 detected_changes += 1
                 if now - SHOP_NOTIFICATION_TIMES.get(key, 0) >= STOCK_NOTIFICATION_COOLDOWN:
-                    notifications.append(
-                        _format_new_variant_notification(item, variant)
-                    )
+                    notifications.append(_format_stock_notification(item, variant))
                     SHOP_NOTIFICATION_TIMES[key] = now
                 continue
 
@@ -3380,15 +3473,17 @@ async def notify_shop_updates(
                 and current_quantity != old_quantity
             ):
                 detected_changes += 1
-                if now - SHOP_NOTIFICATION_TIMES.get(key, 0) >= STOCK_NOTIFICATION_COOLDOWN:
-                    notifications.append(
-                        _format_stock_quantity_change(
-                            item,
-                            variant,
-                            old_variant.get("qty"),
-                            variant.get("qty"),
-                        )
-                    )
+                quantity_changes.append({
+                    "group": item["name"],
+                    "variant": variant.get("name") or item["name"],
+                    "old_qty": old_variant.get("qty"),
+                    "new_qty": variant.get("qty"),
+                })
+                if (
+                    current_quantity > old_quantity
+                    and now - SHOP_NOTIFICATION_TIMES.get(key, 0) >= STOCK_NOTIFICATION_COOLDOWN
+                ):
+                    notifications.append(_format_stock_notification(item, variant))
                     SHOP_NOTIFICATION_TIMES[key] = now
 
     SHOP_UPDATE_STATE = current
@@ -3399,7 +3494,12 @@ async def notify_shop_updates(
             f"{detected_changes} changes detected, {len(notifications)} notifications eligible"
         )
     if not send_notifications or not notifications:
-        return {"compared": True, "detected_changes": detected_changes, "notifications": len(notifications)}
+        return {
+            "compared": True,
+            "detected_changes": detected_changes,
+            "notifications": len(notifications),
+            "quantity_changes": quantity_changes,
+        }
 
     for index, notification in enumerate(notifications):
         try:
@@ -3412,24 +3512,46 @@ async def notify_shop_updates(
             print(f"⚠️ Could not DM new-product notification: {e}")
         if index < len(notifications) - 1:
             await asyncio.sleep(2)
-    return {"compared": True, "detected_changes": detected_changes, "notifications": len(notifications)}
+    return {
+        "compared": True,
+        "detected_changes": detected_changes,
+        "notifications": len(notifications),
+        "quantity_changes": quantity_changes,
+    }
 
 
 async def notify_login_success(bot, run_id=None):
     global LOGIN_NOTIFICATION_SENT
     if run_id is not None and run_id in LOGIN_NOTIFIED_RUNS:
-        return
-    try:
-        await bot.send_message(
-            chat_id=PRICE_ADMIN_ID,
-            text="✅ Successful login completed.",
-            parse_mode="HTML",
-        )
-        LOGIN_NOTIFICATION_SENT = True
-        if run_id is not None:
-            LOGIN_NOTIFIED_RUNS.add(run_id)
-    except Exception as e:
-        print(f"⚠️ Could not DM shop login notification: {e}")
+        return True
+
+    for attempt in range(2):
+        try:
+            await bot.send_message(
+                chat_id=PRICE_ADMIN_ID,
+                text="✅ Successful login completed.",
+                parse_mode="HTML",
+            )
+            LOGIN_NOTIFICATION_SENT = True
+            sent_at = time.time()
+            if run_id is not None:
+                LOGIN_NOTIFIED_RUNS.add(run_id)
+                LOGIN_NOTIFICATION_TIMES[run_id] = sent_at
+                print(
+                    f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+                    f"source=login run={run_id}] successful-login DM sent at "
+                    f"{time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime(sent_at))}"
+                )
+            return True
+        except Exception as error:
+            print(
+                f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+                f"source=login run={run_id or 'unknown'}] DM attempt {attempt + 1}/2 failed: {error}"
+            )
+            if attempt == 0:
+                await asyncio.sleep(2)
+
+    return False
 
 
 class BotRequestHandler(SimpleHTTPRequestHandler):
@@ -3491,7 +3613,6 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
                     else:
                         self.send_response(404)
                         self.send_header('Content-Type', 'text/plain')
-                        self.send_header('Access-Control-Allow-Origin', '*')
                         self.end_headers()
                         self.wfile.write(b"Cached image not found")
                         return
@@ -3632,6 +3753,8 @@ def run_simple_server():
 
 
 def main():
+    global BOT_STARTED_AT
+    BOT_STARTED_AT = time.time()
     print(f"🚀 Bot is starting… (PTB Version: {ptb_version})")
     if not TOKEN:
         print("❌ Error: BOT_TOKEN is missing! Set it in your environment variables.")
@@ -3666,6 +3789,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("menu", menu_command))
     app.add_handler(CommandHandler("checkstock", check_stock_command))
+    app.add_handler(CommandHandler("stockchanges", stock_changes_command))
     app.add_handler(CommandHandler("reply", handle_reply_command))
     app.add_handler(CommandHandler("settings", settings_command))
     app.add_handler(CommandHandler("appsettings", appsettings_command))

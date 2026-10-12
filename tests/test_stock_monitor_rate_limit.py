@@ -1,15 +1,25 @@
 import asyncio
+from concurrent.futures import Future
 import io
 import json
 import unittest
 from contextlib import redirect_stdout
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, mock_open, patch
 
 import bot
 from scraper import RogersRoofingScraper, fetch_authenticated_stock_snapshot
 
 
 class StockMonitorRateLimitTests(unittest.TestCase):
+    def test_monitor_cadence_adapts_to_rate_limit_without_immediate_reset(self):
+        previous_interval = bot.STOCK_MONITOR_INTERVAL
+        bot.STOCK_MONITOR_INTERVAL = 60
+        try:
+            self.assertEqual(bot._adapt_stock_monitor_interval(300), 300)
+            self.assertEqual(bot._adapt_stock_monitor_interval(60), 300)
+        finally:
+            bot.STOCK_MONITOR_INTERVAL = previous_interval
+
     def test_stock_snapshot_merges_same_named_group_rows_and_keeps_all_variants(self):
         payload = {
             "data": [
@@ -212,6 +222,100 @@ class StockMonitorCooldownTests(unittest.IsolatedAsyncioTestCase):
             bot.STOCK_MONITOR_FAILURE_COUNT = previous_failures
 
 
+class StockChangesCommandTests(unittest.IsolatedAsyncioTestCase):
+    async def test_command_is_read_only_and_reports_no_successful_snapshot(self):
+        previous_last_success = bot.LAST_STOCK_MONITOR_SUCCESS
+        previous_history = bot.STOCK_QUANTITY_CHANGE_HISTORY
+        bot.LAST_STOCK_MONITOR_SUCCESS = 0
+        bot.STOCK_QUANTITY_CHANGE_HISTORY = []
+
+        class Message:
+            reply_text = AsyncMock()
+
+        class User:
+            id = bot.PRICE_ADMIN_ID
+
+        class Update:
+            effective_user = User()
+            message = Message()
+
+        try:
+            with patch("bot.fetch_authenticated_stock_snapshot", side_effect=AssertionError("must not scrape")), patch(
+                "bot.RogersRoofingScraper", side_effect=AssertionError("must not scrape")
+            ):
+                await bot.stock_changes_command(Update(), object())
+            report = Message.reply_text.await_args.args[0]
+        finally:
+            bot.LAST_STOCK_MONITOR_SUCCESS = previous_last_success
+            bot.STOCK_QUANTITY_CHANGE_HISTORY = previous_history
+
+        self.assertIn("read-only; no scrape", report)
+        self.assertIn("has not completed a successful snapshot", report)
+
+    async def test_command_reports_recent_quantity_change_sample(self):
+        previous_last_success = bot.LAST_STOCK_MONITOR_SUCCESS
+        previous_group_count = bot.LAST_STOCK_MONITOR_GROUP_COUNT
+        previous_compared = bot.LAST_STOCK_MONITOR_COMPARISON_COMPLETED
+        previous_history = bot.STOCK_QUANTITY_CHANGE_HISTORY
+        now = bot.time.time()
+        bot.LAST_STOCK_MONITOR_SUCCESS = now - 12
+        bot.LAST_STOCK_MONITOR_GROUP_COUNT = 1695
+        bot.LAST_STOCK_MONITOR_COMPARISON_COMPLETED = True
+        bot.STOCK_QUANTITY_CHANGE_HISTORY = [{
+            "timestamp": now - 60,
+            "group": "Flower",
+            "variant": "Blue Dream",
+            "old_qty": 4,
+            "new_qty": 9,
+        }]
+        try:
+            report = bot._stock_changes_report(now)
+        finally:
+            bot.LAST_STOCK_MONITOR_SUCCESS = previous_last_success
+            bot.LAST_STOCK_MONITOR_GROUP_COUNT = previous_group_count
+            bot.LAST_STOCK_MONITOR_COMPARISON_COMPLETED = previous_compared
+            bot.STOCK_QUANTITY_CHANGE_HISTORY = previous_history
+
+        self.assertIn("1695", report)
+        self.assertIn("Quantity changes in the last 30 minutes: 1", report)
+        self.assertIn("Flower - Blue Dream: 4 → 9", report)
+
+    def test_monitor_result_records_only_recent_quantity_changes(self):
+        previous_last_success = bot.LAST_STOCK_MONITOR_SUCCESS
+        previous_group_count = bot.LAST_STOCK_MONITOR_GROUP_COUNT
+        previous_compared = bot.LAST_STOCK_MONITOR_COMPARISON_COMPLETED
+        previous_history = bot.STOCK_QUANTITY_CHANGE_HISTORY
+        bot.STOCK_QUANTITY_CHANGE_HISTORY = [{
+            "timestamp": bot.time.time() - 1900,
+            "group": "Old",
+            "variant": "Old variant",
+            "old_qty": 1,
+            "new_qty": 2,
+        }]
+        try:
+            bot._record_stock_monitor_result(
+                {"snapshot": {"g1": {"variants": {"v1": {}, "v2": {}}}}},
+                {
+                    "compared": True,
+                    "quantity_changes": [{
+                        "group": "Flower",
+                        "variant": "Gelato",
+                        "old_qty": 2,
+                        "new_qty": 3,
+                    }],
+                },
+            )
+            self.assertEqual(bot.LAST_STOCK_MONITOR_GROUP_COUNT, 1)
+            self.assertTrue(bot.LAST_STOCK_MONITOR_COMPARISON_COMPLETED)
+            self.assertEqual(len(bot.STOCK_QUANTITY_CHANGE_HISTORY), 1)
+            self.assertEqual(bot.STOCK_QUANTITY_CHANGE_HISTORY[0]["variant"], "Gelato")
+        finally:
+            bot.LAST_STOCK_MONITOR_SUCCESS = previous_last_success
+            bot.LAST_STOCK_MONITOR_GROUP_COUNT = previous_group_count
+            bot.LAST_STOCK_MONITOR_COMPARISON_COMPLETED = previous_compared
+            bot.STOCK_QUANTITY_CHANGE_HISTORY = previous_history
+
+
 class ScrapeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
     async def test_waiting_full_scrape_precedes_later_monitor(self):
         order = []
@@ -272,6 +376,47 @@ class ScrapeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(context.job_queue.scheduled[1]["when"], 1800)
         self.assertEqual(context.job_queue.scheduled[1]["name"], "periodic_full_scrape")
 
+    def test_next_full_scrape_deadline_is_login_time_plus_thirty_minutes(self):
+        class FakeJobQueue:
+            def __init__(self):
+                self.jobs = []
+                self.scheduled = None
+
+            def get_jobs_by_name(self, _name):
+                return self.jobs
+
+            def run_once(self, callback, **kwargs):
+                self.scheduled = (callback, kwargs)
+
+        class FakeContext:
+            def __init__(self):
+                self.job_queue = FakeJobQueue()
+
+        context = FakeContext()
+        login_dm_at = 1000
+        now = 1200
+        with patch("bot.time.time", return_value=now):
+            bot._schedule_next_full_scrape(
+                context,
+                bot.FULL_CATALOG_INTERVAL,
+                anchor_time=login_dm_at,
+            )
+
+        self.assertEqual(
+            context.job_queue.scheduled[1]["when"],
+            login_dm_at + bot.FULL_CATALOG_INTERVAL - now,
+        )
+
+    def test_monitor_is_suppressed_inside_final_minute_before_catalog(self):
+        previous_deadline = bot.NEXT_FULL_SCRAPE_AT
+        bot.NEXT_FULL_SCRAPE_AT = 2000
+        try:
+            self.assertTrue(bot._monitor_window_is_open(now=1939))
+            self.assertFalse(bot._monitor_window_is_open(now=1940))
+            self.assertFalse(bot._monitor_window_is_open(now=1999))
+        finally:
+            bot.NEXT_FULL_SCRAPE_AT = previous_deadline
+
 
 class NotificationBaselineTests(unittest.IsolatedAsyncioTestCase):
     async def test_duplicate_variant_names_generate_one_new_variation_alert(self):
@@ -305,11 +450,12 @@ class NotificationBaselineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["notifications"], 1)
         self.assertEqual(mock_bot.send_message.await_count, 1)
         alert_text = mock_bot.send_message.await_args.kwargs["text"]
-        self.assertIn("New variation added", alert_text)
-        self.assertIn("Blue Dream", alert_text)
-        self.assertNotIn("New product added", alert_text)
+        self.assertEqual(
+            alert_text,
+            "🆕 🔥 <b>New product added:</b> Flower - Blue Dream (Uncategorized)",
+        )
 
-    async def test_brand_new_group_gets_one_product_alert_with_variation_list(self):
+    async def test_brand_new_group_gets_one_legacy_alert_per_unique_variant(self):
         previous_state = bot.SHOP_UPDATE_STATE
         previous_times = bot.SHOP_NOTIFICATION_TIMES
         bot.SHOP_UPDATE_STATE = {}
@@ -333,12 +479,10 @@ class NotificationBaselineTests(unittest.IsolatedAsyncioTestCase):
             bot.SHOP_NOTIFICATION_TIMES = previous_times
 
         self.assertEqual(result["detected_changes"], 1)
-        self.assertEqual(mock_bot.send_message.await_count, 1)
-        alert_text = mock_bot.send_message.await_args.kwargs["text"]
-        self.assertIn("New product added", alert_text)
-        self.assertIn("Sour Diesel", alert_text)
-        self.assertIn("Gelato", alert_text)
-        self.assertNotIn("New variation added", alert_text)
+        self.assertEqual(mock_bot.send_message.await_count, 2)
+        alert_texts = [call.kwargs["text"] for call in mock_bot.send_message.await_args_list]
+        self.assertIn("🆕 🔥 <b>New product added:</b> New Flower - Sour Diesel (Uncategorized)", alert_texts)
+        self.assertIn("🆕 🔥 <b>New product added:</b> New Flower - Gelato (Uncategorized)", alert_texts)
 
     async def test_cooldown_suppressed_stock_change_is_not_reported_as_zero_changes(self):
         previous_state = bot.SHOP_UPDATE_STATE
@@ -438,7 +582,7 @@ class NotificationBaselineTests(unittest.IsolatedAsyncioTestCase):
             output.getvalue(),
         )
 
-    async def test_quantity_decrease_counts_as_real_stock_change(self):
+    async def test_quantity_decrease_is_recorded_but_does_not_send_dm(self):
         previous_state = bot.SHOP_UPDATE_STATE
         previous_times = bot.SHOP_NOTIFICATION_TIMES
         data_before = {"data": [{"id": "g1", "name": "Item", "products": [{"id": "v1", "name": "Variant", "qty": 8}]}]}
@@ -454,8 +598,30 @@ class NotificationBaselineTests(unittest.IsolatedAsyncioTestCase):
             bot.SHOP_NOTIFICATION_TIMES = previous_times
 
         self.assertEqual(result["detected_changes"], 1)
+        self.assertEqual(result["notifications"], 0)
+        mock_bot.send_message.assert_not_awaited()
+
+    async def test_quantity_increase_uses_legacy_new_product_wording(self):
+        previous_state = bot.SHOP_UPDATE_STATE
+        previous_times = bot.SHOP_NOTIFICATION_TIMES
+        data_before = {"data": [{"id": "g1", "name": "Item", "products": [{"id": "v1", "name": "Variant", "qty": 4}]}]}
+        data_after = {"data": [{"id": "g1", "name": "Item", "products": [{"id": "v1", "name": "Variant", "qty": 8}]}]}
+        bot.SHOP_UPDATE_STATE = bot._normalize_product_snapshot(bot._product_snapshot(data_before))
+        bot.SHOP_NOTIFICATION_TIMES = {}
+        mock_bot = AsyncMock()
+        try:
+            with patch.object(bot, "_save_shop_update_state"):
+                result = await bot.notify_shop_updates(mock_bot, data_after)
+        finally:
+            bot.SHOP_UPDATE_STATE = previous_state
+            bot.SHOP_NOTIFICATION_TIMES = previous_times
+
+        self.assertEqual(result["detected_changes"], 1)
         self.assertEqual(result["notifications"], 1)
-        self.assertIn("8 → 4", mock_bot.send_message.await_args.kwargs["text"])
+        self.assertEqual(
+            mock_bot.send_message.await_args.kwargs["text"],
+            "🆕 🔥 <b>New product added:</b> Item - Variant (Uncategorized)",
+        )
 
     async def test_silent_full_refresh_does_not_overwrite_existing_baseline(self):
         previous_state = bot.SHOP_UPDATE_STATE
@@ -477,6 +643,43 @@ class NotificationBaselineTests(unittest.IsolatedAsyncioTestCase):
 
 
 class FullScrapeRateLimitTests(unittest.IsolatedAsyncioTestCase):
+    async def test_scraper_waits_until_successful_login_dm_is_confirmed(self):
+        notification_future = Future()
+        callback = Mock(return_value=notification_future)
+        scraper = RogersRoofingScraper(login_callback=callback)
+
+        notification_wait = asyncio.create_task(scraper._await_login_notification())
+        await asyncio.sleep(0)
+        self.assertFalse(notification_wait.done())
+
+        notification_future.set_result(True)
+        self.assertTrue(await notification_wait)
+        callback.assert_called_once_with()
+
+    async def test_full_scrape_attempts_even_during_monitor_cooldown(self):
+        previous_cache = bot.PRODUCT_CACHE
+        previous_cooldown = bot.STOCK_MONITOR_RATE_LIMIT_UNTIL
+        bot.PRODUCT_CACHE = {"data": None, "timestamp": 0, "last_attempt": 0}
+        bot.STOCK_MONITOR_RATE_LIMIT_UNTIL = bot.time.time() + 122
+        fresh_result = {
+            "data": [{"id": "group-1", "name": "Product", "products": []}],
+            "imagePathPrefix": "/products/",
+        }
+        fake_scraper = Mock()
+        fake_scraper.get_products.return_value = fresh_result
+        context = type("Context", (), {"bot": AsyncMock()})()
+        try:
+            with patch.object(bot, "RogersRoofingScraper", return_value=fake_scraper), \
+                 patch("builtins.open", mock_open()), \
+                 patch.object(bot, "notify_shop_updates", new=AsyncMock()):
+                refreshed = await bot._run_auto_refresh_job(context, "full-test")
+
+            self.assertTrue(refreshed)
+            fake_scraper.get_products.assert_called_once()
+        finally:
+            bot.PRODUCT_CACHE = previous_cache
+            bot.STOCK_MONITOR_RATE_LIMIT_UNTIL = previous_cooldown
+
     def test_monitor_cooldown_schedules_monitor_resume_not_full_scrape(self):
         class FakeJobQueue:
             def __init__(self):
@@ -514,12 +717,15 @@ class FullScrapeRateLimitTests(unittest.IsolatedAsyncioTestCase):
 
         context = FakeContext()
         previous_started = bot.STOCK_MONITOR_STARTED
+        previous_interval = bot.STOCK_MONITOR_INTERVAL
         bot.STOCK_MONITOR_STARTED = False
+        bot.STOCK_MONITOR_INTERVAL = 60
         try:
             bot._start_stock_monitor_after_full_scrape(context)
             bot._start_stock_monitor_after_full_scrape(context)
         finally:
             bot.STOCK_MONITOR_STARTED = previous_started
+            bot.STOCK_MONITOR_INTERVAL = previous_interval
 
         self.assertEqual(len(context.job_queue.jobs), 1)
         callback, job_kwargs = context.job_queue.jobs[0]
@@ -622,7 +828,8 @@ class FullScrapeRateLimitTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(context.job_queue.jobs), 1)
         callback, job_kwargs = context.job_queue.jobs[0]
         self.assertEqual(callback, bot.auto_refresh_job)
-        self.assertEqual(job_kwargs["when"], 1800)
+        self.assertLessEqual(job_kwargs["when"], 1800)
+        self.assertGreaterEqual(job_kwargs["when"], 1799)
         self.assertEqual(job_kwargs["name"], "periodic_full_scrape")
 
 

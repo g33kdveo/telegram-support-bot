@@ -77,8 +77,6 @@ def fetch_authenticated_stock_snapshot(api_key, base_url="https://chadsflooring.
         payload = response.json()
     except Exception as e:
         return {"ok": False, "auth_required": False, "error": str(e)}
-
-    if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
         return {"ok": False, "auth_required": False, "error": "Unexpected API response"}
 
     snapshot = {}
@@ -227,6 +225,22 @@ class RogersRoofingScraper:
             f"[scrape instance={self.instance_id} pid={os.getpid()} "
             f"source={self.run_label} run={self.run_id}] {message}"
         )
+
+    async def _await_login_notification(self):
+        if not self.login_callback:
+            return True
+        try:
+            notification_future = self.login_callback()
+            if notification_future is None:
+                return True
+            notification_sent = await asyncio.wrap_future(notification_future)
+            if notification_sent is False:
+                self._log("Login succeeded but admin login DM was not delivered")
+                return False
+            return True
+        except Exception as error:
+            self._log(f"Login succeeded but waiting for admin login DM failed: {error}")
+            return False
 
     def _find_chromium(self):
         exec_path = os.getenv("PUPPETEER_EXECUTABLE_PATH")
@@ -400,8 +414,7 @@ class RogersRoofingScraper:
                 self._log(f"Stored {len(_stored_cookies)} cookies for image proxy")
             except Exception as ce:
                 print(f"  Warning: Could not extract cookies: {ce}")
-            if self.login_callback:
-                self.login_callback()
+            await self._await_login_notification()
             return True
         else:
             self._log("WARNING: May still be on login page; continuing anyway")
