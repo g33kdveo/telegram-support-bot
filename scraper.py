@@ -6,10 +6,10 @@ import hashlib
 import time
 import shutil
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse
 from pyppeteer import launch
 import requests
+import httpx
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
@@ -108,7 +108,7 @@ IMAGE_SIZE_VARIANTS = [950, 750, 450, 400, 375, 325, 300, 250, 225, 178, 80]
 IMAGE_MIN_SIZE = 300  # Minimum acceptable image size to prevent tiny fallbacks
 IMAGE_DOWNLOAD_BATCH_SIZE = 60
 IMAGE_DOWNLOAD_CONCURRENCY = 12
-IMAGE_FETCH_TIMEOUT = (3, 10)
+IMAGE_FETCH_TIMEOUT = httpx.Timeout(connect=3, read=10, write=10, pool=3)
 IMAGE_ALL_FAIL_CHECK_COUNT = 75
 RATE_LIMIT_FALLBACK_SECONDS = 300
 
@@ -137,40 +137,18 @@ def _apply_cached_image_references(groups, cached_images):
                 ]
 
 
-def _fetch_image_variants(variants, cookies, user_agent, referer):
-    cookie_jar = requests.cookies.RequestsCookieJar()
-    for cookie in cookies:
-        name = cookie.get("name")
-        if not name:
-            continue
-        cookie_jar.set(
-            name,
-            cookie.get("value", ""),
-            domain=cookie.get("domain") or urlparse(referer).hostname,
-            path=cookie.get("path") or "/",
-        )
-
-    headers = {
-        "User-Agent": user_agent,
-        "Referer": referer.rstrip("/") + "/",
-        "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-    }
+async def _fetch_image_variants(client, variants):
     failures = []
     for image_url in variants:
         try:
-            response = requests.get(
-                image_url,
-                headers=headers,
-                cookies=cookie_jar,
-                timeout=IMAGE_FETCH_TIMEOUT,
-            )
+            response = await client.get(image_url)
             content_type = response.headers.get("Content-Type", "").lower()
             if response.status_code == 429:
                 return None, image_url, f"429 {image_url}", True
-            if response.ok and content_type.startswith("image/") and len(response.content) > 500:
+            if response.is_success and content_type.startswith("image/") and len(response.content) > 500:
                 return response.content, image_url, None, False
             failures.append(f"{response.status_code} {content_type or 'unknown content type'} {image_url}")
-        except requests.RequestException as error:
+        except httpx.RequestError as error:
             failures.append(f"{type(error).__name__} {image_url}")
     return None, None, failures[0] if failures else "no usable image variants", False
 
@@ -581,27 +559,51 @@ class RogersRoofingScraper:
             rate_limited = False
             first_failure = None
 
-            with ThreadPoolExecutor(max_workers=IMAGE_DOWNLOAD_CONCURRENCY) as executor:
+            headers = {
+                "User-Agent": user_agent,
+                "Referer": self.base_url.rstrip("/") + "/",
+                "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+            }
+            cookie_jar = httpx.Cookies()
+            for cookie in cookies:
+                cookie_name = cookie.get("name")
+                if cookie_name:
+                    cookie_jar.set(
+                        cookie_name,
+                        cookie.get("value", ""),
+                        domain=cookie.get("domain") or urlparse(self.base_url).hostname,
+                        path=cookie.get("path") or "/",
+                    )
+
+            semaphore = asyncio.Semaphore(IMAGE_DOWNLOAD_CONCURRENCY)
+            async with httpx.AsyncClient(
+                headers=headers,
+                cookies=cookie_jar,
+                timeout=IMAGE_FETCH_TIMEOUT,
+                follow_redirects=True,
+            ) as client:
                 for i in range(0, total, IMAGE_DOWNLOAD_BATCH_SIZE):
                     batch = items[i:i + IMAGE_DOWNLOAD_BATCH_SIZE]
-                    futures = {
-                        executor.submit(
-                            _fetch_image_variants,
-                            variants,
-                            cookies,
-                            user_agent,
-                            self.base_url,
-                        ): (img_template, cache_fname)
-                        for img_template, (variants, cache_fname, _) in batch
-                    }
 
-                    for future in as_completed(futures):
-                        img_template, cache_fname = futures[future]
-                        try:
-                            image_bytes, used_url, error, is_rate_limited = future.result()
-                        except Exception as error:
-                            image_bytes, used_url, is_rate_limited = None, None, False
-                            error = f"{type(error).__name__}: {error}"
+                    async def fetch_one(variants):
+                        async with semaphore:
+                            return await _fetch_image_variants(client, variants)
+
+                    results = await asyncio.gather(
+                        *(fetch_one(variants) for _, (variants, _, _) in batch),
+                        return_exceptions=True,
+                    )
+
+                    for (img_template, (_, cache_fname, _)), result in zip(batch, results):
+                        if isinstance(result, Exception):
+                            image_bytes, used_url, error, is_rate_limited = (
+                                None,
+                                None,
+                                f"{type(result).__name__}: {result}",
+                                False,
+                            )
+                        else:
+                            image_bytes, used_url, error, is_rate_limited = result
 
                         if image_bytes:
                             with open(os.path.join(img_cache_dir, cache_fname), 'wb') as imgf:
@@ -633,7 +635,10 @@ class RogersRoofingScraper:
                         )
                         break
 
-            print(f"  Downloaded: {downloaded}, Failed: {failed}, Time: {time.time() - start_time:.1f}s")
+            self._log(
+                f"Image downloads finished: {downloaded} downloaded, {failed} failed, "
+                f"{time.time() - start_time:.1f}s"
+            )
         elif not url_map:
             print("  No images to download")
         else:
@@ -781,7 +786,7 @@ class RogersRoofingScraper:
                 try:
                     await self._download_images(page, all_groups, img_prefix)
                 except Exception as e:
-                    print(f"  Image download aborted safely: {e}")
+                    self._log(f"Image download aborted safely: {e}")
 
             try:
                 await browser.close()

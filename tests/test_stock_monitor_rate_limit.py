@@ -131,6 +131,17 @@ class ScrapeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
 
 class NotificationBaselineTests(unittest.IsolatedAsyncioTestCase):
+    async def test_successful_login_notification_is_sent_once_per_process(self):
+        previous_sent = bot.LOGIN_NOTIFICATION_SENT
+        bot.LOGIN_NOTIFICATION_SENT = False
+        mock_bot = AsyncMock()
+        try:
+            await bot.notify_login_success(mock_bot)
+            await bot.notify_login_success(mock_bot)
+            self.assertEqual(mock_bot.send_message.await_count, 1)
+        finally:
+            bot.LOGIN_NOTIFICATION_SENT = previous_sent
+
     async def test_silent_full_refresh_does_not_overwrite_existing_baseline(self):
         previous_state = bot.SHOP_UPDATE_STATE
         previous_times = bot.SHOP_NOTIFICATION_TIMES

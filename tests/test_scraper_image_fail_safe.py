@@ -79,7 +79,7 @@ class ScraperImageBatchTests(unittest.IsolatedAsyncioTestCase):
         groups = [{"imgs": {"main": f"x750-image{index}.webp"}} for index in range(35)]
         fetched = []
 
-        def fake_fetch(variants, *_args):
+        async def fake_fetch(_client, variants):
             image_url = variants[0]
             fetched.append(image_url)
             image_index = int(image_url.rsplit("image", 1)[1].split(".", 1)[0])
@@ -105,7 +105,7 @@ class ScraperImageBatchTests(unittest.IsolatedAsyncioTestCase):
         groups = [{"imgs": {"main": f"x750-image{index}.webp"}} for index in range(200)]
         fetched = []
 
-        def fake_fetch(variants, *_args):
+        async def fake_fetch(_client, variants):
             fetched.append(variants[0])
             return None, None, "404 image not found", False
 
@@ -124,7 +124,7 @@ class ScraperImageBatchTests(unittest.IsolatedAsyncioTestCase):
         groups = [{"imgs": {"main": f"x750-image{index}.webp"}} for index in range(200)]
         fetched = []
 
-        def fake_fetch(variants, *_args):
+        async def fake_fetch(_client, variants):
             fetched.append(variants[0])
             return None, variants[0], "429", True
 
@@ -139,39 +139,39 @@ class ScraperImageBatchTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(fetched), IMAGE_DOWNLOAD_BATCH_SIZE)
 
-    def test_fetch_image_variants_rejects_non_image_then_uses_image(self):
+    async def test_fetch_image_variants_rejects_non_image_then_uses_image(self):
         class Response:
             def __init__(self, content_type, content):
                 self.status_code = 200
-                self.ok = True
+                self.is_success = True
                 self.headers = {"Content-Type": content_type}
                 self.content = content
 
-        responses = [Response("text/html", b"login page"), Response("image/webp", b"x" * 800)]
-        with patch("scraper.requests.get", side_effect=responses) as get:
-            result = _fetch_image_variants(
-                [
-                    "https://chadsflooring.bz/uploads/products/first.webp",
-                    "https://chadsflooring.bz/uploads/products/second.webp",
-                ],
-                [{"name": "session", "value": "abc123", "domain": ".chadsflooring.bz", "path": "/"}],
-                "test-agent",
-                "https://chadsflooring.bz",
-            )
+        class FakeClient:
+            def __init__(self):
+                self.responses = [Response("text/html", b"login page"), Response("image/webp", b"x" * 800)]
+                self.requested = []
+
+            async def get(self, image_url):
+                self.requested.append(image_url)
+                return self.responses.pop(0)
+
+        urls = [
+            "https://img.chadsflooring.bz/products/first.webp",
+            "https://img.chadsflooring.bz/products/second.webp",
+        ]
+        client = FakeClient()
+        result = await _fetch_image_variants(client, urls)
 
         self.assertEqual(result[0], b"x" * 800)
-        self.assertEqual(result[1], "https://chadsflooring.bz/uploads/products/second.webp")
-        self.assertEqual(get.call_count, 2)
-        self.assertEqual(
-            get.call_args_list[0].kwargs["cookies"].get_dict()["session"],
-            "abc123",
-        )
+        self.assertEqual(result[1], urls[1])
+        self.assertEqual(client.requested, urls)
 
-    def test_fetch_image_variants_uses_largest_available_size(self):
+    async def test_fetch_image_variants_uses_largest_available_size(self):
         class Response:
             def __init__(self, status_code, content_type, content):
                 self.status_code = status_code
-                self.ok = status_code == 200
+                self.is_success = status_code == 200
                 self.headers = {"Content-Type": content_type}
                 self.content = content
 
@@ -185,19 +185,26 @@ class ScraperImageBatchTests(unittest.IsolatedAsyncioTestCase):
             "https://img.chadsflooring.bz/products/x450-photo.webp",
         ]
 
-        with patch("scraper.requests.get", side_effect=responses) as get:
-            image_bytes, chosen_url, error, rate_limited = _fetch_image_variants(
-                candidate_urls,
-                [],
-                "test-agent",
-                "https://chadsflooring.bz",
-            )
+        class FakeClient:
+            def __init__(self):
+                self.responses = list(responses)
+                self.requested = []
+
+            async def get(self, image_url):
+                self.requested.append(image_url)
+                return self.responses.pop(0)
+
+        client = FakeClient()
+        image_bytes, chosen_url, error, rate_limited = await _fetch_image_variants(
+            client,
+            candidate_urls,
+        )
 
         self.assertEqual(image_bytes, b"x" * 900)
         self.assertEqual(chosen_url, candidate_urls[1])
         self.assertIsNone(error)
         self.assertFalse(rate_limited)
-        self.assertEqual(get.call_count, 2)
+        self.assertEqual(client.requested, candidate_urls[:2])
 
 
 if __name__ == "__main__":
