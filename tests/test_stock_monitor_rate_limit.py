@@ -162,6 +162,29 @@ class NotificationBaselineTests(unittest.IsolatedAsyncioTestCase):
 
 
 class FullScrapeRateLimitTests(unittest.IsolatedAsyncioTestCase):
+    def test_monitor_cooldown_schedules_monitor_resume_not_full_scrape(self):
+        class FakeJobQueue:
+            def __init__(self):
+                self.jobs = []
+
+            def get_jobs_by_name(self, _name):
+                return []
+
+            def run_once(self, callback, **kwargs):
+                self.jobs.append((callback, kwargs))
+
+        class FakeContext:
+            job_queue = FakeJobQueue()
+
+        context = FakeContext()
+        bot._schedule_stock_monitor_resume(context, 300)
+
+        callback, job_kwargs = context.job_queue.jobs[0]
+        self.assertEqual(callback, bot.resume_stock_monitor_job)
+        self.assertNotEqual(callback, bot.auto_refresh_job)
+        self.assertEqual(job_kwargs["when"], 300)
+        self.assertEqual(job_kwargs["name"], "stock_monitor_rate_limit_resume")
+
     def test_stock_monitor_starts_once_after_full_scrape_with_sixty_second_delay(self):
         class FakeJobQueue:
             def __init__(self):
@@ -254,34 +277,38 @@ class FullScrapeRateLimitTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(page.calls, 1)
         self.assertEqual(scraper.rate_limit_retry_after, 90)
 
-    def test_rate_limited_full_scrape_schedules_retry(self):
-        class FakeJob:
-            def __init__(self):
-                self.removed = False
-
-            def schedule_removal(self):
-                self.removed = True
-
+    async def test_full_scrape_failure_keeps_next_run_on_thirty_minute_schedule(self):
         class FakeJobQueue:
             def __init__(self):
-                self.jobs = [FakeJob()]
-                self.scheduled = None
+                self.jobs = []
 
-            def get_jobs_by_name(self, _name):
-                return self.jobs
+            def get_jobs_by_name(self, name):
+                return [job for job in self.jobs if job[1].get("name") == name]
 
             def run_once(self, callback, **kwargs):
-                self.scheduled = (callback, kwargs)
+                self.jobs.append((callback, kwargs))
 
         class FakeContext:
-            job_queue = FakeJobQueue()
+            def __init__(self):
+                self.job_queue = FakeJobQueue()
 
         context = FakeContext()
-        bot._schedule_rate_limited_auto_refresh(context, 90)
+        previous_monitor_started = bot.STOCK_MONITOR_STARTED
+        previous_cooldown = bot.STOCK_MONITOR_RATE_LIMIT_UNTIL
+        bot.STOCK_MONITOR_STARTED = False
+        bot.STOCK_MONITOR_RATE_LIMIT_UNTIL = bot.time.time() + 90
+        try:
+            with patch.object(bot, "_run_auto_refresh_job", new=AsyncMock(return_value=False)):
+                await bot.auto_refresh_job(context)
+        finally:
+            bot.STOCK_MONITOR_STARTED = previous_monitor_started
+            bot.STOCK_MONITOR_RATE_LIMIT_UNTIL = previous_cooldown
 
-        self.assertTrue(context.job_queue.jobs[0].removed)
-        self.assertEqual(context.job_queue.scheduled[0], bot.auto_refresh_job)
-        self.assertEqual(context.job_queue.scheduled[1]["when"], 90)
+        self.assertEqual(len(context.job_queue.jobs), 1)
+        callback, job_kwargs = context.job_queue.jobs[0]
+        self.assertEqual(callback, bot.auto_refresh_job)
+        self.assertEqual(job_kwargs["when"], 1800)
+        self.assertEqual(job_kwargs["name"], "periodic_full_scrape")
 
 
 if __name__ == "__main__":

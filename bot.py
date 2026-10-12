@@ -2379,6 +2379,7 @@ async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
             f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
             f"source={source} run={run_id}] acquired full-scrape slot"
         )
+        monitor_was_started = STOCK_MONITOR_STARTED
         _pause_stock_monitor(context)
         try:
             refreshed = await _run_auto_refresh_job(context, run_id)
@@ -2386,9 +2387,10 @@ async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
             if locals().get("refreshed", False):
                 LAST_FULL_SCRAPE_COMPLETED = time.time()
                 _start_stock_monitor_after_full_scrape(context)
-                _schedule_next_full_scrape(context, 1800)
-            elif STOCK_MONITOR_RATE_LIMIT_UNTIL <= time.time():
-                _schedule_next_full_scrape(context, 1800)
+            elif monitor_was_started:
+                cooldown = max(1.0, STOCK_MONITOR_RATE_LIMIT_UNTIL - time.time())
+                _schedule_stock_monitor_resume(context, cooldown)
+            _schedule_next_full_scrape(context, 1800)
 
 
 def _schedule_next_full_scrape(context, delay):
@@ -2404,19 +2406,32 @@ def _schedule_next_full_scrape(context, delay):
     )
 
 
-def _schedule_rate_limited_auto_refresh(context, delay):
+def _schedule_stock_monitor_resume(context, delay):
     job_queue = getattr(context, "job_queue", None)
     if job_queue is None:
         return
 
-    job_name = "rate_limited_auto_refresh"
+    job_name = "stock_monitor_rate_limit_resume"
     for job in job_queue.get_jobs_by_name(job_name):
         job.schedule_removal()
     job_queue.run_once(
-        auto_refresh_job,
+        resume_stock_monitor_job,
         when=max(1.0, delay),
         name=job_name,
+        job_kwargs={"misfire_grace_time": 60},
     )
+
+
+async def resume_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
+    async with _scrape_slot("monitor"):
+        if STOCK_MONITOR_RATE_LIMIT_UNTIL > time.time():
+            _schedule_stock_monitor_resume(
+                context,
+                STOCK_MONITOR_RATE_LIMIT_UNTIL - time.time(),
+            )
+            return
+        if not STOCK_MONITOR_STARTED:
+            _start_stock_monitor_after_full_scrape(context)
 
 
 async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE, run_id=None):
@@ -2427,8 +2442,11 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE, run_id=None)
 
     cooldown_remaining = STOCK_MONITOR_RATE_LIMIT_UNTIL - time.time()
     if cooldown_remaining > 0:
-        print(f"⏳ Full scrape deferred for {cooldown_remaining:.0f}s due to API rate limit.")
-        _schedule_rate_limited_auto_refresh(context, cooldown_remaining)
+        print(
+            f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+            f"source=full run={run_id}] skipped: API cooldown has "
+            f"{math.ceil(cooldown_remaining)}s remaining; next full run stays on its 30-minute schedule"
+        )
         return False
 
     await _claim_full_scrape()
@@ -2464,9 +2482,8 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE, run_id=None)
             print(
                 f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
                 f"source=full run={run_id}] HTTP 429; keeping existing cache and "
-                f"retrying after {retry_after:.0f}s."
+                f"not scheduling an extra catalog retry (next run in 30 minutes)."
             )
-            _schedule_rate_limited_auto_refresh(context, retry_after)
             return False
 
         if fresh_result and isinstance(fresh_result.get('data'), list) and len(fresh_result['data']) > 0:
@@ -2633,7 +2650,12 @@ async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE, run_id=None
 
         if time.time() - LAST_SESSION_REFRESH_ATTEMPT >= SESSION_REFRESH_COOLDOWN:
             LAST_SESSION_REFRESH_ATTEMPT = time.time()
-            _schedule_rate_limited_auto_refresh(context, 1)
+            _pause_stock_monitor(context)
+            print(
+                f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+                f"source=stock-monitor run={run_id}] session expired; "
+                "monitor paused until the next scheduled full catalog scrape"
+            )
         return
 
     if result.get("cooldown_active"):
@@ -2647,7 +2669,7 @@ async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE, run_id=None
     if result.get("rate_limited"):
         retry_after = max(1.0, float(result.get("retry_after") or 300))
         _pause_stock_monitor(context)
-        _schedule_rate_limited_auto_refresh(context, retry_after)
+        _schedule_stock_monitor_resume(context, retry_after)
 
     if not result.get("ok"):
         STOCK_MONITOR_FAILURE_COUNT += 1
