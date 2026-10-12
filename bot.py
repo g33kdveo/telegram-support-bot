@@ -2212,6 +2212,7 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 LOGIN_NOTIFICATION_SENT = False
+LOGIN_NOTIFIED_RUNS = set()
 STOCK_CHECK_STATE = None
 STOCK_CHECK_IN_PROGRESS = False
 STOCK_MONITOR_AUTH_WARNING_SENT = False
@@ -2224,6 +2225,8 @@ STOCK_MONITOR_STARTED = False
 STARTUP_FULL_JOB_SCHEDULED = False
 LAST_FULL_SCRAPE_COMPLETED = 0
 FULL_SCRAPE_GENERATION = 0
+STOCK_MONITOR_COMPARISONS_SINCE_FULL = 0
+STOCK_CHANGES_DETECTED_SINCE_FULL = 0
 MANUAL_CHECK_PENDING = False
 LAST_MANUAL_CHECK = 0
 
@@ -2247,20 +2250,43 @@ def _reset_stock_api_rate_limit():
 
 def _stock_snapshot(scrape_result):
     snapshot = {}
+    product_key_counts = {}
+    product_identity_keys = {}
     for group in scrape_result.get("data", []):
         if not isinstance(group, dict):
             continue
         group_name = str(group.get("name", "Unknown product"))
+        group_base_id = _snapshot_record_id(group)
+        group_identity = (group_base_id, group_name)
         for product in group.get("products", []):
             if not isinstance(product, dict):
                 continue
-            product_id = str(product.get("id") or product.get("sku") or product.get("name"))
+            product_base_id = _snapshot_record_id(product)
+            product_name = str(product.get("name", product_base_id))
+            identity = (product_base_id, group_identity, product_name)
+            product_id = product_identity_keys.get(identity)
+            if product_id is None:
+                product_key_counts[product_base_id] = product_key_counts.get(product_base_id, 0) + 1
+                product_id = _snapshot_collision_key(product_base_id, product_key_counts[product_base_id])
+                product_identity_keys[identity] = product_id
             snapshot[product_id] = {
                 "group": group_name,
-                "name": str(product.get("name", product_id)),
+                "name": product_name,
                 "qty": product.get("qty"),
             }
     return snapshot
+
+
+def _snapshot_record_id(record):
+    return str(
+        record.get("id") or record.get("sku") or record.get("slug") or record.get("name")
+    )
+
+
+def _snapshot_collision_key(base_id, occurrence):
+    if occurrence == 1:
+        return base_id
+    return f"{base_id}::duplicate:{occurrence}"
 
 
 def _format_stock_value(value):
@@ -2318,7 +2344,7 @@ async def _run_check_stock_command(update: Update, context: ContextTypes.DEFAULT
                 run_label="checkstock",
                 instance_id=BOT_INSTANCE_ID,
                 login_callback=lambda: asyncio.run_coroutine_threadsafe(
-                    notify_login_success(context.bot), loop
+                    notify_login_success(context.bot, run_id), loop
                 )
             )
             return scraper.get_stock_snapshot()
@@ -2367,6 +2393,7 @@ async def _run_check_stock_command(update: Update, context: ContextTypes.DEFAULT
 # ===== AUTO REFRESH JOB =====
 async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
     global LAST_FULL_SCRAPE_COMPLETED
+    global STOCK_MONITOR_COMPARISONS_SINCE_FULL, STOCK_CHANGES_DETECTED_SINCE_FULL
 
     run_id = uuid.uuid4().hex[:8]
     source = getattr(getattr(context, "job", None), "name", None) or "full-scrape"
@@ -2385,12 +2412,42 @@ async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
             refreshed = await _run_auto_refresh_job(context, run_id)
         finally:
             if locals().get("refreshed", False):
+                await _report_stock_cycle_summary(context, run_id)
+                STOCK_MONITOR_COMPARISONS_SINCE_FULL = 0
+                STOCK_CHANGES_DETECTED_SINCE_FULL = 0
                 LAST_FULL_SCRAPE_COMPLETED = time.time()
                 _start_stock_monitor_after_full_scrape(context)
             elif monitor_was_started:
                 cooldown = max(1.0, STOCK_MONITOR_RATE_LIMIT_UNTIL - time.time())
                 _schedule_stock_monitor_resume(context, cooldown)
             _schedule_next_full_scrape(context, 1800)
+
+
+async def _report_stock_cycle_summary(context, full_run_id):
+    if STOCK_MONITOR_COMPARISONS_SINCE_FULL <= 0:
+        print(
+            f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+            f"source=full run={full_run_id}] no zero-change DM: "
+            "no successful stock comparison completed during this interval"
+        )
+        return
+    if STOCK_CHANGES_DETECTED_SINCE_FULL > 0:
+        return
+
+    try:
+        await context.bot.send_message(
+            chat_id=PRICE_ADMIN_ID,
+            text="✅ No stock changes were detected during the last 30-minute monitoring period.",
+        )
+        print(
+            f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+            f"source=full run={full_run_id}] sent one zero-stock-change DM"
+        )
+    except Exception as error:
+        print(
+            f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+            f"source=full run={full_run_id}] could not send zero-change DM: {error}"
+        )
 
 
 def _schedule_next_full_scrape(context, delay):
@@ -2468,7 +2525,7 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE, run_id=None)
                 run_label="full",
                 instance_id=BOT_INSTANCE_ID,
                 login_callback=lambda: asyncio.run_coroutine_threadsafe(
-                    notify_login_success(context.bot), loop
+                    notify_login_success(context.bot, run_id), loop
                 )
             )
             return scraper.get_products()
@@ -2587,6 +2644,7 @@ async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE, run_id=None
     global LAST_SESSION_REFRESH_ATTEMPT, STOCK_MONITOR_FAILURE_COUNT
     global STOCK_MONITOR_FAILURE_WARNING_SENT
     global STOCK_MONITOR_RATE_LIMIT_UNTIL
+    global STOCK_MONITOR_COMPARISONS_SINCE_FULL, STOCK_CHANGES_DETECTED_SINCE_FULL
 
     run_id = run_id or uuid.uuid4().hex[:8]
 
@@ -2697,12 +2755,22 @@ async def _run_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE, run_id=None
     print(
         f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
         f"source=stock-monitor run={run_id}] snapshot succeeded: "
-        f"{len(result['snapshot'])} groups"
+        f"{len(result['snapshot'])} logical groups from "
+        f"{result.get('source_group_rows', len(result['snapshot']))} feed rows, "
+        f"{result.get('variant_count', sum(len(group['variants']) for group in result['snapshot'].values()))} variants"
     )
-    await notify_shop_updates(
+    notification_context = (
+        f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+        f"source=stock-monitor run={run_id}]"
+    )
+    comparison = await notify_shop_updates(
         context.bot,
         {"data": _snapshot_to_groups(result["snapshot"])},
+        log_context=notification_context,
     )
+    if comparison and comparison.get("compared"):
+        STOCK_MONITOR_COMPARISONS_SINCE_FULL += 1
+        STOCK_CHANGES_DETECTED_SINCE_FULL += comparison["detected_changes"]
 
 
 def _snapshot_to_groups(snapshot):
@@ -3010,21 +3078,48 @@ def _request_can_see_prices(path):
 
 def _product_snapshot(scrape_result):
     snapshot = {}
+    group_identity_keys = {}
+    duplicate_group_counts = {}
+    variant_identity_keys = {}
+    duplicate_variant_counts_by_group = {}
     for group in scrape_result.get("data", []):
         if not isinstance(group, dict):
             continue
-        group_id = str(group.get("id") or group.get("slug") or group.get("name"))
-        variants = {}
+        group_base_id = _snapshot_record_id(group)
+        group_name = str(group.get("name", group_base_id))
+        group_identity = (group_base_id, group_name)
+        group_id = group_identity_keys.get(group_identity)
+        if group_id is None:
+            if group_base_id not in snapshot:
+                group_id = group_base_id
+            else:
+                duplicate_group_counts[group_base_id] = duplicate_group_counts.get(group_base_id, 1) + 1
+                group_id = f"{group_base_id}::duplicate:{duplicate_group_counts[group_base_id]}"
+            group_identity_keys[group_identity] = group_id
+
+        variants = snapshot.get(group_id, {}).get("variants", {})
+        variant_identity_map = variant_identity_keys.setdefault(group_id, {})
+        duplicate_variant_counts = duplicate_variant_counts_by_group.setdefault(group_id, {})
         for product in group.get("products", []):
             if not isinstance(product, dict):
                 continue
-            product_id = str(product.get("id") or product.get("sku") or product.get("name"))
+            product_base_id = _snapshot_record_id(product)
+            product_name = str(product.get("name", product_base_id))
+            variant_identity = (product_base_id, product_name)
+            product_id = variant_identity_map.get(variant_identity)
+            if product_id is None:
+                if product_base_id not in variants:
+                    product_id = product_base_id
+                else:
+                    duplicate_variant_counts[product_base_id] = duplicate_variant_counts.get(product_base_id, 1) + 1
+                    product_id = f"{product_base_id}::duplicate:{duplicate_variant_counts[product_base_id]}"
+                variant_identity_map[variant_identity] = product_id
             variants[product_id] = {
-                "name": str(product.get("name", product_id)),
+                "name": product_name,
                 "qty": product.get("qty"),
             }
         snapshot[group_id] = {
-            "name": str(group.get("name", group_id)),
+            "name": group_name,
             "category": str(group.get("cat") or group.get("category") or "Uncategorized"),
             "variants": variants,
         }
@@ -3159,12 +3254,19 @@ def _normalize_product_snapshot(snapshot):
         variants = {}
         for variant_id, variant in (group.get("variants") or {}).items():
             if isinstance(variant, dict):
-                variants[str(variant_id)] = {
-                    "name": str(variant.get("name", variant_id)),
-                    "qty": variant.get("qty"),
-                }
+                variant_name = re.sub(r"\s+", " ", str(variant.get("name", variant_id))).strip()
+                quantity = variant.get("qty")
             else:
-                variants[str(variant_id)] = {"name": str(variant), "qty": None}
+                variant_name = re.sub(r"\s+", " ", str(variant)).strip()
+                quantity = None
+            normalized_name = re.sub(r"\s+", " ", variant_name).casefold()
+            canonical_variant_id = (
+                f"name:{normalized_name}" if normalized_name else f"id:{variant_id}"
+            )
+            variants[canonical_variant_id] = {
+                "name": variant_name,
+                "qty": quantity,
+            }
         normalized[str(group_id)] = {
             "name": str(group.get("name", group_id)),
             "category": str(group.get("category") or "Uncategorized"),
@@ -3173,19 +3275,53 @@ def _normalize_product_snapshot(snapshot):
     return normalized
 
 
-def _format_stock_notification(item, variant):
+def _format_new_product_notification(item):
     product_name = html_escape(item["name"])
-    variant_name = str(variant.get("name") or "").strip()
     category = html_escape(item.get("category") or "Uncategorized")
-    if not variant_name or variant_name.casefold() == str(item["name"]).strip().casefold():
-        return f"🆕 🔥 <b>New product added:</b> {product_name} ({category})"
+    variants = list(dict.fromkeys(
+        str(variant.get("name") or "").strip()
+        for variant in item["variants"].values()
+        if str(variant.get("name") or "").strip()
+    ))
+    text = f"🆕 🔥 <b>New product added:</b> {product_name} ({category})"
+    if variants:
+        shown = ", ".join(html_escape(name) for name in variants[:5])
+        remaining = len(variants) - 5
+        if remaining > 0:
+            shown += f", and {remaining} more"
+        text += f"\n<b>Available variations:</b> {shown}"
+    return text
+
+
+def _format_new_variant_notification(item, variant):
     return (
-        f"🆕 🔥 <b>New product added:</b> {product_name} - "
-        f"{html_escape(variant_name)} ({category})"
+        f"🆕 🌿 <b>New variation added:</b> "
+        f"{html_escape(item['name'])} - {html_escape(variant['name'])} "
+        f"({html_escape(item.get('category') or 'Uncategorized')})"
     )
 
 
-async def notify_shop_updates(bot, scrape_result, send_notifications=True, update_baseline=True):
+def _format_stock_quantity_change(item, variant, old_quantity, current_quantity):
+    item_name = html_escape(item["name"])
+    variant_name = str(variant.get("name") or "").strip()
+    label = item_name
+    if variant_name and variant_name.casefold() != str(item["name"]).strip().casefold():
+        label += f" - {html_escape(variant_name)}"
+    category = html_escape(item.get("category") or "Uncategorized")
+    return (
+        f"📦 <b>Stock changed:</b> {label} ({category}): "
+        f"{html_escape(_format_stock_value(old_quantity))} → "
+        f"{html_escape(_format_stock_value(current_quantity))}"
+    )
+
+
+async def notify_shop_updates(
+    bot,
+    scrape_result,
+    send_notifications=True,
+    update_baseline=True,
+    log_context="[stock-notifications]",
+):
     global SHOP_UPDATE_STATE, SHOP_NOTIFICATION_TIMES
 
     current = _normalize_product_snapshot(_product_snapshot(scrape_result))
@@ -3194,32 +3330,30 @@ async def notify_shop_updates(bot, scrape_result, send_notifications=True, updat
         if SHOP_UPDATE_STATE is None:
             SHOP_UPDATE_STATE = current
             _save_shop_update_state(current, SHOP_NOTIFICATION_TIMES)
-            return
+            group_count = len(current)
+            variant_count = sum(len(item["variants"]) for item in current.values())
+            print(
+                f"{log_context} initialized notification baseline: "
+                f"{group_count} groups, {variant_count} variants; no alerts this cycle"
+            )
+            return None
 
     if not send_notifications and not update_baseline:
-        return
+        return None
 
     previous = _normalize_product_snapshot(SHOP_UPDATE_STATE)
     notifications = []
+    detected_changes = 0
     now = time.time()
 
     for group_id, item in current.items():
         old_item = previous.get(group_id)
         if old_item is None:
-            if len(item["variants"]) > 1:
-                for variant_id, variant in item["variants"].items():
-                    key = f"variant:{group_id}:{variant_id}"
-                    if now - SHOP_NOTIFICATION_TIMES.get(key, 0) >= STOCK_NOTIFICATION_COOLDOWN:
-                        notifications.append(
-                            _format_stock_notification(item, variant)
-                        )
-                        SHOP_NOTIFICATION_TIMES[key] = now
-            else:
-                key = f"group:{group_id}"
-                if now - SHOP_NOTIFICATION_TIMES.get(key, 0) >= STOCK_NOTIFICATION_COOLDOWN:
-                    variant = next(iter(item["variants"].values()), {"name": ""})
-                    notifications.append(_format_stock_notification(item, variant))
-                    SHOP_NOTIFICATION_TIMES[key] = now
+            detected_changes += 1
+            key = f"group:{group_id}"
+            if now - SHOP_NOTIFICATION_TIMES.get(key, 0) >= STOCK_NOTIFICATION_COOLDOWN:
+                notifications.append(_format_new_product_notification(item))
+                SHOP_NOTIFICATION_TIMES[key] = now
             continue
 
         for variant_id, variant in item["variants"].items():
@@ -3230,9 +3364,10 @@ async def notify_shop_updates(bot, scrape_result, send_notifications=True, updat
                 else f"group:{group_id}"
             )
             if old_variant is None:
+                detected_changes += 1
                 if now - SHOP_NOTIFICATION_TIMES.get(key, 0) >= STOCK_NOTIFICATION_COOLDOWN:
                     notifications.append(
-                        _format_stock_notification(item, variant)
+                        _format_new_variant_notification(item, variant)
                     )
                     SHOP_NOTIFICATION_TIMES[key] = now
                 continue
@@ -3242,18 +3377,29 @@ async def notify_shop_updates(bot, scrape_result, send_notifications=True, updat
             if (
                 old_quantity is not None
                 and current_quantity is not None
-                and current_quantity > old_quantity
-                and now - SHOP_NOTIFICATION_TIMES.get(key, 0) >= STOCK_NOTIFICATION_COOLDOWN
+                and current_quantity != old_quantity
             ):
-                notifications.append(
-                    _format_stock_notification(item, variant)
-                )
-                SHOP_NOTIFICATION_TIMES[key] = now
+                detected_changes += 1
+                if now - SHOP_NOTIFICATION_TIMES.get(key, 0) >= STOCK_NOTIFICATION_COOLDOWN:
+                    notifications.append(
+                        _format_stock_quantity_change(
+                            item,
+                            variant,
+                            old_variant.get("qty"),
+                            variant.get("qty"),
+                        )
+                    )
+                    SHOP_NOTIFICATION_TIMES[key] = now
 
     SHOP_UPDATE_STATE = current
     _save_shop_update_state(current, SHOP_NOTIFICATION_TIMES)
+    if log_context != "[stock-notifications]":
+        print(
+            f"{log_context} comparison complete: {len(current)} groups, "
+            f"{detected_changes} changes detected, {len(notifications)} notifications eligible"
+        )
     if not send_notifications or not notifications:
-        return
+        return {"compared": True, "detected_changes": detected_changes, "notifications": len(notifications)}
 
     for index, notification in enumerate(notifications):
         try:
@@ -3266,11 +3412,12 @@ async def notify_shop_updates(bot, scrape_result, send_notifications=True, updat
             print(f"⚠️ Could not DM new-product notification: {e}")
         if index < len(notifications) - 1:
             await asyncio.sleep(2)
+    return {"compared": True, "detected_changes": detected_changes, "notifications": len(notifications)}
 
 
-async def notify_login_success(bot):
+async def notify_login_success(bot, run_id=None):
     global LOGIN_NOTIFICATION_SENT
-    if LOGIN_NOTIFICATION_SENT:
+    if run_id is not None and run_id in LOGIN_NOTIFIED_RUNS:
         return
     try:
         await bot.send_message(
@@ -3279,6 +3426,8 @@ async def notify_login_success(bot):
             parse_mode="HTML",
         )
         LOGIN_NOTIFICATION_SENT = True
+        if run_id is not None:
+            LOGIN_NOTIFIED_RUNS.add(run_id)
     except Exception as e:
         print(f"⚠️ Could not DM shop login notification: {e}")
 

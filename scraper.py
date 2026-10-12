@@ -82,24 +82,64 @@ def fetch_authenticated_stock_snapshot(api_key, base_url="https://chadsflooring.
         return {"ok": False, "auth_required": False, "error": "Unexpected API response"}
 
     snapshot = {}
+    group_identity_keys = {}
+    duplicate_group_counts = {}
+    variant_identity_keys = {}
+    duplicate_variant_counts_by_group = {}
     for group in payload["data"]:
         if not isinstance(group, dict):
             continue
-        group_id = str(group.get("id") or group.get("sku") or group.get("name"))
+        group_base_id = str(
+            group.get("id") or group.get("sku") or group.get("slug") or group.get("name")
+        )
+        group_name = str(group.get("name", group_base_id))
+        group_identity = (group_base_id, group_name)
+        group_id = group_identity_keys.get(group_identity)
+        if group_id is None:
+            if group_base_id not in snapshot:
+                group_id = group_base_id
+            else:
+                duplicate_group_counts[group_base_id] = duplicate_group_counts.get(group_base_id, 1) + 1
+                group_id = f"{group_base_id}::duplicate:{duplicate_group_counts[group_base_id]}"
+            group_identity_keys[group_identity] = group_id
+
+        variants = snapshot.get(group_id, {}).get("variants", {})
+        variant_identity_map = variant_identity_keys.setdefault(group_id, {})
+        duplicate_variant_counts = duplicate_variant_counts_by_group.setdefault(group_id, {})
+        for product in group.get("products", []):
+            if not isinstance(product, dict):
+                continue
+            variant_base_id = str(
+                product.get("id") or product.get("sku") or product.get("slug") or product.get("name")
+            )
+            variant_name = str(product.get("name", variant_base_id))
+            variant_identity = (variant_base_id, variant_name)
+            variant_id = variant_identity_map.get(variant_identity)
+            if variant_id is None:
+                if variant_base_id not in variants:
+                    variant_id = variant_base_id
+                else:
+                    duplicate_variant_counts[variant_base_id] = duplicate_variant_counts.get(variant_base_id, 1) + 1
+                    variant_id = f"{variant_base_id}::duplicate:{duplicate_variant_counts[variant_base_id]}"
+                variant_identity_map[variant_identity] = variant_id
+            variants[variant_id] = {
+                "name": variant_name,
+                "qty": product.get("qty"),
+            }
+
         snapshot[group_id] = {
-            "name": str(group.get("name", group_id)),
+            "name": group_name,
             "category": str(group.get("cat") or group.get("category") or "Uncategorized"),
-            "variants": {
-                str(product.get("id") or product.get("sku") or product.get("name")): {
-                    "name": str(product.get("name", "")),
-                    "qty": product.get("qty"),
-                }
-                for product in group.get("products", [])
-                if isinstance(product, dict)
-            },
+            "variants": variants,
         }
 
-    return {"ok": True, "auth_required": False, "snapshot": snapshot}
+    return {
+        "ok": True,
+        "auth_required": False,
+        "snapshot": snapshot,
+        "source_group_rows": len(payload["data"]),
+        "variant_count": sum(len(group["variants"]) for group in snapshot.values()),
+    }
 
 IMAGE_CDN_BASE_URL = "https://img.chadsflooring.bz"
 IMAGE_PATH_PREFIX = "/products/"

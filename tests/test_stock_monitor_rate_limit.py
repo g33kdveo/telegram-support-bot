@@ -10,6 +10,149 @@ from scraper import RogersRoofingScraper, fetch_authenticated_stock_snapshot
 
 
 class StockMonitorRateLimitTests(unittest.TestCase):
+    def test_stock_snapshot_merges_same_named_group_rows_and_keeps_all_variants(self):
+        payload = {
+            "data": [
+                {"id": "group-1", "name": "Same group", "products": [{"id": "v1", "name": "First", "qty": 2}]},
+                {"id": "group-1", "name": "Same group", "products": [{"id": "v2", "name": "Second", "qty": 3}]},
+            ]
+        }
+
+        class Response:
+            status_code = 200
+            url = "https://chadsflooring.bz/api/products/scrape"
+            headers = {"Content-Type": "application/json"}
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return payload
+
+        with patch(
+            "scraper.get_stored_cookies",
+            return_value=([{"name": "session", "value": "test"}], "test-agent"),
+        ), patch("scraper.requests.get", return_value=Response()):
+            result = fetch_authenticated_stock_snapshot("test-api-key")
+
+        self.assertEqual(result["source_group_rows"], 2)
+        self.assertEqual(len(result["snapshot"]), 1)
+        self.assertEqual(len(result["snapshot"]["group-1"]["variants"]), 2)
+        self.assertEqual(result["variant_count"], 2)
+
+    def test_stock_snapshot_preserves_duplicate_group_and_variant_ids(self):
+        payload = {
+            "data": [
+                {
+                    "id": "group-1",
+                    "name": "Group one",
+                    "products": [{"id": "variant-1", "name": "First variant", "qty": 2}],
+                },
+                {
+                    "id": "group-1",
+                    "name": "Group duplicate",
+                    "products": [
+                        {"id": "variant-1", "name": "Second variant", "qty": 3},
+                        {"id": "variant-1", "name": "Third variant", "qty": 4},
+                    ],
+                },
+            ]
+        }
+
+        class Response:
+            status_code = 200
+            url = "https://chadsflooring.bz/api/products/scrape"
+            headers = {"Content-Type": "application/json"}
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return payload
+
+        with patch(
+            "scraper.get_stored_cookies",
+            return_value=([{"name": "session", "value": "test"}], "test-agent"),
+        ), patch("scraper.requests.get", return_value=Response()):
+            result = fetch_authenticated_stock_snapshot("test-api-key")
+
+        self.assertEqual(len(result["snapshot"]), 2)
+        self.assertEqual(len(result["snapshot"]["group-1"]["variants"]), 1)
+        duplicate_variants = result["snapshot"]["group-1::duplicate:2"]["variants"]
+        self.assertEqual(len(duplicate_variants), 2)
+
+    def test_stock_snapshot_merges_same_named_duplicate_group_rows(self):
+        payload = {
+            "data": [
+                {"id": "group-1", "name": "Same group", "products": [{"id": "v1", "name": "First", "qty": 2}]},
+                {"id": "group-1", "name": "Same group", "products": [{"id": "v2", "name": "Second", "qty": 3}]},
+            ]
+        }
+
+        class Response:
+            status_code = 200
+            url = "https://chadsflooring.bz/api/products/scrape"
+            headers = {"Content-Type": "application/json"}
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return payload
+
+        with patch(
+            "scraper.get_stored_cookies",
+            return_value=([{"name": "session", "value": "test"}], "test-agent"),
+        ), patch("scraper.requests.get", return_value=Response()):
+            result = fetch_authenticated_stock_snapshot("test-api-key")
+
+        self.assertEqual(result["source_group_rows"], 2)
+        self.assertEqual(len(result["snapshot"]), 1)
+        self.assertEqual(set(result["snapshot"]["group-1"]["variants"]), {"v1", "v2"})
+
+    def test_full_and_checkstock_snapshots_preserve_duplicate_group_ids(self):
+        scrape_result = {
+            "data": [
+                {"id": "group-1", "name": "First", "products": [{"id": "v1", "name": "V1", "qty": 1}]},
+                {"id": "group-1", "name": "Second", "products": [{"id": "v2", "name": "V2", "qty": 2}]},
+            ]
+        }
+
+        full_snapshot = bot._product_snapshot(scrape_result)
+        checkstock_snapshot = bot._stock_snapshot(scrape_result)
+
+        self.assertEqual(set(full_snapshot), {"group-1", "group-1::duplicate:2"})
+        self.assertEqual(len(checkstock_snapshot), 2)
+        self.assertEqual({item["name"] for item in checkstock_snapshot.values()}, {"V1", "V2"})
+
+    def test_full_snapshot_merges_same_named_duplicate_groups(self):
+        scrape_result = {
+            "data": [
+                {"id": "group-1", "name": "Same group", "products": [{"id": "v1", "name": "First", "qty": 1}]},
+                {"id": "group-1", "name": "Same group", "products": [{"id": "v2", "name": "Second", "qty": 2}]},
+            ]
+        }
+
+        snapshot = bot._product_snapshot(scrape_result)
+        stock_snapshot = bot._stock_snapshot(scrape_result)
+
+        self.assertEqual(len(snapshot), 1)
+        self.assertEqual(set(snapshot["group-1"]["variants"]), {"v1", "v2"})
+        self.assertEqual(set(stock_snapshot), {"v1", "v2"})
+
+    def test_full_snapshot_merges_same_named_group_rows(self):
+        scrape_result = {
+            "data": [
+                {"id": "group-1", "name": "Same group", "products": [{"id": "v1", "name": "First", "qty": 1}]},
+                {"id": "group-1", "name": "Same group", "products": [{"id": "v2", "name": "Second", "qty": 2}]},
+            ]
+        }
+
+        snapshot = bot._product_snapshot(scrape_result)
+
+        self.assertEqual(len(snapshot), 1)
+        self.assertEqual(set(snapshot["group-1"]["variants"]), {"v1", "v2"})
+
     def test_repeated_rate_limits_back_off_and_reset_after_recovery(self):
         bot._reset_stock_api_rate_limit()
         try:
@@ -131,16 +274,188 @@ class ScrapeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
 
 class NotificationBaselineTests(unittest.IsolatedAsyncioTestCase):
-    async def test_successful_login_notification_is_sent_once_per_process(self):
-        previous_sent = bot.LOGIN_NOTIFICATION_SENT
-        bot.LOGIN_NOTIFICATION_SENT = False
+    async def test_duplicate_variant_names_generate_one_new_variation_alert(self):
+        previous_state = bot.SHOP_UPDATE_STATE
+        previous_times = bot.SHOP_NOTIFICATION_TIMES
+        baseline = {
+            "data": [{"id": "g1", "name": "Flower", "products": [{"id": "old", "name": "Original", "qty": 5}]}]
+        }
+        current = {
+            "data": [{
+                "id": "g1",
+                "name": "Flower",
+                "products": [
+                    {"id": "old", "name": "Original", "qty": 5},
+                    {"id": "new-a", "name": "Blue Dream", "qty": 4},
+                    {"id": "new-b", "name": "Blue  Dream", "qty": 4},
+                ],
+            }]
+        }
+        bot.SHOP_UPDATE_STATE = bot._normalize_product_snapshot(bot._product_snapshot(baseline))
+        bot.SHOP_NOTIFICATION_TIMES = {}
         mock_bot = AsyncMock()
         try:
-            await bot.notify_login_success(mock_bot)
-            await bot.notify_login_success(mock_bot)
-            self.assertEqual(mock_bot.send_message.await_count, 1)
+            with patch.object(bot, "_save_shop_update_state"):
+                result = await bot.notify_shop_updates(mock_bot, current)
+        finally:
+            bot.SHOP_UPDATE_STATE = previous_state
+            bot.SHOP_NOTIFICATION_TIMES = previous_times
+
+        self.assertEqual(result["detected_changes"], 1)
+        self.assertEqual(result["notifications"], 1)
+        self.assertEqual(mock_bot.send_message.await_count, 1)
+        alert_text = mock_bot.send_message.await_args.kwargs["text"]
+        self.assertIn("New variation added", alert_text)
+        self.assertIn("Blue Dream", alert_text)
+        self.assertNotIn("New product added", alert_text)
+
+    async def test_brand_new_group_gets_one_product_alert_with_variation_list(self):
+        previous_state = bot.SHOP_UPDATE_STATE
+        previous_times = bot.SHOP_NOTIFICATION_TIMES
+        bot.SHOP_UPDATE_STATE = {}
+        bot.SHOP_NOTIFICATION_TIMES = {}
+        current = {
+            "data": [{
+                "id": "new-group",
+                "name": "New Flower",
+                "products": [
+                    {"id": "v1", "name": "Sour Diesel", "qty": 5},
+                    {"id": "v2", "name": "Gelato", "qty": 3},
+                ],
+            }]
+        }
+        mock_bot = AsyncMock()
+        try:
+            with patch.object(bot, "_save_shop_update_state"):
+                result = await bot.notify_shop_updates(mock_bot, current)
+        finally:
+            bot.SHOP_UPDATE_STATE = previous_state
+            bot.SHOP_NOTIFICATION_TIMES = previous_times
+
+        self.assertEqual(result["detected_changes"], 1)
+        self.assertEqual(mock_bot.send_message.await_count, 1)
+        alert_text = mock_bot.send_message.await_args.kwargs["text"]
+        self.assertIn("New product added", alert_text)
+        self.assertIn("Sour Diesel", alert_text)
+        self.assertIn("Gelato", alert_text)
+        self.assertNotIn("New variation added", alert_text)
+
+    async def test_cooldown_suppressed_stock_change_is_not_reported_as_zero_changes(self):
+        previous_state = bot.SHOP_UPDATE_STATE
+        previous_times = bot.SHOP_NOTIFICATION_TIMES
+        previous_comparisons = bot.STOCK_MONITOR_COMPARISONS_SINCE_FULL
+        previous_changes = bot.STOCK_CHANGES_DETECTED_SINCE_FULL
+        baseline_data = {
+            "data": [{"id": "group-1", "name": "Item", "products": [{"id": "v1", "name": "Variant", "qty": 5}]}]
+        }
+        updated_data = {
+            "data": [{"id": "group-1", "name": "Item", "products": [{"id": "v1", "name": "Variant", "qty": 6}]}]
+        }
+        bot.SHOP_UPDATE_STATE = bot._normalize_product_snapshot(bot._product_snapshot(baseline_data))
+        bot.SHOP_NOTIFICATION_TIMES = {"group:group-1": bot.time.time()}
+        bot.STOCK_MONITOR_COMPARISONS_SINCE_FULL = 0
+        bot.STOCK_CHANGES_DETECTED_SINCE_FULL = 0
+        try:
+            with patch.object(bot, "_save_shop_update_state"):
+                comparison = await bot.notify_shop_updates(
+                    object(),
+                    updated_data,
+                    log_context="[source=stock-monitor run=test-run]",
+                )
+            bot.STOCK_MONITOR_COMPARISONS_SINCE_FULL += 1
+            bot.STOCK_CHANGES_DETECTED_SINCE_FULL += comparison["detected_changes"]
+            mock_bot = AsyncMock()
+            await bot._report_stock_cycle_summary(
+                type("Context", (), {"bot": mock_bot})(),
+                "full-run",
+            )
+            mock_bot.send_message.assert_not_awaited()
+        finally:
+            bot.SHOP_UPDATE_STATE = previous_state
+            bot.SHOP_NOTIFICATION_TIMES = previous_times
+            bot.STOCK_MONITOR_COMPARISONS_SINCE_FULL = previous_comparisons
+            bot.STOCK_CHANGES_DETECTED_SINCE_FULL = previous_changes
+
+    async def test_zero_change_summary_sends_once_for_full_cycle(self):
+        previous_comparisons = bot.STOCK_MONITOR_COMPARISONS_SINCE_FULL
+        previous_changes = bot.STOCK_CHANGES_DETECTED_SINCE_FULL
+        bot.STOCK_MONITOR_COMPARISONS_SINCE_FULL = 2
+        bot.STOCK_CHANGES_DETECTED_SINCE_FULL = 0
+        mock_bot = AsyncMock()
+        context = type("Context", (), {"bot": mock_bot})()
+        try:
+            await bot._report_stock_cycle_summary(context, "full-run")
+            mock_bot.send_message.assert_awaited_once()
+            self.assertIn("No stock changes", mock_bot.send_message.await_args.kwargs["text"])
+        finally:
+            bot.STOCK_MONITOR_COMPARISONS_SINCE_FULL = previous_comparisons
+            bot.STOCK_CHANGES_DETECTED_SINCE_FULL = previous_changes
+
+    async def test_successful_login_notification_is_sent_once_per_run(self):
+        previous_sent = bot.LOGIN_NOTIFICATION_SENT
+        previous_runs = bot.LOGIN_NOTIFIED_RUNS.copy()
+        bot.LOGIN_NOTIFICATION_SENT = False
+        bot.LOGIN_NOTIFIED_RUNS.clear()
+        mock_bot = AsyncMock()
+        try:
+            await bot.notify_login_success(mock_bot, "run-one")
+            await bot.notify_login_success(mock_bot, "run-one")
+            await bot.notify_login_success(mock_bot, "run-two")
+            self.assertEqual(mock_bot.send_message.await_count, 2)
         finally:
             bot.LOGIN_NOTIFICATION_SENT = previous_sent
+            bot.LOGIN_NOTIFIED_RUNS.clear()
+            bot.LOGIN_NOTIFIED_RUNS.update(previous_runs)
+
+    async def test_monitor_logs_when_no_stock_changes_are_detected(self):
+        previous_state = bot.SHOP_UPDATE_STATE
+        previous_times = bot.SHOP_NOTIFICATION_TIMES
+        current_data = {
+            "data": [{
+                "id": "item-1",
+                "name": "Item",
+                "products": [{"id": "v1", "name": "Variant", "qty": 5}],
+            }]
+        }
+        baseline = bot._normalize_product_snapshot(bot._product_snapshot(current_data))
+        bot.SHOP_UPDATE_STATE = baseline
+        bot.SHOP_NOTIFICATION_TIMES = {}
+        output = io.StringIO()
+        try:
+            with redirect_stdout(output):
+                with patch.object(bot, "_save_shop_update_state"):
+                    await bot.notify_shop_updates(
+                        object(),
+                        current_data,
+                        log_context="[source=stock-monitor run=test-run]",
+                    )
+        finally:
+            bot.SHOP_UPDATE_STATE = previous_state
+            bot.SHOP_NOTIFICATION_TIMES = previous_times
+
+        self.assertIn(
+            "comparison complete: 1 groups, 0 changes detected, 0 notifications eligible",
+            output.getvalue(),
+        )
+
+    async def test_quantity_decrease_counts_as_real_stock_change(self):
+        previous_state = bot.SHOP_UPDATE_STATE
+        previous_times = bot.SHOP_NOTIFICATION_TIMES
+        data_before = {"data": [{"id": "g1", "name": "Item", "products": [{"id": "v1", "name": "Variant", "qty": 8}]}]}
+        data_after = {"data": [{"id": "g1", "name": "Item", "products": [{"id": "v1", "name": "Variant", "qty": 4}]}]}
+        bot.SHOP_UPDATE_STATE = bot._normalize_product_snapshot(bot._product_snapshot(data_before))
+        bot.SHOP_NOTIFICATION_TIMES = {}
+        mock_bot = AsyncMock()
+        try:
+            with patch.object(bot, "_save_shop_update_state"):
+                result = await bot.notify_shop_updates(mock_bot, data_after)
+        finally:
+            bot.SHOP_UPDATE_STATE = previous_state
+            bot.SHOP_NOTIFICATION_TIMES = previous_times
+
+        self.assertEqual(result["detected_changes"], 1)
+        self.assertEqual(result["notifications"], 1)
+        self.assertIn("8 → 4", mock_bot.send_message.await_args.kwargs["text"])
 
     async def test_silent_full_refresh_does_not_overwrite_existing_baseline(self):
         previous_state = bot.SHOP_UPDATE_STATE
