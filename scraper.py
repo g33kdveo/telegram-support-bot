@@ -8,6 +8,7 @@ import shutil
 import uuid
 from urllib.parse import urlparse
 from pyppeteer import launch
+from pyppeteer.errors import BrowserError, NetworkError
 import requests
 import httpx
 from datetime import datetime, timezone
@@ -149,6 +150,17 @@ IMAGE_DOWNLOAD_CONCURRENCY = 12
 IMAGE_FETCH_TIMEOUT = httpx.Timeout(connect=3, read=10, write=10, pool=3)
 IMAGE_ALL_FAIL_CHECK_COUNT = 75
 RATE_LIMIT_FALLBACK_SECONDS = 300
+SCRAPE_BROWSER_MAX_ATTEMPTS = 2
+
+
+def _is_retriable_browser_error(error):
+    """Return True when Chromium/its connection died and a fresh browser may recover."""
+    message = str(error).lower()
+    return (
+        isinstance(error, (BrowserError, NetworkError))
+        or "target closed" in message
+        or "connection closed" in message
+    )
 
 
 def _apply_cached_image_references(groups, cached_images):
@@ -219,12 +231,31 @@ class RogersRoofingScraper:
         self.run_id = run_id or uuid.uuid4().hex[:8]
         self.run_label = run_label
         self.instance_id = instance_id or SCRAPER_INSTANCE_ID
+        self._last_browser_crash = False
 
     def _log(self, message):
         print(
             f"[scrape instance={self.instance_id} pid={os.getpid()} "
             f"source={self.run_label} run={self.run_id}] {message}"
         )
+
+    async def _cleanup_browser(self, browser):
+        """Close the browser and kill its process if the connection died first."""
+        if not browser:
+            return
+        try:
+            await asyncio.wait_for(browser.close(), timeout=10)
+        except Exception:
+            pass
+        process = getattr(browser, "process", None)
+        if process is None:
+            return
+        try:
+            if process.poll() is None:
+                self._log("Terminating unresponsive Chromium process after scrape failure")
+                process.kill()
+        except Exception:
+            pass
 
     async def _await_login_notification(self):
         if not self.login_callback:
@@ -716,6 +747,22 @@ class RogersRoofingScraper:
         return result_map
 
     async def _scrape_async(self, download_images=True):
+        for attempt in range(1, SCRAPE_BROWSER_MAX_ATTEMPTS + 1):
+            self._last_browser_crash = False
+            result = await self._scrape_once(download_images)
+            if result.get("data") or result.get("rate_limited"):
+                return result
+            if self._last_browser_crash and attempt < SCRAPE_BROWSER_MAX_ATTEMPTS:
+                self._log(
+                    f"Browser crashed during scrape attempt {attempt}/{SCRAPE_BROWSER_MAX_ATTEMPTS}; "
+                    "retrying with a fresh browser"
+                )
+                await asyncio.sleep(5)
+                continue
+            return result
+        return {"data": [], "imagePathPrefix": IMAGE_PATH_PREFIX}
+
+    async def _scrape_once(self, download_images=True):
         print("=" * 60)
         self._log("Starting catalog scrape")
         print("=" * 60)
@@ -739,6 +786,7 @@ class RogersRoofingScraper:
                     '--disable-background-networking', '--disable-default-apps',
                     '--disable-sync', '--disable-translate',
                     '--hide-scrollbars', '--mute-audio',
+                    '--js-flags=--max-old-space-size=256',
                 ],
                 autoClose=False,
                 handleSIGINT=False, handleSIGTERM=False, handleSIGHUP=False,
@@ -841,11 +889,8 @@ class RogersRoofingScraper:
                 except Exception as e:
                     self._log(f"Image download aborted safely: {e}")
 
-            try:
-                await browser.close()
-                browser = None
-            except:
-                pass
+            await self._cleanup_browser(browser)
+            browser = None
 
             return {
                 "data": all_groups,
@@ -857,15 +902,12 @@ class RogersRoofingScraper:
             }
 
         except Exception as e:
+            self._last_browser_crash = _is_retriable_browser_error(e)
             self._log(f"Scraper failed: {e}")
             import traceback
             traceback.print_exc()
         finally:
-            if browser:
-                try:
-                    await browser.close()
-                except:
-                    pass
+            await self._cleanup_browser(browser)
 
         return {"data": [], "imagePathPrefix": IMAGE_PATH_PREFIX}
 

@@ -2233,6 +2233,9 @@ LAST_FULL_SCRAPE_COMPLETED = 0
 FULL_SCRAPE_GENERATION = 0
 STOCK_MONITOR_COMPARISONS_SINCE_FULL = 0
 STOCK_CHANGES_DETECTED_SINCE_FULL = 0
+FULL_SCRAPE_FAILURE_COUNT = 0
+FULL_SCRAPE_FAILURE_WARNING_SENT = False
+LAST_FULL_SCRAPE_ERROR = None
 STOCK_QUANTITY_CHANGE_HISTORY = []
 LAST_STOCK_MONITOR_SUCCESS = 0
 LAST_STOCK_MONITOR_GROUP_COUNT = 0
@@ -2488,7 +2491,37 @@ async def auto_refresh_job(context: ContextTypes.DEFAULT_TYPE):
             elif monitor_was_started:
                 cooldown = max(1.0, STOCK_MONITOR_RATE_LIMIT_UNTIL - time.time())
                 _schedule_stock_monitor_resume(context, cooldown)
+            await _record_full_scrape_outcome(context, locals().get("refreshed", False), run_id)
             _schedule_next_full_scrape(context, FULL_CATALOG_INTERVAL, anchor_time=cycle_anchor)
+
+
+async def _record_full_scrape_outcome(context, refreshed, run_id):
+    """Track consecutive full-scrape failures and warn the admin once per streak."""
+    global FULL_SCRAPE_FAILURE_COUNT, FULL_SCRAPE_FAILURE_WARNING_SENT
+    if refreshed:
+        FULL_SCRAPE_FAILURE_COUNT = 0
+        FULL_SCRAPE_FAILURE_WARNING_SENT = False
+        return
+    FULL_SCRAPE_FAILURE_COUNT += 1
+    if FULL_SCRAPE_FAILURE_COUNT < 2 or FULL_SCRAPE_FAILURE_WARNING_SENT:
+        return
+    FULL_SCRAPE_FAILURE_WARNING_SENT = True
+    detail = LAST_FULL_SCRAPE_ERROR or "unknown error"
+    print(
+        f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
+        f"source=full run={run_id}] {FULL_SCRAPE_FAILURE_COUNT} consecutive failures; warning admin"
+    )
+    try:
+        await context.bot.send_message(
+            chat_id=PRICE_ADMIN_ID,
+            text=(
+                f"⚠️ Full catalog scrape failed {FULL_SCRAPE_FAILURE_COUNT} times in a row "
+                f"({detail}). The menu is serving the existing cache and the next attempt "
+                "remains on its 30-minute schedule."
+            ),
+        )
+    except Exception as error:
+        print(f"⚠️ Could not DM full-scrape failure warning: {error}")
 
 
 async def _report_stock_cycle_summary(context, full_run_id):
@@ -2568,7 +2601,7 @@ async def resume_stock_monitor_job(context: ContextTypes.DEFAULT_TYPE):
 
 async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE, run_id=None):
     global PRODUCT_CACHE, SCRAPE_IN_PROGRESS, STOCK_CHECK_IN_PROGRESS
-    global STOCK_MONITOR_RATE_LIMIT_UNTIL, STOCK_MONITOR_INTERVAL
+    global STOCK_MONITOR_RATE_LIMIT_UNTIL, STOCK_MONITOR_INTERVAL, LAST_FULL_SCRAPE_ERROR
 
     run_id = run_id or uuid.uuid4().hex[:8]
 
@@ -2603,6 +2636,7 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE, run_id=None)
             STOCK_MONITOR_RATE_LIMIT_UNTIL = time.time() + retry_after
             _adapt_stock_monitor_interval(retry_after)
             PRODUCT_CACHE["last_attempt"] = time.time()
+            LAST_FULL_SCRAPE_ERROR = f"HTTP 429 (retry after {retry_after:.0f}s)"
             print(
                 f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
                 f"source=full run={run_id}] HTTP 429; keeping existing cache and "
@@ -2640,13 +2674,16 @@ async def _run_auto_refresh_job(context: ContextTypes.DEFAULT_TYPE, run_id=None)
                 f"[scrape instance={BOT_INSTANCE_ID} pid={os.getpid()} "
                 f"source=full run={run_id}] cache refreshed: {new_count} groups"
             )
+            LAST_FULL_SCRAPE_ERROR = None
             return True
         else:
             print("❌ Scrape returned no products. Keeping existing cache.")
             PRODUCT_CACHE["last_attempt"] = time.time()
+            LAST_FULL_SCRAPE_ERROR = "scrape returned no products"
             return False
     except Exception as e:
         print(f"❌ Error during auto-refresh: {str(e)}")
+        LAST_FULL_SCRAPE_ERROR = str(e)
         return False
     finally:
         with SCRAPE_LOCK:
@@ -3554,6 +3591,39 @@ async def notify_login_success(bot, run_id=None):
     return False
 
 
+class BoundedThreadingHTTPServer(ThreadingHTTPServer):
+    daemon_threads = True
+
+    def __init__(self, *args, max_workers=24, **kwargs):
+        self._request_semaphore = threading.BoundedSemaphore(max_workers)
+        super().__init__(*args, **kwargs)
+
+    def process_request(self, request, client_address):
+        if not self._request_semaphore.acquire(blocking=False):
+            try:
+                request.sendall(
+                    b"HTTP/1.1 503 Service Unavailable\r\n"
+                    b"Content-Type: text/plain\r\n"
+                    b"Content-Length: 11\r\n\r\nServer busy"
+                )
+            except Exception:
+                pass
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except RuntimeError as error:
+            self._request_semaphore.release()
+            print(f"❌ Web server could not start a request thread: {error}")
+            self.shutdown_request(request)
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._request_semaphore.release()
+
+
 class BotRequestHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         global PRODUCT_CACHE
@@ -3561,6 +3631,11 @@ class BotRequestHandler(SimpleHTTPRequestHandler):
         if self.path == '/favicon.ico':
             self.send_response(204)
             self.end_headers()
+            return
+
+        if self.path.startswith('/healthz'):
+            cached = PRODUCT_CACHE.get("data") or {}
+            self.send_json({"ok": True, "groups": len(cached.get("data", []))})
             return
 
         if self.path.startswith('/api/settings'):
@@ -3748,7 +3823,7 @@ def run_simple_server():
     port = int(os.getenv("PORT", 8080))
     print(f"🌍 Starting Web Server on port {port}…")
     server_address = ('0.0.0.0', port)
-    httpd = ThreadingHTTPServer(server_address, BotRequestHandler)
+    httpd = BoundedThreadingHTTPServer(server_address, BotRequestHandler)
     httpd.serve_forever()
 
 

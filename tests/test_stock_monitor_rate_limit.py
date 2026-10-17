@@ -317,6 +317,35 @@ class StockChangesCommandTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ScrapeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
+    async def test_full_scrape_failure_alert_sent_once_per_streak_and_resets(self):
+        previous_count = bot.FULL_SCRAPE_FAILURE_COUNT
+        previous_warning = bot.FULL_SCRAPE_FAILURE_WARNING_SENT
+        previous_error = bot.LAST_FULL_SCRAPE_ERROR
+        bot.FULL_SCRAPE_FAILURE_COUNT = 0
+        bot.FULL_SCRAPE_FAILURE_WARNING_SENT = False
+        bot.LAST_FULL_SCRAPE_ERROR = "browser crashed"
+        mock_bot = AsyncMock()
+        context = type("Context", (), {"bot": mock_bot})()
+        try:
+            await bot._record_full_scrape_outcome(context, False, "run-1")
+            self.assertEqual(mock_bot.send_message.await_count, 0)
+
+            await bot._record_full_scrape_outcome(context, False, "run-2")
+            self.assertEqual(mock_bot.send_message.await_count, 1)
+            self.assertIn("2 times in a row", mock_bot.send_message.await_args.kwargs["text"])
+
+            await bot._record_full_scrape_outcome(context, False, "run-3")
+            self.assertEqual(mock_bot.send_message.await_count, 1)
+
+            await bot._record_full_scrape_outcome(context, True, "run-4")
+            await bot._record_full_scrape_outcome(context, False, "run-5")
+            await bot._record_full_scrape_outcome(context, False, "run-6")
+            self.assertEqual(mock_bot.send_message.await_count, 2)
+        finally:
+            bot.FULL_SCRAPE_FAILURE_COUNT = previous_count
+            bot.FULL_SCRAPE_FAILURE_WARNING_SENT = previous_warning
+            bot.LAST_FULL_SCRAPE_ERROR = previous_error
+
     async def test_waiting_full_scrape_precedes_later_monitor(self):
         order = []
         monitor_started = asyncio.Event()
